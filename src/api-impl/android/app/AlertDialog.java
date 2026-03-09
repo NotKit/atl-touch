@@ -4,11 +4,15 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.view.View;
 import android.widget.Button;
+import java.util.HashMap;
+import java.util.Map;
 
 public class AlertDialog extends Dialog implements DialogInterface {
 
+	private Map<Integer, Button> buttons = new HashMap<>();
+
 	private native void nativeSetMessage(long ptr, String message);
-	private native void nativeSetButton(long ptr, int whichButton, String text, OnClickListener listener);
+	private native void nativeSetButton(long ptr, long widget);
 	private native void nativeSetItems(long ptr, String[] items, DialogInterface.OnClickListener listener);
 
 	public AlertDialog(Context context) {
@@ -25,11 +29,23 @@ public class AlertDialog extends Dialog implements DialogInterface {
 	}
 
 	public void setButton(int whichButton, CharSequence text, OnClickListener listener) {
-		nativeSetButton(nativePtr, whichButton, String.valueOf(text), listener);
+		// use themeless context, so that it matches the GTK theme of the AlertDialog
+		Context context = new ContextImpl(Context.r, Context.pkg.applicationInfo, Context.r.newTheme());
+		Button button = new Button(context);
+		button.setText(text);
+		button.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				listener.onClick(AlertDialog.this, whichButton);
+				dismiss();
+			}
+		});
+		buttons.put(whichButton, button);
+		nativeSetButton(nativePtr, button.widget);
 	}
 
 	public Button getButton(int whichButton) {
-		return new Button(super.getContext());
+		return buttons.get(whichButton);
 	}
 
 	public void setView(View view) {

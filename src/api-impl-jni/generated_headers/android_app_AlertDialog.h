@@ -18,10 +18,10 @@ JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetMessage
 /*
  * Class:     android_app_AlertDialog
  * Method:    nativeSetButton
- * Signature: (JILjava/lang/String;Landroid/content/DialogInterface/OnClickListener;)V
+ * Signature: (JJ)V
  */
 JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetButton
-  (JNIEnv *, jobject, jlong, jint, jstring, jobject);
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     android_app_AlertDialog

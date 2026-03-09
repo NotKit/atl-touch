@@ -16,29 +16,12 @@ JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetMessage(JNIEnv *env
 	(*env)->ReleaseStringUTFChars(env, message, nativeMessage);
 }
 
-static void button_clicked_cb(GtkWidget *button, gpointer user_data)
-{
-	JNIEnv *env = get_jni_env();
-	jobject listener = user_data;
-	jobject this = g_object_get_data(G_OBJECT(button), "this_dialog");
-	jint which = _INTPTR(g_object_get_data(G_OBJECT(button), "which"));
-	jmethodID on_click_method = _METHOD(_CLASS(listener), "onClick", "(Landroid/content/DialogInterface;I)V");
-	(*env)->CallVoidMethod(env, listener, on_click_method, this, which);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
-}
-
-JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetButton(JNIEnv *env, jobject this, jlong ptr, jint id, jstring text, jobject listener)
+JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetButton(JNIEnv *env, jobject this, jlong ptr, jlong widget_ptr)
 {
 	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
 	GtkWidget *content_area = gtk_window_get_child(dialog);
-	const char *nativeText = (*env)->GetStringUTFChars(env, text, NULL);
-	GtkWidget *button = gtk_button_new_with_label(nativeText);
-	g_object_set_data(G_OBJECT(button), "which", _PTR(id));
-	g_object_set_data(G_OBJECT(button), "this_dialog", _REF(this));
-	g_signal_connect(button, "clicked", G_CALLBACK(button_clicked_cb), _REF(listener));
-	gtk_box_append(GTK_BOX(content_area), button);
-	(*env)->ReleaseStringUTFChars(env, text, nativeText);
+	GtkWidget *button = GTK_WIDGET(_PTR(widget_ptr));
+	gtk_box_append(GTK_BOX(content_area), gtk_widget_get_parent(button));
 }
 
 struct click_callback_data {
