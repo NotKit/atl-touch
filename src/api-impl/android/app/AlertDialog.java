@@ -4,23 +4,28 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.view.View;
 import android.widget.Button;
-import java.util.HashMap;
-import java.util.Map;
 
 public class AlertDialog extends Dialog implements DialogInterface {
 
-	private Map<Integer, Button> buttons = new HashMap<>();
+	private Button[] buttons;
 
+	private native void nativeConstruct(long ptr, long button_positive, long button_negative, long button_neutral);
 	private native void nativeSetMessage(long ptr, String message);
-	private native void nativeSetButton(long ptr, long widget);
 	private native void nativeSetItems(long ptr, String[] items, DialogInterface.OnClickListener listener);
 
 	public AlertDialog(Context context) {
-		super(context, 0);
+		this(context, 0);
 	}
 
 	public AlertDialog(Context context, int themeResId) {
 		super(context, themeResId);
+		Context themeless = new ContextImpl(Context.r, Context.pkg.applicationInfo, Context.r.newTheme());
+		// three buttons: positive, negative, neutral
+		buttons = new Button[] {new Button(themeless), new Button(themeless), new Button(themeless)};
+		buttons[0].setVisibility(View.GONE);
+		buttons[1].setVisibility(View.GONE);
+		buttons[2].setVisibility(View.GONE);
+		nativeConstruct(nativePtr, buttons[0].widget, buttons[1].widget, buttons[2].widget);
 	}
 
 	public void setMessage(CharSequence message) {
@@ -29,9 +34,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
 	}
 
 	public void setButton(int whichButton, CharSequence text, OnClickListener listener) {
-		// use themeless context, so that it matches the GTK theme of the AlertDialog
-		Context context = new ContextImpl(Context.r, Context.pkg.applicationInfo, Context.r.newTheme());
-		Button button = new Button(context);
+		Button button = getButton(whichButton);
 		button.setText(text);
 		button.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -40,12 +43,12 @@ public class AlertDialog extends Dialog implements DialogInterface {
 				dismiss();
 			}
 		});
-		buttons.put(whichButton, button);
-		nativeSetButton(nativePtr, button.widget);
+		button.setVisibility(View.VISIBLE);
 	}
 
 	public Button getButton(int whichButton) {
-		return buttons.get(whichButton);
+		// BUTTON_POSITIVE = -1, BUTTON_NEGATIVE = -2, BUTTON_NEUTRAL = -3
+		return buttons[-1 - whichButton];
 	}
 
 	public void setView(View view) {
