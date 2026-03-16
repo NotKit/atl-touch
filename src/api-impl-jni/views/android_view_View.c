@@ -132,7 +132,7 @@ static void call_hover_callback(jobject this, int action, float x, float y, floa
 		(*env)->ExceptionDescribe(env);
 }
 
-static void gdk_event_get_widget_relative_position(GdkEvent *event, GtkWidget *widget, double *x, double *y)
+static void transform_coords_to_widget_relative(GtkWidget *widget, double *x, double *y)
 {
 	int ret;
 
@@ -140,7 +140,6 @@ static void gdk_event_get_widget_relative_position(GdkEvent *event, GtkWidget *w
 	double off_x;
 	double off_y;
 
-	gdk_event_get_position(event, x, y);
 	GtkWidget *window = GTK_WIDGET(gtk_widget_get_native(widget));
 	gtk_native_get_surface_transform(GTK_NATIVE(window), &off_x, &off_y);
 	ret = gtk_widget_compute_point(window, widget, &GRAPHENE_POINT_INIT(*x - off_x, *y - off_y), &p);
@@ -165,7 +164,7 @@ void remove_pointer_fast(GPtrArray *pointer_indices, struct pointer *pointer)
 static bool action_up_already_handled = false;
 
 // TODO: find a way to reconcile this with libandroid/input.c?
-static gboolean on_event(GtkEventControllerLegacy *event_controller, GdkEvent *event, gpointer user_data)
+static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, GdkEvent *event, gpointer user_data)
 {
 	double x;
 	double y;
@@ -226,7 +225,8 @@ static gboolean on_event(GtkEventControllerLegacy *event_controller, GdkEvent *e
 	double raw_x;
 	double raw_y;
 	gdk_event_get_position(event, &raw_x, &raw_y);
-	gdk_event_get_widget_relative_position(event, widget, &x, &y);
+	x = raw_x, y = raw_y;
+	transform_coords_to_widget_relative(widget, &x, &y);
 
 	if (!pointers[id].id) {
 		/* if this is a new sequence, add a slot for it */
@@ -254,6 +254,23 @@ static gboolean on_event(GtkEventControllerLegacy *event_controller, GdkEvent *e
 		call_hover_callback(wrapper->jobj, ACTION_HOVER_EXIT, x, y, raw_x, raw_y);
 	}
 	return ret;
+}
+
+
+static gboolean on_event(GtkEventControllerLegacy *event_controller, GdkEvent *event, gpointer user_data)
+{
+	GdkEventType event_type = gdk_event_get_event_type(event);
+	switch (event_type) {
+		case GDK_BUTTON_PRESS:
+		case GDK_TOUCH_BEGIN:
+		case GDK_BUTTON_RELEASE:
+		case GDK_TOUCH_END:
+		case GDK_MOTION_NOTIFY:
+		case GDK_TOUCH_UPDATE:
+			return on_pointer_event(event_controller, event, user_data);
+		default: // not a touch or mouse event, nothing to do here
+			return false;
+	}
 }
 
 static void on_click(GtkGestureClick *gesture, int n_press, double x, double y, gpointer user_data)
