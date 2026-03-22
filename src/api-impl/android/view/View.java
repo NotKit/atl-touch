@@ -2540,4 +2540,6 @@ public class View implements Drawable.Callback {
 	}
 
 	public void destroyDrawingCache() {}
+
+	public void setHovered(boolean isHovered) {}
 }

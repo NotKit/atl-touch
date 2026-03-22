@@ -714,4 +714,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			viewGroupOverlay = new ViewGroupOverlay();
 		return viewGroupOverlay;
 	}
+
+	public void scheduleLayoutAnimation() {}
 }

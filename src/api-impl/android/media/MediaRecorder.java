@@ -57,4 +57,5 @@ public class MediaRecorder {
 	public void stop() {}
 	public void resume() {}
 	public void pause() {}
+	public void release() {}
 }

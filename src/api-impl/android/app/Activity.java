@@ -668,4 +668,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void requestPermissions(String[] permissions, int requestCode) {
 		Slog.w(TAG, "requestPermissions(" + Arrays.toString(permissions) + "): not handled");
 	}
+
+	public boolean shouldShowRequestPermissionRationale(String permission) {
+		return true;
+	}
 }

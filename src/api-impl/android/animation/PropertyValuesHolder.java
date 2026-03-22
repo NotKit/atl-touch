@@ -10,6 +10,8 @@ public class PropertyValuesHolder {
 	private int values_int[];
 	private Object values_object[];
 	private Object value;
+	private Keyframe values_keyframe[];
+
 	private String property_name;
 	private Method setter;
 	Property property;
@@ -35,6 +37,14 @@ public class PropertyValuesHolder {
 	public static PropertyValuesHolder ofInt(String propertyName, int... values) {
 		PropertyValuesHolder propertyValuesHolder = new PropertyValuesHolder();
 		propertyValuesHolder.values_int = values;
+		propertyValuesHolder.property_name = propertyName;
+		propertyValuesHolder.value = values[0];
+		return propertyValuesHolder;
+	}
+
+	public static PropertyValuesHolder ofKeyframe(String propertyName, Keyframe... values) {
+		PropertyValuesHolder propertyValuesHolder = new PropertyValuesHolder();
+		propertyValuesHolder.values_keyframe = values;
 		propertyValuesHolder.property_name = propertyName;
 		propertyValuesHolder.value = values[0];
 		return propertyValuesHolder;
@@ -68,6 +78,15 @@ public class PropertyValuesHolder {
 		return propertyValuesHolder;
 	}
 
+	public static PropertyValuesHolder ofKeyframe(Property property, Keyframe... values) {
+		PropertyValuesHolder propertyValuesHolder = new PropertyValuesHolder();
+		propertyValuesHolder.values_keyframe = values;
+		propertyValuesHolder.property_name = property.getName();
+		propertyValuesHolder.property = property;
+		propertyValuesHolder.value = values[0];
+		return propertyValuesHolder;
+	}
+
 	public void setIntValues(int... values) {
 		values_int = values;
 	}
@@ -78,6 +97,10 @@ public class PropertyValuesHolder {
 
 	public void setObjectValues(Object... values) {
 		values_object = values;
+	}
+
+	public void setKeyframes(Keyframe... values) {
+		values_keyframe = values;
 	}
 
 	public String getProperty_name() {
@@ -137,6 +160,7 @@ public class PropertyValuesHolder {
 		propertyValuesHolder.values_float = values_float;
 		propertyValuesHolder.values_int = values_int;
 		propertyValuesHolder.values_object = values_object;
+		propertyValuesHolder.values_keyframe = values_keyframe;
 		return propertyValuesHolder;
 	}
 

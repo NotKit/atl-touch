@@ -178,6 +178,10 @@ public class AudioTrack {
 	private native int native_write(short[] audioData, int offsetInShorts, int framesToWrite, float volume);
 	public native void native_release();
 
+	public static int getNativeOutputSampleRate(int i) {
+		return -1;
+	}
+
 	// nested classes
 	public static class Builder {
 		private AudioAttributes mAttributes;

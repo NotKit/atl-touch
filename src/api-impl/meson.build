@@ -10,6 +10,7 @@ srcs = [
 	'android/animation/AnimatorSet.java',
 	'android/animation/ArgbEvaluator.java',
 	'android/animation/FloatEvaluator.java',
+	'android/animation/Keyframe.java',
 	'android/animation/LayoutTransition.java',
 	'android/animation/ObjectAnimator.java',
 	'android/animation/PropertyValuesHolder.java',
