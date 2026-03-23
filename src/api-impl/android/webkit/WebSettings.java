@@ -11,6 +11,10 @@ public class WebSettings {
 		HIGH,
 	}
 
+	public static String getDefaultUserAgent(android.content.Context context) {
+		return "GDPR VIOLATION";
+	}
+
 	public String getUserAgentString() {
 		return "GDPR VIOLATION";
 	}

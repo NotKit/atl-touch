@@ -43,4 +43,6 @@ public class CookieManager {
 	}
 
 	public void setAcceptThirdPartyCookies(WebView webView, boolean accept) {}
+
+	public static void setAcceptFileSchemeCookies(boolean accept) {}
 }
