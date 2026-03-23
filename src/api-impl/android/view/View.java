@@ -1291,6 +1291,10 @@ public class View implements Drawable.Callback {
 		nativeRequestFocus(widget, direction);
 		return true;
 	}
+	public final boolean requestFocusFromTouch() {
+		// TODO: if (isInTouchMode()) leave touch mode
+		return requestFocus(View.FOCUS_DOWN);
+	}
 	private native void nativeRequestFocus(long widget, int direction);
 
 	private native void nativeSetFullscreen(long widget, boolean fullscreen);
