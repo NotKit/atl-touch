@@ -1449,7 +1449,7 @@ public final class Configuration implements Comparable<Configuration> {
 	* @return The locale list.
 	*/
 	public LocaleList getLocales() {
-		return new LocaleList();
+		return LocaleList.getDefault();
 		/*fixUpLocaleList();
 		return mLocaleList;*/
 	}
