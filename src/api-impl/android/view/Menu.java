@@ -6,6 +6,8 @@ import android.view.MenuItem;
 
 public interface Menu {
 
+	public static final int NONE = 0;
+
 	public MenuItem add(int groupId, int itemId, int order, CharSequence title);
 
 	public MenuItem add(int groupId, int itemId, int order, int titleRes);

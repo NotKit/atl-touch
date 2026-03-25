@@ -1,5 +1,7 @@
 package android.view.accessibility;
 
+import java.lang.CharSequence;
+
 public class AccessibilityNodeInfo {
 	public static final class AccessibilityAction {
 		public static final AccessibilityAction ACTION_CONTEXT_CLICK = new AccessibilityAction(0, null);
@@ -23,5 +25,39 @@ public class AccessibilityNodeInfo {
 		public int getId() { return 0; }
 	}
 
+	public class RangeInfo {
+		public static final int RANGE_TYPE_INT = 0;
+		public static final int RANGE_TYPE_FLOAT = 1;
+		public static final int RANGE_TYPE_PERCENT = 2;
+	}
+
 	public static AccessibilityNodeInfo obtain() { return null; }
+
+	public void setClassName(CharSequence className) {}
+
+	public void addAction(int action) {}
+
+	public void setCheckable(boolean checkable) {}
+
+	public void setChecked(boolean checked) {}
+
+	public void setClickable(boolean clickable) {}
+
+	public void setContentDescription(CharSequence description) {}
+
+	public void setEditable(boolean editable) {}
+
+	public void setEnabled(boolean enabled) {}
+
+	public void setFocusable(boolean focusable) {}
+
+	public void setFocused(boolean focused) {}
+
+	public void setScrollable(boolean scrollable) {}
+
+	public void setVisibleToUser(boolean visible) {}
+
+	public void setTextSelection(int start, int end) {}
+
+	public void setRangeInfo(RangeInfo info) {}
 }

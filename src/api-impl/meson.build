@@ -30,6 +30,7 @@ srcs = [
 	'android/annotation/TargetApi.java',
 	'android/annotation/UnsupportedAppUsage.java',
 	'android/annotation/Widget.java',
+	'android/app/ActionBar.java',
 	'android/app/Activity.java',
 	'android/app/ActivityManager.java',
 	'android/app/ActivityOptions.java',

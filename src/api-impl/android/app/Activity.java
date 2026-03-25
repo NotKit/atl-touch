@@ -1,5 +1,6 @@
 package android.app;
 
+import android.app.ActionBar;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -672,5 +673,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public boolean shouldShowRequestPermissionRationale(String permission) {
 		return true;
+	}
+
+	public ActionBar getActionBar() {
+		return null;
 	}
 }
