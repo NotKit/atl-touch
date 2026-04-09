@@ -605,6 +605,16 @@ public class Canvas {
 		Log.w("Canvas", "STUB: drawPoint");
 	}
 
+	public void drawPoints(float[] pts, Paint paint) {
+		drawPoints(pts, 0, pts.length / 2, paint);
+	}
+
+	public void drawPoints(float[] pts, int offset, int count, Paint paint) {
+		for (int i = offset; i < count; i++) {
+			drawPoint(pts[i * 2], pts[i * 2 + 1], paint);
+		}
+	}
+
 	public boolean quickReject(float left, float top, float right, float bottom, EdgeType edgeType) {
 		return false;
 	}

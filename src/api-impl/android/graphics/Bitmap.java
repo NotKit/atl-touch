@@ -90,6 +90,10 @@ public final class Bitmap {
 		return dest;
 	}
 
+	public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {
+		return createBitmap(width, height, config);
+	}
+
 	public static Bitmap createBitmap(Bitmap src) {
 		return new Bitmap(native_ref_texture(src.getTexture()));
 	}
