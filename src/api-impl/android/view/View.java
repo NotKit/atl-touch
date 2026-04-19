@@ -1383,11 +1383,13 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setVisibility(int visibility) {
-		native_setVisibility(widget, visibility, alpha);
+		if (visibility == this.visibility)
+			return;
 		if ((visibility == View.GONE) != (this.visibility == View.GONE) && parent instanceof ViewGroup) {
 			((ViewGroup)parent).requestLayout();
 		}
 		this.visibility = visibility;
+		native_setVisibility(widget, visibility, alpha);
 		dispatchVisibilityChanged(this, visibility);
 	}
 
