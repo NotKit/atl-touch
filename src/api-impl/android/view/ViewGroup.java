@@ -915,6 +915,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 
 		public int getLayoutDirection() { return LAYOUT_DIRECTION_LTR; }
+
+		public boolean isMarginRelative() { return false; }
 	}
 
 	public interface OnHierarchyChangeListener {
