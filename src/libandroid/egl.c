@@ -128,6 +128,21 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 	return eglCreatePbufferSurface(display, config, attrib_list);
 }
 
+/*
+ * Android exports eglCreateImageKHR (with EGLAttrib) as a direct libEGL.so symbol,
+ * while Mesa exports the core EGL 1.5 function eglCreateImage as its linkable entry
+ * point instead. The wrappers bridge this ABI naming difference.
+ */
+EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list)
+{
+	return eglCreateImage(dpy, ctx, target, buffer, attrib_list);
+}
+
+EGLBoolean bionic_eglDestroyImageKHR(EGLDisplay dpy, EGLImage image)
+{
+	return eglDestroyImage(dpy, image);
+}
+
 EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, struct ANativeWindow *native_window, EGLint const *attrib_list)
 {
 	// better than crashing (TODO: check if apps try to use the NULL value anyway)
