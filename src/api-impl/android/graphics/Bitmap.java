@@ -56,6 +56,11 @@ public final class Bitmap {
 		this.texture = texture;
 	}
 
+	/** wrap a native SkBitmap* the caller owns (used by SurfaceView frame posting) */
+	public static Bitmap fromNative(long skbitmap) {
+		return new Bitmap(skbitmap);
+	}
+
 	private Bitmap(int width, int height, Config config) {
 		this.config = config;
 		this.width = width;

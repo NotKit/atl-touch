@@ -12,6 +12,7 @@
 
 extern "C" {
 #include "../generated_headers/android_graphics_Bitmap.h"
+#include "../generated_headers/android_view_SurfaceView.h"
 }
 
 /*
@@ -147,6 +148,17 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1to_1buffer(JNI
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1get_1pixels_1ptr(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
 {
 	return _INTPTR(((SkBitmap *)_PTR(bitmap_ptr))->getPixels());
+}
+
+/* detach the backing SkBitmap from a raster ATLCanvas (frees the canvas);
+ * used by SurfaceView to post a finished frame */
+JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1canvas_1to_1bitmap(JNIEnv *env, jclass clazz, jlong canvas_ptr)
+{
+	ATLCanvas *atl_canvas = (ATLCanvas *)_PTR(canvas_ptr);
+	SkBitmap *bitmap = atl_canvas->bitmap;
+	atl_canvas->owns_bitmap = false;
+	delete atl_canvas;
+	return _INTPTR(bitmap);
 }
 
 JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1png(JNIEnv *env, jclass clazz, jlong bitmap_ptr)

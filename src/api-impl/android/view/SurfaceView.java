@@ -41,11 +41,49 @@ public class SurfaceView extends View {
 		}
 	}
 
+	/* the latest frame posted through the surface, drawn into the scene */
+	private android.graphics.Bitmap frontBuffer;
+	private boolean reportedCreated = false;
+
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
+	protected void onAttachedToWindow() {
+		super.onAttachedToWindow();
+		post(new Runnable() {
+			@Override
+			public void run() {
+				if (!reportedCreated) {
+					reportedCreated = true;
+					surfaceCreated();
+					if (getWidth() > 0 && getHeight() > 0)
+						surfaceChanged(1 /*RGBA_8888*/, getWidth(), getHeight());
+				}
+			}
+		});
+	}
+
+	@Override
+	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+		super.onSizeChanged(w, h, oldw, oldh);
+		if (reportedCreated && w > 0 && h > 0)
+			surfaceChanged(1 /*RGBA_8888*/, w, h);
+	}
+
+	@Override
+	public void onDraw(android.graphics.Canvas canvas) {
+		android.graphics.Bitmap frame = frontBuffer;
+		if (frame != null)
+			canvas.drawBitmap(frame, new android.graphics.Rect(0, 0, frame.getWidth(), frame.getHeight()),
+			                  new android.graphics.Rect(0, 0, getWidth(), getHeight()), null);
+	}
+
+	void postFrame(android.graphics.Bitmap frame) {
+		frontBuffer = frame;
+		postInvalidate();
+	}
 
 	protected native long native_createSnapshot(int width, int height);
-	protected native void native_postSnapshot(long surfaceView, long snapshot);
+	/** detach the canvas's backing bitmap (frees the canvas) */
+	protected static native long native_canvas_to_bitmap(long canvas);
 
 	public SurfaceHolder getHolder() {
 		return mSurfaceHolder;
@@ -207,7 +245,9 @@ public class SurfaceView extends View {
 		 */
 		@Override
 		public void unlockCanvasAndPost(Canvas canvas) {
-			native_postSnapshot(widget, ((GskCanvas)canvas).snapshot);
+			long bitmap = native_canvas_to_bitmap(((GskCanvas)canvas).snapshot);
+			((GskCanvas)canvas).snapshot = 0;
+			postFrame(android.graphics.Bitmap.fromNative(bitmap));
 			//		mSurface.unlockCanvasAndPost(canvas);
 			//		mSurfaceLock.unlock();
 		}

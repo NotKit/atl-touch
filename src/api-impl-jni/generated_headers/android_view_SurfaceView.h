@@ -213,14 +213,6 @@ extern "C" {
 #define android_view_SurfaceView_TEXT_DIRECTION_RTL 4L
 /*
  * Class:     android_view_SurfaceView
- * Method:    native_constructor
- * Signature: (Landroid/content/Context;Landroid/util/AttributeSet;)J
- */
-JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor
-  (JNIEnv *, jobject, jobject, jobject);
-
-/*
- * Class:     android_view_SurfaceView
  * Method:    native_createSnapshot
  * Signature: (II)J
  */
@@ -229,11 +221,11 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createSnapshot
 
 /*
  * Class:     android_view_SurfaceView
- * Method:    native_postSnapshot
- * Signature: (JJ)V
+ * Method:    native_canvas_to_bitmap
+ * Signature: (J)J
  */
-JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1postSnapshot
-  (JNIEnv *, jobject, jlong, jlong);
+JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1canvas_1to_1bitmap
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

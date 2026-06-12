@@ -267,7 +267,14 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 		.global_remove = wl_registry_global_remove_handler
 	};
 
-	GtkWidget *surface_view_widget = gtk_widget_get_first_child(_PTR(_GET_LONG_FIELD(surface, "widget")));
+	jlong widget_ptr = _GET_LONG_FIELD(surface, "widget");
+	if (!widget_ptr) {
+		/* SurfaceView no longer has a GTK widget; native EGL rendering is
+		 * unavailable until the GLFW/EGL windowing phase lands */
+		fprintf(stderr, "ANativeWindow_fromSurface: native window rendering is not currently supported\n");
+		return NULL;
+	}
+	GtkWidget *surface_view_widget = gtk_widget_get_first_child(_PTR(widget_ptr));
 	GtkWidget *window = GTK_WIDGET(gtk_widget_get_native(surface_view_widget));
 	while ((width = gtk_widget_get_width(surface_view_widget)) == 0) {
 		// FIXME: UGLY: this loop waits until the SurfaceView widget gets mapped

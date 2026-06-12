@@ -259,7 +259,15 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 		i++;
 	}
 
-	SurfaceViewWidget *surface_view_widget = SURFACE_VIEW_WIDGET(gtk_widget_get_first_child(_PTR(_GET_LONG_FIELD(surface_obj, "widget"))));
+	jlong widget_ptr = _GET_LONG_FIELD(surface_obj, "widget");
+	if (!widget_ptr) {
+		/* SurfaceView no longer has a GTK widget; video frames are dropped for now.
+		 * TODO: route MediaCodec frames through the Skia scene */
+		fprintf(stderr, "MediaCodec: rendering to a Surface is not currently supported\n");
+		ctx->video.surface_view_widget = NULL;
+		return;
+	}
+	SurfaceViewWidget *surface_view_widget = SURFACE_VIEW_WIDGET(gtk_widget_get_first_child(_PTR(widget_ptr)));
 	ctx->video.surface_view_widget = surface_view_widget;
 }
 
