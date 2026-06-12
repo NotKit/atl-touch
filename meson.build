@@ -51,8 +51,9 @@ skia_dep = dependency('skia')
 layer_shell_dep = dependency('gtk4-layer-shell-0', required : false)
 if layer_shell_dep.found()
   extra_deps = [ layer_shell_dep ]
-  extra_jni_srcs = [ 'src/api-impl-jni/app/android_atl_ATLKeyboardDialog.c' ]
-  add_project_arguments('-DATL_HAS_OSK', language: 'c')
+  # the OSK (ATLKeyboardDialog) depended on the GTK widget hierarchy; needs a
+  # canvas-drawn replacement
+
 endif
 
 # libandroid
@@ -97,11 +98,9 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/android_util_Log.c',
                                                                   	'src/api-impl-jni/android_view_Window.c',
                                                                   	'src/api-impl-jni/app/android_app_Activity.c',
-                                                                  	'src/api-impl-jni/app/android_app_AlertDialog.c',
                                                                   	'src/api-impl-jni/app/android_app_Dialog.c',
                                                                   	'src/api-impl-jni/app/android_app_NotificationManager.c',
                                                                   	'src/api-impl-jni/app/android_app_WallpaperManager.c',
-                                                                        'src/api-impl-jni/android_inputmethodservice_InputMethodService.c',
                                                                   	'src/api-impl-jni/AssetInputStream.c',
                                                                   	'src/api-impl-jni/audio/android_media_AudioManager.c',
                                                                   	'src/api-impl-jni/audio/android_media_AudioRecord.c',
@@ -142,32 +141,9 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
                                                                   	'src/api-impl-jni/text/android_text_Layout.cpp',
                                                                   	'src/api-impl-jni/util.c',
+                                                                  	'src/api-impl-jni/views/ATLSceneWidget.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
-                                                                  	'src/api-impl-jni/views/AndroidLayout.c',
-                                                                  	'src/api-impl-jni/views/android_view_inputmethod_InputMethodManager.c',
-                                                                  	'src/api-impl-jni/views/android_view_View.c',
-                                                                  	'src/api-impl-jni/views/android_view_ViewGroup.c',
-                                                                  	'src/api-impl-jni/views/android_view_ViewTreeObserver.c',
-                                                                  	'src/api-impl-jni/views/android_view_WindowManagerImpl.c',
-                                                                  	'src/api-impl-jni/widgets/WrapperWidget.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
-                                                                  	'src/api-impl-jni/widgets/android_webkit_WebView.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_Button.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_CheckBox.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_CompoundButton.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_DatePicker.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_EditText.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_ImageButton.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_ImageView.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_PopupMenu.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_PopupWindow.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_Progressbar.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_RadioButton.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_ScrollView.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_Spinner.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_SeekBar.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_TextView.c',
-                                                                  	'src/api-impl-jni/widgets/android_widget_TimePicker.c',
                                                                   	mpris,
                                                                   	portal_openuri,
                                                                   	portal_email,

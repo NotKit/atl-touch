@@ -13,11 +13,11 @@ extern "C" {
 #define android_view_Window_FEATURE_NO_TITLE 1L
 /*
  * Class:     android_view_Window
- * Method:    set_widget_as_root
- * Signature: (JJ)V
+ * Method:    native_set_view_root
+ * Signature: (JLandroid/view/ViewRootImpl;)V
  */
-JNIEXPORT void JNICALL Java_android_view_Window_set_1widget_1as_1root
-  (JNIEnv *, jobject, jlong, jlong);
+JNIEXPORT void JNICALL Java_android_view_Window_native_1set_1view_1root
+  (JNIEnv *, jobject, jlong, jobject);
 
 /*
  * Class:     android_view_Window

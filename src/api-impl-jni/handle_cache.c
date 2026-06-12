@@ -79,7 +79,6 @@ void set_up_handle_cache(JNIEnv *env)
 	handle_cache.view.onTouchEventInternal = _METHOD(handle_cache.view.class, "onTouchEventInternal", "(Landroid/view/MotionEvent;Z)Z");
 	handle_cache.view.dispatchTouchEvent = _METHOD(handle_cache.view.class, "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z");
 	handle_cache.view.onInterceptTouchEvent = _METHOD(handle_cache.view.class, "onInterceptTouchEvent", "(Landroid/view/MotionEvent;)Z");
-	handle_cache.view.layoutInternal = _METHOD(handle_cache.view.class, "layoutInternal", "(II)V");
 	handle_cache.view.measure = _METHOD(handle_cache.view.class, "measure", "(II)V");
 	handle_cache.view.performLongClick = _METHOD(handle_cache.view.class, "performLongClick", "(FF)Z");
 	handle_cache.view.getId = _METHOD(handle_cache.view.class, "getId", "()I");

@@ -120,7 +120,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				break;
 			}
 		}
-		native_addView(widget, child.widget, sortedIndex, params);
+		if (getViewRootImpl() != null)
+			child.dispatchAttachedToWindow();
 		if (callOnViewAdded) {
 			onViewAdded(child);
 			if (onHierarchyChangeListener != null)
@@ -128,10 +129,66 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
-	/* We never call this ourselves */
+	private View touchTarget;
+
+	/** transform a MotionEvent into a child's coordinate space */
+	private MotionEvent transformEventForChild(MotionEvent event, View child) {
+		MotionEvent transformed = event.copy();
+		transformed.offsetLocation(getScrollX() - child.getLeft() - child.getTranslationX(),
+		                           getScrollY() - child.getTop() - child.getTranslationY());
+		return transformed;
+	}
+
+	private boolean isTransformedTouchPointInView(MotionEvent event, View child) {
+		float x = event.getX() + getScrollX() - child.getLeft() - child.getTranslationX();
+		float y = event.getY() + getScrollY() - child.getTop() - child.getTranslationY();
+		return x >= 0 && y >= 0 && x < child.getWidth() && y < child.getHeight();
+	}
+
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {
-		return native_dispatchTouchEvent(widget, event, event.getX(), event.getY());
+		int action = event.getActionMasked();
+		if (action == MotionEvent.ACTION_DOWN)
+			touchTarget = null;
+
+		boolean intercepted = false;
+		if (touchTarget != null || action == MotionEvent.ACTION_DOWN) {
+			if (!disallowIntercept)
+				intercepted = onInterceptTouchEvent(event);
+		}
+		if (intercepted && touchTarget != null) {
+			MotionEvent cancel = event.copy();
+			cancel.setAction(MotionEvent.ACTION_CANCEL);
+			touchTarget.dispatchTouchEvent(transformEventForChild(cancel, touchTarget));
+			touchTarget = null;
+		}
+
+		boolean handled = false;
+		if (!intercepted && action == MotionEvent.ACTION_DOWN) {
+			for (int i = children.size() - 1; i >= 0; i--) {
+				View child = children.get(i);
+				if (child.getVisibility() != View.VISIBLE)
+					continue;
+				if (!isTransformedTouchPointInView(event, child))
+					continue;
+				if (child.dispatchTouchEvent(transformEventForChild(event, child))) {
+					touchTarget = child;
+					handled = true;
+					break;
+				}
+			}
+		} else if (!intercepted && touchTarget != null) {
+			handled = touchTarget.dispatchTouchEvent(transformEventForChild(event, touchTarget));
+		}
+
+		if (!handled && touchTarget == null)
+			handled = onTouchEventInternal(event, true);
+
+		if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+			touchTarget = null;
+			disallowIntercept = false;
+		}
+		return handled;
 	}
 
 	protected boolean addViewInLayout(View child, int index, LayoutParams params) {
@@ -152,9 +209,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	protected void removeViewInternal(View child) {
 		if (child == null || child.parent != this)
 			return;
+		if (getViewRootImpl() != null)
+			child.dispatchDetachedFromWindow();
 		child.parent = null;
 		children.remove(child);
-		native_removeView(widget, child.widget);
 		onViewRemoved(child);
 		if (onHierarchyChangeListener != null) {
 			onHierarchyChangeListener.onChildViewRemoved(this, child);
@@ -177,9 +235,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void removeAllViews() {
 		for (Iterator<View> it = children.iterator(); it.hasNext();) {
 			View child = it.next();
+			if (getViewRootImpl() != null)
+				child.dispatchDetachedFromWindow();
 			child.parent = null;
 			it.remove();
-			native_removeView(widget, child.widget);
 			onViewRemoved(child);
 			if (onHierarchyChangeListener != null) {
 				onHierarchyChangeListener.onChildViewRemoved(this, child);
@@ -204,14 +263,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (index < 0)
 			index = children.size();
 		children.add(index, view);
-		view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha());
 	}
 
 	protected void removeDetachedView(View child, boolean animate) {
 		if (!detachedChildren.remove(child))
 			return;
 		child.parent = null;
-		native_removeView(widget, child.widget);
 		if (onHierarchyChangeListener != null) {
 			onHierarchyChangeListener.onChildViewRemoved(this, child);
 		}
@@ -227,13 +284,28 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
-	protected native void native_addView(long widget, long child, int index, LayoutParams params);
-	protected native void native_removeView(long widget, long child);
 	@Override
-	protected native void native_drawChildren(long widget, long snapshot);
-	protected native void native_drawChild(long widget, long child, long snapshot);
+	protected void dispatchDraw(Canvas canvas) {
+		for (View child : children) {
+			if (child.getVisibility() != View.VISIBLE)
+				continue;
+			drawChild(canvas, child, 0);
+		}
+	}
+
 	@Override
-	protected void native_drawContent(long widget, long snapshot) {}
+	void dispatchAttachedToWindow() {
+		super.dispatchAttachedToWindow();
+		for (View child : children)
+			child.dispatchAttachedToWindow();
+	}
+
+	@Override
+	void dispatchDetachedFromWindow() {
+		for (View child : children)
+			child.dispatchDetachedFromWindow();
+		super.dispatchDetachedFromWindow();
+	}
 
 	public View getChildAt(int index) {
 		try {
@@ -483,8 +555,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
-		if (canvas instanceof GskCanvas)
-			native_drawChild(widget, child.widget, ((GskCanvas)canvas).snapshot);
+		child.computeScroll();
+		canvas.save();
+		canvas.translate(child.getLeft() - getScrollX() + child.getTranslationX(),
+		                 child.getTop() - getScrollY() + child.getTranslationY());
+		canvas.clipRect(0, 0, child.getWidth(), child.getHeight());
+		canvas.translate(-child.getScrollX(), -child.getScrollY());
+		child.draw(canvas);
+		canvas.restore();
 		return false;
 	}
 
@@ -701,8 +779,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public boolean getClipChildren() {
 		return false;
 	}
-
-	public native boolean native_dispatchTouchEvent(long widget, MotionEvent event, double x, double y);
 
 	@Override
 	public void onDescendantInvalidated(View child, View target) {}

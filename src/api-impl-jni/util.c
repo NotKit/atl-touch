@@ -184,7 +184,7 @@ static gboolean queue_queue_resize(GtkWidget *widget, GdkFrameClock *frame_clock
 /* Some functions call gtk_widget_queue_allocate or similar internally.
  * To prevent that from breaking the snapshotting process, when called at the wrong time,
  * we have to follow those functions with this pile of hacks that will unset the problematic flags. */
-extern int snapshot_in_progress;
+int snapshot_in_progress = 0; /* no GTK widget snapshots happen anymore */
 void atl_ensure_widget_snapshotability(GtkWidget *widget)
 {
 	if (snapshot_in_progress) {

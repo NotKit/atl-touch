@@ -1024,8 +1024,6 @@ public class View implements Drawable.Callback {
 	public View(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		this.context = context;
 
-		widget = native_constructor(context, attrs);
-
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.View, defStyle, defStyleRes);
 		this.id = a.getResourceId(com.android.internal.R.styleable.View_id, View.NO_ID);
 		if (a.hasValue(com.android.internal.R.styleable.View_backgroundTint))
@@ -1047,7 +1045,6 @@ public class View implements Drawable.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
-			native_setVisibility(widget, visibility, alpha);
 		}
 
 		if (a.hasValue(com.android.internal.R.styleable.View_minWidth))
@@ -1093,8 +1090,6 @@ public class View implements Drawable.Callback {
 			}
 		}
 
-		native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
-
 		if (a.hasValue(com.android.internal.R.styleable.View_tag))
 			tag = a.getText(com.android.internal.R.styleable.View_tag);
 
@@ -1130,18 +1125,19 @@ public class View implements Drawable.Callback {
 			return null;
 	}
 
-	public void onDraw(Canvas canvas) {
-		if (canvas instanceof GskCanvas)
-			native_drawContent(widget, ((GskCanvas)canvas).snapshot);
+	public void onDraw(Canvas canvas) {}
+
+	protected void dispatchDraw(Canvas canvas) {}
+
+	void drawBackground(Canvas canvas) {
+		if (background != null) {
+			background.setBounds(0, 0, getWidth(), getHeight());
+			background.draw(canvas);
+		}
 	}
 
-	protected void dispatchDraw(Canvas canvas) {
-		if (canvas instanceof GskCanvas)
-			native_drawChildren(widget, ((GskCanvas)canvas).snapshot);
-	}
 	public void draw(Canvas canvas) {
-		if (canvas instanceof GskCanvas)
-			native_drawBackground(widget, ((GskCanvas)canvas).snapshot);
+		drawBackground(canvas);
 		onDraw(canvas);
 		// HACK: catch non critical exceptions happening in some composeUI apps
 		try {
@@ -1180,9 +1176,8 @@ public class View implements Drawable.Callback {
 			bottomMargin = ((ViewGroup.MarginLayoutParams)params).bottomMargin;
 		}
 
-		native_setLayoutParams(widget, params.width, params.height, gravity, params.weight, leftMargin, topMargin, rightMargin, bottomMargin);
-
 		layout_params = params;
+		requestLayout();
 	}
 
 	public ViewGroup.LayoutParams getLayoutParams() {
@@ -1223,16 +1218,12 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setOnTouchListener(OnTouchListener l) {
-		nativeSetOnTouchListener(widget);
 		on_touch_listener = l;
 	}
-	protected native void nativeSetOnTouchListener(long widget);
 	private OnClickListener on_click_listener = null;
 	public void setOnClickListener(OnClickListener l) {
-		nativeSetOnClickListener(widget);
 		on_click_listener = l;
 	}
-	protected native void nativeSetOnClickListener(long widget);
 
 	private OnScrollChangeListener on_scroll_change_listener = null;
 	public void setOnScrollChangeListener(OnScrollChangeListener l) {}
@@ -1245,28 +1236,31 @@ public class View implements Drawable.Callback {
 		return bottom - top;
 	}
 
-	protected native long native_constructor(Context context, AttributeSet attrs); // will create a custom GtkWidget with a custom drawing function
-	public native void native_setLayoutParams(long widget, int width, int height, int gravity, float weight, int leftMargin, int topMargin, int rightMargin, int bottomMargin);
-	protected native void native_destructor(long widget);
-	/**
-	 * We decide between simple widgets which handles MEASURE_SPEC_AT_MOST the same way as
-	 * MEASURE_SPEC_EXACTLY, and complex widgets which handles MEASURE_SPEC_AT_MOST by measuring the content
-	 */
-	protected native void native_measure(long widget, int widthMeasureSpec, int heightMeasureSpec);
-	protected native void native_layout(long widget, int l, int t, int r, int b);
-	protected native void native_requestLayout(long widget);
-	protected native void native_setBackgroundDrawable(long widget, long paintable);
-	protected native void native_queueAllocate(long widget);
+	/* the GTK widget hierarchy is gone: views are pure java objects rendered
+	 * through Skia by the window's ViewRootImpl; these remain as no-ops until
+	 * the remaining callers are cleaned up */
+	protected void native_addClass(long widget, String className) {}
+	protected void native_removeClass(long widget, String className) {}
 
-	protected native void native_addClass(long widget, String className);
-	protected native void native_removeClass(long widget, String className);
+	protected void native_addClasses(long widget, String[] classNames) {}
+	protected void native_removeClasses(long widget, String[] classNames) {}
 
-	protected native void native_addClasses(long widget, String[] classNames);
-	protected native void native_removeClasses(long widget, String[] classNames);
+	ViewRootImpl viewRootImpl; // set on the root view by ViewRootImpl.setView
 
-	protected native void native_drawBackground(long widget, long snapshot);
-	protected native void native_drawContent(long widget, long snapshot);
-	protected void native_drawChildren(long widget, long snapshot) {} // override in ViewGroup
+	public ViewRootImpl getViewRootImpl() {
+		View view = this;
+		while (view.parent instanceof View)
+			view = (View)view.parent;
+		return view.viewRootImpl;
+	}
+
+	void dispatchAttachedToWindow() {
+		onAttachedToWindow();
+	}
+
+	void dispatchDetachedFromWindow() {
+		onDetachedFromWindow();
+	}
 
 	// --- stubs
 
@@ -1288,21 +1282,15 @@ public class View implements Drawable.Callback {
 		return requestFocus(direction, null);
 	}
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
-		nativeRequestFocus(widget, direction);
 		return true;
 	}
 	public final boolean requestFocusFromTouch() {
 		// TODO: if (isInTouchMode()) leave touch mode
 		return requestFocus(View.FOCUS_DOWN);
 	}
-	private native void nativeRequestFocus(long widget, int direction);
-
-	private native void nativeSetFullscreen(long widget, boolean fullscreen);
 
 	public void setSystemUiVisibility(int visibility) {
-		/* LAYOUT_FULLSCREEN mode would make the app window continue behind semi-transparent status bar.
-		   Such a mode doesn't exist on desktop Linux, so we just use normal fullscreen for both modes. */
-		nativeSetFullscreen(widget, (visibility & (View.SYSTEM_UI_FLAG_FULLSCREEN | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)) != 0);
+		// TODO: route fullscreen request to the window
 		system_ui_visibility = visibility;
 	}
 	public int getSystemUiVisibility() {
@@ -1310,10 +1298,7 @@ public class View implements Drawable.Callback {
 	};
 
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		if (haveCustomMeasure) // calling native_measure here would create infinite loop
-			setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
-		else
-			native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+		setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
 	}
 
 	public void setPressed(boolean pressed) {
@@ -1327,7 +1312,10 @@ public class View implements Drawable.Callback {
 
 	public void setSelected(boolean selected) {}
 
-	public native Window native_get_window(long widget);
+	public Window native_get_window(long widget) {
+		ViewRootImpl root = getViewRootImpl();
+		return root != null ? root.window : null;
+	}
 	public ViewTreeObserver getViewTreeObserver() {
 		Window window = native_get_window(widget);
 		if (window != null) {
@@ -1343,7 +1331,7 @@ public class View implements Drawable.Callback {
 	protected void onFinishInflate() {}
 
 	public void invalidateDrawable(Drawable drawable) {
-		nativeInvalidate(widget);
+		invalidate();
 	}
 
 	public void scheduleDrawable(Drawable drawable, Runnable runnable, long time) {
@@ -1357,23 +1345,23 @@ public class View implements Drawable.Callback {
 	public void unscheduleDrawable(Drawable drawable) {}
 
 	public void invalidate(Rect dirty) {
-		nativeInvalidate(widget);
+		invalidate();
 	}
 	public void invalidate(int l, int t, int r, int b) {
-		nativeInvalidate(widget);
+		invalidate();
 	}
 	public void invalidate() {
-		nativeInvalidate(widget);
+		ViewRootImpl root = getViewRootImpl();
+		if (root != null)
+			root.invalidate();
 	}
-	private static native void nativeInvalidate(long widget);
 
-	protected native void native_setBackgroundColor(long widget, int color);
 	public void setBackgroundColor(int color) {
 		background = new ColorDrawable(color);
-		native_setBackgroundColor(widget, color);
+		invalidate();
 	}
 
-	public native void native_setVisibility(long widget, int visibility, float alpha);
+	public void native_setVisibility(long widget, int visibility, float alpha) {}
 
 	protected void onVisibilityChanged(View changedView, int visibility) {
 	}
@@ -1389,7 +1377,7 @@ public class View implements Drawable.Callback {
 			((ViewGroup)parent).requestLayout();
 		}
 		this.visibility = visibility;
-		native_setVisibility(widget, visibility, alpha);
+		invalidate();
 		dispatchVisibilityChanged(this, visibility);
 	}
 
@@ -1398,9 +1386,8 @@ public class View implements Drawable.Callback {
 		paddingTop = top;
 		paddingRight = right;
 		paddingBottom = bottom;
-		native_setPadding(widget, left, top, right, bottom);
+		requestLayout();
 	}
-	public native void native_setPadding(long widget, int left, int top, int right, int bottom);
 
 	public void setBackgroundResource(int resid) {
 		setBackgroundDrawable(resid == 0 ? null : getResources().getDrawable(resid));
@@ -1539,10 +1526,8 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 	public void setOnLongClickListener(OnLongClickListener listener) {
-		nativeSetOnLongClickListener(widget);
 		on_long_click_listener = listener;
 	}
-	protected native void nativeSetOnLongClickListener(long widget);
 
 	public void setLongClickable(boolean longClickable) {}
 
@@ -1626,31 +1611,15 @@ public class View implements Drawable.Callback {
 		this.top = t;
 		this.right = r;
 		this.bottom = b;
-		native_layout(widget, l, t, r, b);
-	}
-
-	/** Helper function to be called from GTKs LayoutManager via JNI */
-	private void layoutInternal(int width, int height) {
-		// if the layout is triggered from a native widget, we might not have measured yet
-		if (!(parent instanceof ViewGroup) && (width != getMeasuredWidth() || height != getMeasuredHeight())) {
-			requestLayout();
-			measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
-		}
+		int width = r - l;
+		int height = b - t;
 		boolean changed = oldWidth != width || oldHeight != height;
 		if (changed)
 			onSizeChanged(width, height, oldWidth, oldHeight);
-		bottom = top + height;
-		right = left + width;
-		onLayout(changed, 0, 0, width, height);
 		oldWidth = width;
 		oldHeight = height;
-	}
-
-	/** Prefill the measureSpec cache, so that AndroidLayout can use it from native code if GTK measure spec is incomplete */
-	public void internalSetDefaultMeasureSpec(int widthMeasureSpec, int heightMeasureSpec) {
-		this.oldWidthMeasureSpec = widthMeasureSpec;
-		this.oldHeightMeasureSpec = heightMeasureSpec;
-		requestLayout();
+		onLayout(changed, l, t, r, b);
+		layoutRequested = false;
 	}
 
 	public int getLeft() {
@@ -1681,7 +1650,7 @@ public class View implements Drawable.Callback {
 			if (backgroundTint != 0)
 				backgroundDrawable.setTint(backgroundTint);
 		}
-		native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0);
+		invalidate();
 	}
 
 	public int getOverScrollMode() { return 0; }
@@ -1694,16 +1663,20 @@ public class View implements Drawable.Callback {
 
 	public boolean removeCallbacks(Runnable action) { return false; }
 
+	/** legacy shim (used by Dialog/WindowManagerImpl sizing) */
+	public void internalSetDefaultMeasureSpec(int widthMeasureSpec, int heightMeasureSpec) {
+		requestLayout();
+	}
+
 	public void requestLayout() {
-		native_requestLayout(widget);
 		View view = this;
-		while (!view.layoutRequested) {
+		view.layoutRequested = true;
+		while (view.parent instanceof View) {
+			view = (View)view.parent;
 			view.layoutRequested = true;
-			if (view.parent instanceof View)
-				view = (View)view.parent;
-			else
-				break;
 		}
+		if (view.viewRootImpl != null)
+			view.viewRootImpl.requestLayout();
 	};
 
 	public void setOverScrollMode(int mode) {}
@@ -1781,15 +1754,6 @@ public class View implements Drawable.Callback {
 
 	public boolean isInEditMode() { return false; }
 
-	@Override
-	@SuppressWarnings("deprecation")
-	protected void finalize() throws Throwable {
-		try {
-			native_destructor(widget);
-		} finally {
-			super.finalize();
-		}
-	}
 
 	public final int[] getDrawableState() {
 		int[] state = new int[2];
@@ -1809,9 +1773,8 @@ public class View implements Drawable.Callback {
 	public boolean isLayoutRequested() { return layoutRequested; }
 	public int getBaseline() { return -1; }
 	public boolean hasFocusable() { return false; }
-	private static native boolean nativeIsFocused(long widget);
 	public boolean isFocused() {
-		return nativeIsFocused(widget);
+		return false;
 	}
 
 	public void clearAnimation() {}
@@ -1833,14 +1796,12 @@ public class View implements Drawable.Callback {
 
 	public void setTranslationX(float translationX) {
 		this.translationX = translationX;
-		if (parent instanceof View)
-			((View)parent).native_queueAllocate(((View)parent).widget);
+		invalidate();
 	}
 
 	public void setTranslationY(float translationY) {
 		this.translationY = translationY;
-		if (parent instanceof View)
-			((View)parent).native_queueAllocate(((View)parent).widget);
+		invalidate();
 	}
 
 	public void setX(float x) {
@@ -1852,8 +1813,8 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setAlpha(float alpha) {
-		native_setVisibility(widget, visibility, alpha);
 		this.alpha = alpha;
+		invalidate();
 	}
 
 	public boolean onGenericMotionEvent(MotionEvent event) { return false; }
@@ -1864,7 +1825,6 @@ public class View implements Drawable.Callback {
 
 	protected boolean awakenScrollBars() { return false; }
 
-	protected native boolean native_getMatrix(long widget, long matrix);
 	public Matrix getMatrix() {
 		return Matrix.IDENTITY_MATRIX;
 	}
@@ -2011,9 +1971,8 @@ public class View implements Drawable.Callback {
 
 	public void setPaddingRelative(int start, int top, int end, int bottom) {}
 
-	private native boolean nativeIsAttachedToWindow(long widget);
 	public boolean isAttachedToWindow() {
-		return nativeIsAttachedToWindow(widget);
+		return getViewRootImpl() != null;
 	}
 
 	public void requestApplyInsets() {}
@@ -2092,19 +2051,14 @@ public class View implements Drawable.Callback {
 	}
 
 	private boolean keepScreenOn = false;
-	private static native void native_keep_screen_on(long widget, boolean keepScreenOn);
 	public void setKeepScreenOn(boolean screenOn) {
-		if (isAttachedToWindow() && keepScreenOn != screenOn)
-			native_keep_screen_on(widget, screenOn);
-		keepScreenOn = screenOn;
+		keepScreenOn = screenOn; // TODO: route to the window (gtk_application_inhibit)
 	}
 
 	protected void onAttachedToWindow() {
 		if (onAttachStateChangeListener != null) {
 			onAttachStateChangeListener.onViewAttachedToWindow(this);
 		}
-		if (keepScreenOn)
-			native_keep_screen_on(widget, true);
 		if (floating_observer != null) {
 			getViewTreeObserver().merge(floating_observer);
 			floating_observer = null;
@@ -2114,8 +2068,6 @@ public class View implements Drawable.Callback {
 		if (onAttachStateChangeListener != null) {
 			onAttachStateChangeListener.onViewDetachedFromWindow(this);
 		}
-		if (keepScreenOn)
-			native_keep_screen_on(widget, false);
 	}
 
 	public void setLayerType(int layerType, Paint paint) {}
@@ -2174,14 +2126,27 @@ public class View implements Drawable.Callback {
 
 	public boolean onInterceptTouchEvent(MotionEvent event) { return false; }
 
-	public boolean dispatchTouchEvent(MotionEvent event) { return false; }
+	public boolean dispatchTouchEvent(MotionEvent event) {
+		return onTouchEventInternal(event, true);
+	}
 
 	public boolean canScrollHorizontally(int direction) { return false; }
 
-	protected native boolean native_getGlobalVisibleRect(long widget, Rect visibleRect);
-
 	public boolean getGlobalVisibleRect(Rect visibleRect) {
-		return native_getGlobalVisibleRect(widget, visibleRect);
+		int x = 0;
+		int y = 0;
+		View view = this;
+		while (true) {
+			x += view.left + (int)view.translationX;
+			y += view.top + (int)view.translationY;
+			if (!(view.parent instanceof View))
+				break;
+			view = (View)view.parent;
+			x -= view.scrollX;
+			y -= view.scrollY;
+		}
+		visibleRect.set(x, y, x + getWidth(), y + getHeight());
+		return getWidth() > 0 && getHeight() > 0;
 	}
 
 	public boolean onCheckIsTextEditor() { return false; }
@@ -2215,7 +2180,15 @@ public class View implements Drawable.Callback {
 
 	public boolean isPressed() { return false; }
 
-	public native void getWindowVisibleDisplayFrame(Rect rect);
+	public void getWindowVisibleDisplayFrame(Rect rect) {
+		ViewRootImpl root = getViewRootImpl();
+		if (root != null && root.getWidth() > 0) {
+			rect.set(0, 0, root.getWidth(), root.getHeight());
+		} else {
+			Display display = new Display();
+			rect.set(0, 0, display.getWidth(), display.getHeight());
+		}
+	}
 
 	public void setRotation(float rotation) {}
 	public void setRotationX(float deg) {}
@@ -2389,7 +2362,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public boolean getGlobalVisibleRect(Rect visibleRect, Point globalOffset) {
-		boolean result = native_getGlobalVisibleRect(widget, visibleRect);
+		boolean result = getGlobalVisibleRect(visibleRect);
 		globalOffset.set(visibleRect.left, visibleRect.top);
 		return result;
 	}

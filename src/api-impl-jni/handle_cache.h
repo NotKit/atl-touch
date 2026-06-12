@@ -78,8 +78,7 @@ struct handle_cache {
 		jmethodID onTouchEventInternal;
 		jmethodID dispatchTouchEvent;
 		jmethodID onInterceptTouchEvent;
-		jmethodID layoutInternal;
-		jmethodID measure;
+			jmethodID measure;
 		jmethodID performLongClick;
 		jmethodID getId;
 		jmethodID getIdName;

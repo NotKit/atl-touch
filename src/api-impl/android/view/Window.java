@@ -35,6 +35,7 @@ public class Window {
 
 	public long native_window;
 	private ViewGroup decorView;
+	private ViewRootImpl viewRootImpl;
 
 	private Window.Callback callback;
 	private Context context;
@@ -72,8 +73,23 @@ public class Window {
 		decorView.removeAllViews();
 		decorView.addView(view);
 		if (view != null) {
-			set_widget_as_root(native_window, decorView.widget);
+			attachViewRoot();
 		}
+	}
+
+	public ViewRootImpl getViewRootImpl() {
+		if (viewRootImpl == null)
+			viewRootImpl = new ViewRootImpl(this);
+		return viewRootImpl;
+	}
+
+	/** create the native scene widget rendering this window's view hierarchy */
+	public void attachViewRoot() {
+		ViewRootImpl root = getViewRootImpl();
+		boolean needs_scene = root.scene == 0;
+		root.setView(decorView);
+		if (needs_scene)
+			native_set_view_root(native_window, root);
 	}
 
 	public View getDecorView() {
@@ -193,7 +209,7 @@ public class Window {
 
 	public void setNavigationBarContrastEnforced(boolean enforced) {}
 
-	public native void set_widget_as_root(long native_window, long widget);
+	public native void native_set_view_root(long native_window, ViewRootImpl view_root);
 	private native void set_title(long native_window, String title);
 	public native void take_input_queue(long native_window, InputQueue.Callback callback, InputQueue queue);
 	public native void set_layout(long native_window, int width, int height);

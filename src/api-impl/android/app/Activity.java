@@ -187,7 +187,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	protected void onStart() {
 		Slog.i(TAG, "- onStart - yay!");
-		window.set_widget_as_root(window.native_window, window.getDecorView().widget);
+		window.attachViewRoot();
 		window.setTitle(title);
 
 		for (Fragment fragment : fragments) {

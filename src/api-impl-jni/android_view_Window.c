@@ -3,15 +3,16 @@
 #include "defines.h"
 #include "util.h"
 
+#include "views/ATLSceneWidget.h"
+
 #include "generated_headers/android_view_Window.h"
 
-JNIEXPORT void JNICALL Java_android_view_Window_set_1widget_1as_1root(JNIEnv *env, jobject this, jlong window, jlong widget)
+JNIEXPORT void JNICALL Java_android_view_Window_native_1set_1view_1root(JNIEnv *env, jobject this, jlong window, jobject view_root)
 {
 	GtkWindow *gtk_window = GTK_WINDOW(_PTR(window));
-	GtkWidget *gtk_widget = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget)));
-	if (gtk_widget != gtk_window_get_child(gtk_window)) {
-		gtk_window_set_child(gtk_window, gtk_widget);
-	}
+	GtkWidget *scene = atl_scene_widget_new(env, view_root);
+	gtk_window_set_child(gtk_window, scene);
+	gtk_window_set_focus(gtk_window, scene);
 }
 
 JNIEXPORT void JNICALL Java_android_view_Window_set_1title(JNIEnv *env, jobject this, jlong window, jstring title_jstr)

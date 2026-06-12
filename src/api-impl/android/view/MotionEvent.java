@@ -2784,10 +2784,10 @@ public final class MotionEvent extends InputEvent {
 	 */
 	public final void offsetLocation(float deltaX, float deltaY) {
 		if (deltaX != 0.0f || deltaY != 0.0f) {
-			// nativeOffsetLocation(mNativePtr, deltaX, deltaY);
-			/* FIXME: loop for all pointers? */
-			coords[0 + X_OFFSET] += deltaX;
-			coords[0 + Y_OFFSET] += deltaY;
+			for (int i = 0; i < ids.length; i++) {
+				coords[4 * i + X_OFFSET] += deltaX;
+				coords[4 * i + Y_OFFSET] += deltaY;
+			}
 		}
 	}
 

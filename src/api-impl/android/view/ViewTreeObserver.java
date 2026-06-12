@@ -1046,5 +1046,5 @@ public final class ViewTreeObserver {
 		}
 	}
 
-	private native void native_set_have_global_layout_listeners(boolean have_listeners);
+	private void native_set_have_global_layout_listeners(boolean have_listeners) {}
 }

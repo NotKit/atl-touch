@@ -114,7 +114,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		removeView(view);
 	}
 
-	private static native void native_addView(long widget, int type, int x, int y, int width, int height);
-	private static native void native_updateViewLayout(long widget, int x, int y, int width, int height);
-	private static native void native_removeView(long widget);
+	private static void native_addView(long widget, int type, int x, int y, int width, int height) {}
+	private static void native_updateViewLayout(long widget, int x, int y, int width, int height) {}
+	private static void native_removeView(long widget) {}
 }
