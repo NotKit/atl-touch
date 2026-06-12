@@ -1,0 +1,8 @@
+[wrap-git]
+url = https://skia.googlesource.com/skia.git
+revision = chrome/m131
+depth = 1
+patch_directory = skia
+
+[provide]
+skia = skia_dep

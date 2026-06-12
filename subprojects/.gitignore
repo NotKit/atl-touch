@@ -1,0 +1,4 @@
+# wrap-git clone (sources fetched by meson)
+/skia/
+/packagecache/
+/.wraplock
