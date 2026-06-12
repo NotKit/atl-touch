@@ -1,0 +1,103 @@
+#ifndef ATL_CANVAS_H
+#define ATL_CANVAS_H
+
+/*
+ * ATLCanvas: the native object behind android.atl.GskCanvas's `snapshot` field
+ * (kept under that name for now) and android.graphics.Bitmap's drawing context.
+ *
+ * It always exposes an SkCanvas, backed by one of:
+ *  - a raster SkBitmap it owns (widget rendering, SurfaceView, paintables)
+ *  - an external SkBitmap owned by a java Bitmap
+ *  - an SkPictureRecorder (RenderNode display list recording)
+ *
+ * ATLNode is the native object behind android.view.RenderNode handles: a
+ * patchable display list built on SkDrawable so that child nodes can be
+ * swapped without re-recording the parent (the GSK render node tree allowed
+ * structural patching; SkPicture alone does not).
+ */
+
+#include <gdk/gdk.h>
+
+#ifdef __cplusplus
+
+#include "include/core/SkBitmap.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkDrawable.h"
+#include "include/core/SkFontMgr.h"
+#include "include/core/SkImage.h"
+#include "include/core/SkPictureRecorder.h"
+#include "include/core/SkTypeface.h"
+
+#include <vector>
+
+struct ATLNode;
+
+struct ATLCanvas {
+	SkCanvas *canvas = nullptr; // valid in all modes; not owned in recording mode
+	SkBitmap *bitmap = nullptr;
+	bool owns_bitmap = false;
+	SkPictureRecorder *recorder = nullptr;
+	std::vector<sk_sp<ATLNode>> stubs; // stub nodes recorded into a display list
+
+	static ATLCanvas *new_raster(int width, int height);
+	static ATLCanvas *for_bitmap(SkBitmap *bitmap);
+	static ATLCanvas *new_recording(void);
+	bool is_recording() const { return recorder != nullptr; }
+	~ATLCanvas();
+};
+
+struct ATLNode : public SkDrawable {
+	/* content node: a finished recording plus the stubs referenced by it */
+	sk_sp<SkDrawable> recording;
+	std::vector<sk_sp<ATLNode>> stubs;
+
+	/* stub node: live indirection to a child node, retargetable via patching */
+	bool is_stub = false;
+	sk_sp<ATLNode> target;
+
+	/* wrapper node: transform and/or clip applied around a child node */
+	sk_sp<ATLNode> child;
+	SkMatrix matrix = SkMatrix::I();
+	bool has_clip = false;
+	SkRect clip = SkRect::MakeEmpty();
+
+	/* retarget all stubs (recursively reachable ones included) currently
+	 * pointing at old_child (or being old_child itself) to new_child;
+	 * returns true if anything was patched */
+	bool patch(ATLNode *old_child, ATLNode *new_child);
+
+protected:
+	void onDraw(SkCanvas *canvas) override;
+	SkRect onGetBounds() override { return SkRect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f); }
+};
+
+/* wrap a bitmap for drawing onto the given canvas: zero-copy for immediate
+ * raster canvases, copying for recording canvases (the picture outlives the
+ * draw call, so it must not borrow pixels) */
+sk_sp<SkImage> atl_image_for_draw(ATLCanvas *atl_canvas, SkBitmap *bitmap);
+
+sk_sp<SkFontMgr> atl_fontmgr(void);
+sk_sp<SkTypeface> atl_default_typeface(void);
+
+extern "C" {
+#endif
+
+/* C bridge for the GTK-side code (WrapperWidget, SurfaceView, paintables) */
+void *atl_canvas_new_raster(int width, int height);
+void atl_canvas_free(void *atl_canvas);
+GdkTexture *atl_canvas_to_gdk_texture(void *atl_canvas);
+GdkTexture *atl_skbitmap_to_gdk_texture(void *skbitmap);
+/* download a GdkTexture into an SkBitmap; the result is cached on the
+ * texture and freed together with it */
+void *atl_skbitmap_from_gdk_texture(GdkTexture *texture);
+/* snapshot a GTK child widget, render it offscreen and draw the result onto
+ * the canvas at the child's allocated position */
+void atl_canvas_draw_gtk_child(void *atl_canvas, void *parent_widget, void *child_widget);
+/* render any GdkPaintable offscreen and draw it onto the canvas */
+void atl_canvas_draw_gdk_paintable(void *atl_canvas, GdkPaintable *paintable, double width, double height);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

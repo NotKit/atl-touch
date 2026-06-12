@@ -1,4 +1,4 @@
-project('android_translation_layer', ['c', 'java'], default_options: ['b_lundef=false'])
+project('android_translation_layer', ['c', 'cpp', 'java'], default_options: ['b_lundef=false', 'cpp_std=c++17'])
 
 gnome = import('gnome')
 fs = import('fs')
@@ -44,6 +44,9 @@ unifiedpush_connector = gnome.gdbus_codegen('unifiedpush-connector',
 
 extra_deps = []
 extra_jni_srcs = []
+
+# Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap
+skia_dep = dependency('skia')
 
 layer_shell_dep = dependency('gtk4-layer-shell-0', required : false)
 if layer_shell_dep.found()
@@ -115,18 +118,19 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/database/android_database_SQLiteConnection.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteGlobal.c',
                                                                   	'src/api-impl-jni/egl/com_google_android_gles_jni_EGLImpl.c',
+                                                                  	'src/api-impl-jni/graphics/ATLCanvas.cpp',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
-                                                                  	'src/api-impl-jni/graphics/NinePatchPaintable.c',
-                                                                  	'src/api-impl-jni/graphics/android_atl_GskCanvas.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_Bitmap.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_BitmapFactory.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_Matrix.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_Paint.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_Path.c',
-                                                                  	'src/api-impl-jni/graphics/android_view_RenderNode.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_drawable_Drawable.c',
+                                                                  	'src/api-impl-jni/graphics/NinePatchSkia.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_atl_GskCanvas.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_Bitmap.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_BitmapFactory.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_Matrix.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_Paint.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_Path.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_view_RenderNode.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_drawable_Drawable.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_DrawableContainer.c',
-                                                                  	'src/api-impl-jni/graphics/android_graphics_drawable_NinePatchDrawable.c',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_drawable_NinePatchDrawable.cpp',
                                                                   	'src/api-impl-jni/location/android_location_LocationManager.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',
@@ -136,7 +140,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/os/android_atl_GVariantIterParcel.c',
                                                                   	'src/api-impl-jni/os/android_os_Process.c',
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
-                                                                  	'src/api-impl-jni/text/android_text_Layout.c',
+                                                                  	'src/api-impl-jni/text/android_text_Layout.cpp',
                                                                   	'src/api-impl-jni/util.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/views/AndroidLayout.c',
@@ -181,7 +185,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'),
-                                                                        libart_dep, wayland_protos_dep
+                                                                        libart_dep, wayland_protos_dep, skia_dep
                                                                   ],
                                                                   link_with: [ libandroid_so ],
                                                                   link_args: [
@@ -189,6 +193,10 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   ],
                                                                   c_args: [
                                                                   	'-D_LARGEFILE64_SOURCE',
+                                                                  ],
+                                                                  # skia is built without RTTI; subclassing its types requires matching
+                                                                  cpp_args: [
+                                                                  	'-fno-rtti',
                                                                   ])
 
 # atl.gresources.xml

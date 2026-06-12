@@ -10,7 +10,7 @@ public class WallpaperManager {
 	}
 
 	public void setBitmap(Bitmap bitmap) {
-		set_bitmap(bitmap.getTexture());
+		set_bitmap(bitmap.getGdkTexture());
 	}
 
 	private static native void set_bitmap(long texture);

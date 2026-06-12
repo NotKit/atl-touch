@@ -1,4 +1,8 @@
+#pragma once
+
 #include <gdk/gdk.h>
+
+G_BEGIN_DECLS
 
 struct Res_png_9patch {
 	int8_t wasDeserialized;
@@ -32,3 +36,8 @@ struct _NinePatchPaintable {
 G_DECLARE_FINAL_TYPE(NinePatchPaintable, ninepatch_paintable, NINEPATCH, PAINTABLE, GObject)
 
 GdkPaintable *ninepatch_paintable_new(struct Res_png_9patch *chunk, uint32_t chunk_size, GdkTexture *texture);
+
+/* draw onto an ATLCanvas (implemented in NinePatchSkia.cpp) */
+void ninepatch_paintable_draw_skia(NinePatchPaintable *paintable, void *atl_canvas, double width, double height);
+
+G_END_DECLS

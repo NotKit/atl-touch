@@ -1,16 +1,16 @@
-#include "pango/pango-layout.h"
-#include <gdk/gdk.h>
-#include <gsk/gsk.h>
+#pragma once
+
+#include "include/core/SkFont.h"
+#include "include/core/SkPaint.h"
+
 #include <pango/pango.h>
 
 struct AndroidPaint {
-	GdkRGBA color;
-	GskStroke *gsk_stroke;
-	PangoFontDescription *font;
-	PangoAlignment alignment;
-	graphene_matrix_t color_matrix;
-	graphene_vec4_t color_offset;
-	bool is_fill : 1;
-	bool is_stroke : 1;
-	bool use_color_filter : 1;
+	SkPaint paint;
+	SkFont font;
+	/* matches both android.graphics.Paint.Align ordinals and SkTextUtils::Align */
+	int text_align = 0;
+	/* kept in sync with the font size for android_text_Layout.cpp, which
+	 * still uses Pango for line breaking and metrics */
+	PangoFontDescription *pango_font = nullptr;
 };

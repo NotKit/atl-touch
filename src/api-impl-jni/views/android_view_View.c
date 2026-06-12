@@ -7,6 +7,7 @@
 #include "../util.h"
 
 #include "../views/AndroidLayout.h"
+#include "../graphics/ATLCanvas.h"
 #include "../widgets/WrapperWidget.h"
 
 #include "../generated_headers/android_view_MotionEvent.h"
@@ -863,16 +864,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1queueAllocate(JNIEnv *env,
 JNIEXPORT void JNICALL Java_android_view_View_native_1drawBackground(JNIEnv *env, jobject this, jlong widget_ptr, jlong snapshot_ptr)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
-	GdkSnapshot *snapshot = GDK_SNAPSHOT(_PTR(snapshot_ptr));
 	if (wrapper->background)
-		gtk_widget_snapshot_child(&wrapper->parent_instance, wrapper->background, snapshot);
+		atl_canvas_draw_gtk_child(_PTR(snapshot_ptr), &wrapper->parent_instance, wrapper->background);
 }
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1drawContent(JNIEnv *env, jobject this, jlong widget_ptr, jlong snapshot_ptr)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
-	GdkSnapshot *snapshot = GDK_SNAPSHOT(_PTR(snapshot_ptr));
-	gtk_widget_snapshot_child(&wrapper->parent_instance, wrapper->child, snapshot);
+	atl_canvas_draw_gtk_child(_PTR(snapshot_ptr), &wrapper->parent_instance, wrapper->child);
 }
 
 JNIEXPORT void JNICALL Java_android_view_View_nativeSetFullscreen(JNIEnv *env, jobject this, jlong widget_ptr, jboolean fullscreen)

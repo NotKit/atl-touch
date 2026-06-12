@@ -25,13 +25,13 @@ public class BitmapDrawable extends Drawable {
 	public BitmapDrawable(Resources res, Bitmap bitmap) {
 		this.bitmap = bitmap;
 		if (bitmap != null)
-			setPaintable(bitmap.getTexture());
+			setPaintable(bitmap.getGdkTexture());
 	}
 
 	public BitmapDrawable(Bitmap bitmap) {
 		this.bitmap = bitmap;
 		if (bitmap != null)
-			setPaintable(bitmap.getTexture());
+			setPaintable(bitmap.getGdkTexture());
 	}
 
 	public Bitmap getBitmap() {
@@ -56,7 +56,7 @@ public class BitmapDrawable extends Drawable {
 		a.recycle();
 		if (bitmap == null)
 			throw new XmlPullParserException("<bitmap> needs a valid `src' attribute");
-		setPaintable(bitmap.getTexture());
+		setPaintable(bitmap.getGdkTexture());
 	}
 
 	@Override

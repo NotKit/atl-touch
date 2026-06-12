@@ -6,6 +6,7 @@
 #include "../generated_headers/android_view_View.h"
 
 #include "WrapperWidget.h"
+#include "src/api-impl-jni/graphics/ATLCanvas.h"
 #include "src/api-impl-jni/views/AndroidLayout.h"
 
 G_DEFINE_TYPE(WrapperWidget, wrapper_widget, GTK_TYPE_WIDGET)
@@ -191,10 +192,24 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 	}
 	if (wrapper->draw_method) {
 		JNIEnv *env = get_jni_env();
-		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(snapshot));
-		(*env)->CallVoidMethod(env, wrapper->jobj, wrapper->draw_method, wrapper->canvas);
-		if ((*env)->ExceptionCheck(env))
-			(*env)->ExceptionDescribe(env);
+		/* render through a raster Skia canvas, then hand the pixels to GTK */
+		int width = gtk_widget_get_width(widget);
+		int height = gtk_widget_get_height(widget);
+		if (!width || !height) {
+			width = wrapper->real_width;
+			height = wrapper->real_height;
+		}
+		if (width > 0 && height > 0) {
+			void *atl_canvas = atl_canvas_new_raster(width, height);
+			_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(atl_canvas));
+			(*env)->CallVoidMethod(env, wrapper->jobj, wrapper->draw_method, wrapper->canvas);
+			if ((*env)->ExceptionCheck(env))
+				(*env)->ExceptionDescribe(env);
+			GdkTexture *texture = atl_canvas_to_gdk_texture(atl_canvas);
+			gtk_snapshot_append_texture(snapshot, texture, &GRAPHENE_RECT_INIT(0, 0, width, height));
+			g_object_unref(texture);
+			atl_canvas_free(atl_canvas);
+		}
 	} else {
 		GtkWidget *widget = &wrapper->parent_instance;
 		GtkWidget *child = gtk_widget_get_first_child(widget);

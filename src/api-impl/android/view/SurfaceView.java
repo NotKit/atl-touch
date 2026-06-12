@@ -44,7 +44,7 @@ public class SurfaceView extends View {
 	@Override
 	protected native long native_constructor(Context context, AttributeSet attrs);
 
-	protected native long native_createSnapshot();
+	protected native long native_createSnapshot(int width, int height);
 	protected native void native_postSnapshot(long surfaceView, long snapshot);
 
 	public SurfaceHolder getHolder() {
@@ -196,7 +196,7 @@ public class SurfaceView extends View {
 			if (getWidth() == 0 || getHeight() == 0)
 				return null;
 
-			return new GskCanvas(native_createSnapshot());
+			return new GskCanvas(native_createSnapshot(getWidth(), getHeight()));
 		}
 
 		/**

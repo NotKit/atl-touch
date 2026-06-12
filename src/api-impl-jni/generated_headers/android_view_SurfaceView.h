@@ -222,10 +222,10 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor
 /*
  * Class:     android_view_SurfaceView
  * Method:    native_createSnapshot
- * Signature: ()J
+ * Signature: (II)J
  */
 JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createSnapshot
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jint, jint);
 
 /*
  * Class:     android_view_SurfaceView

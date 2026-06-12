@@ -6,6 +6,8 @@
 #include "WrapperWidget.h"
 #include "marshal.h"
 
+#include "../graphics/ATLCanvas.h"
+
 #include "../generated_headers/android_view_SurfaceView.h"
 #include "android_view_SurfaceView.h"
 
@@ -182,9 +184,9 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv
 	return _INTPTR(graphics_offload);
 }
 
-JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createSnapshot(JNIEnv *env, jclass class)
+JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createSnapshot(JNIEnv *env, jclass class, jint width, jint height)
 {
-	return _INTPTR(gtk_snapshot_new());
+	return _INTPTR(atl_canvas_new_raster(width, height));
 }
 
 extern GtkWindow *window;
@@ -193,24 +195,9 @@ JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1postSnapshot(JNIEnv
 {
 	GtkWidget *view = GTK_WIDGET(_PTR(surface_view));
 	SurfaceViewWidget *surface_view_widget = SURFACE_VIEW_WIDGET(gtk_widget_get_first_child(view));
-	GtkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
-	static GType renderer_type = 0;
-	if (!renderer_type) {
-		// Use same renderer type as for onscreen rendering.
-		GdkSurface *surface = gdk_surface_new_toplevel(gdk_display_get_default());
-		GskRenderer *renderer = gsk_renderer_new_for_surface(surface);
-		renderer_type = G_OBJECT_TYPE(renderer);
-		gsk_renderer_unrealize(renderer);
-		g_object_unref(renderer);
-		gdk_surface_destroy(surface);
-	}
-	GskRenderer *renderer = g_object_new(renderer_type, NULL);
-	gsk_renderer_realize(renderer, NULL, NULL);
-	GskRenderNode *node = gtk_snapshot_free_to_node(snapshot);
-	GdkTexture *texture = gsk_renderer_render_texture(renderer, node, NULL);
-	gsk_render_node_unref(node);
-	gsk_renderer_unrealize(renderer);
-	g_object_unref(renderer);
+	void *atl_canvas = _PTR(snapshot_ptr);
+	GdkTexture *texture = atl_canvas_to_gdk_texture(atl_canvas);
+	atl_canvas_free(atl_canvas);
 
 	surface_view_widget_set_texture(surface_view_widget, texture, FALSE);
 }
