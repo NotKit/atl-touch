@@ -7,7 +7,6 @@
 #include "../defines.h"
 #include "../util.h"
 #include "../generated_headers/android_app_Activity.h"
-#include "../../main-executable/back_button.h"
 #include "android_app_Activity.h"
 
 static GList *activity_backlog = NULL;
@@ -96,9 +95,9 @@ static void activity_update_current(JNIEnv *env)
 			(*env)->ExceptionDescribe(env);
 
 		if (g_list_length(activity_backlog) > 1 || handle_cache.activity.onBackPressed != current_activity_on_back_pressed_method_id) {
-			back_button_set_sensitive(true);
+			; /* the GTK header-bar back button is gone; Escape sends KEYCODE_BACK */
 		} else {
-			back_button_set_sensitive(false);
+			;
 		}
 	}
 }
@@ -129,7 +128,7 @@ void current_activity_back_pressed(void)
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 	} else {
-		back_button_set_sensitive(false);
+		;
 	}
 }
 
@@ -190,7 +189,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 		_UNREF(removed_activity);
 	}
 	if (activity_backlog == NULL && window)
-		gtk_window_close(GTK_WINDOW(_PTR(window)));
+		exit(0); // the last activity is gone; quit like the window was closed
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env, jclass class, jobject activity)

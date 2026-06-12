@@ -1,5 +1,5 @@
-#include <gtk/gtk.h>
 #include <pango/pango.h>
+#include <pango/pangocairo.h>
 
 #include "../defines.h"
 #include "../jni_cpp.h"
@@ -10,12 +10,16 @@ extern "C" {
 #include "../generated_headers/android_text_Layout.h"
 }
 
-extern GtkWidget *window;
+static PangoContext *atl_pango_context(void)
+{
+	static PangoContext *context = pango_font_map_create_context(pango_cairo_font_map_get_default());
+	return context;
+}
 
 JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env, jclass clazz, jstring text, jlong paint, jint width)
 {
 	AndroidPaint *android_paint = (AndroidPaint *)_PTR(paint);
-	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
+	PangoLayout *layout = pango_layout_new(atl_pango_context());
 	pango_layout_set_font_description(layout, android_paint->pango_font);
 	const char *str = env->GetStringUTFChars(text, NULL);
 	pango_layout_set_text(layout, str, -1);

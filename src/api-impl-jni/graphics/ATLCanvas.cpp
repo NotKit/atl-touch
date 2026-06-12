@@ -119,6 +119,15 @@ extern "C" void atl_canvas_free(void *atl_canvas)
 	delete (ATLCanvas *)atl_canvas;
 }
 
+extern "C" const void *atl_canvas_get_pixels(void *atl_canvas, int *width, int *height, int *stride)
+{
+	SkBitmap *bitmap = ((ATLCanvas *)atl_canvas)->bitmap;
+	*width = bitmap->width();
+	*height = bitmap->height();
+	*stride = (int)bitmap->rowBytes();
+	return bitmap->getPixels();
+}
+
 extern "C" GdkTexture *atl_skbitmap_to_gdk_texture(void *skbitmap)
 {
 	SkBitmap *bitmap = (SkBitmap *)skbitmap;

@@ -3,6 +3,7 @@
 
 #include <cairo-svg.h>
 #include <gdk/wayland/gdkwayland.h>
+#include <GLFW/glfw3.h>
 #include <gtk/gtk.h>
 #include <libportal/portal.h>
 
@@ -11,7 +12,7 @@
 #include "../api-impl-jni/app/android_app_Activity.h"
 
 #include "actions.h"
-#include "back_button.h"
+#include "../api-impl-jni/ATLWindow.h"
 #include "libc_bio_path_overrides.h"
 
 #include <dlfcn.h>
@@ -38,16 +39,13 @@
 	#error unknown native architecture
 #endif
 
-GtkWidget *window;
+GtkWidget *window = NULL; /* legacy: still referenced by libandroid's egl.c */
+ATLWindow *atl_window = NULL;
 char *apk_path;
 
 // standard Gtk Application stuff, more or less
 
-gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
-{
-	activity_close_all();
-	return false;
-}
+
 
 // this is the equivalent of /data/data/com.example.app/
 char *app_data_dir = NULL;
@@ -142,12 +140,6 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	return env;
 }
 
-void icon_override(GtkWidget *window, GList *icon_list)
-{
-	GdkSurface *window_surface = gtk_native_get_surface(GTK_NATIVE(window));
-	// set app icon as window icon; this is a noop on Wayland because there is currently no way to set a window icon on Wayland
-	gdk_toplevel_set_icon_list(GDK_TOPLEVEL(window_surface), icon_list);
-}
 
 /*
  * There is no way to get a nice clean callback for when the window is ready to be used for stuff
@@ -155,7 +147,7 @@ void icon_override(GtkWidget *window, GList *icon_list)
  */
 gboolean hacky_on_window_focus_changed_callback(JNIEnv *env)
 {
-	if (gtk_widget_get_width(window) != 0) {
+	if (atl_window_get_width(atl_window) != 0) {
 		activity_window_ready();
 		return G_SOURCE_REMOVE;
 	}
@@ -253,29 +245,6 @@ static void parse_string_extras(JNIEnv *env, char **extra_string_keys, jobject i
 }
 
 /* Drag and drop callback to simulate ACTION_SEND intents */
-static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, double y, gpointer user_data)
-{
-	const char *data = g_value_get_string(value);
-	if (!data || !*data) {
-		return FALSE;
-	}
-
-	JNIEnv *env = get_jni_env();
-	jobject intent = (*env)->NewObject(env, handle_cache.intent.class, handle_cache.intent.constructor);
-	_SET_OBJ_FIELD(intent, "action", "Ljava/lang/String;", _JSTRING("android.intent.action.SEND"));
-	_SET_OBJ_FIELD(intent, "data", "Landroid/net/Uri;", (*env)->CallStaticObjectMethod(env, handle_cache.uri.class, handle_cache.uri.parse, _JSTRING(data)));
-
-	jobject activity = (*env)->CallStaticObjectMethod(env, handle_cache.context.class, handle_cache.context.resolveActivityInternal, intent);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-	}
-	if (!activity) {
-		fprintf(stderr, "failed to resolve activity to handle URI: %s\n", data);
-		return FALSE;
-	}
-	activity_start(env, activity);
-	return TRUE;
-}
 
 char *find_jar_or_die(char *builddir_path, char *installed_path, char *install_prefix)
 {
@@ -305,14 +274,14 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		printf(">- [%s]\n", g_file_get_path(files[i]));
 	}
 */
-	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
+	if (atl_window) { // this is not the first launch, but a DBus request to open an URI in the running app
 		fprintf(stderr, "opening uri over DBus %p\n", files[0]);
 		char *uri = g_file_get_uri(files[0]);
 		JNIEnv *env = get_jni_env();
 		fprintf(stderr, "opening uri over DBus: %s\n", uri);
 		jobject activity = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
 		                                                  _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
-		                                                  _JSTRING(d->apk_main_activity_class), _INTPTR(window), _JSTRING(uri));
+		                                                  _JSTRING(d->apk_main_activity_class), _INTPTR(atl_window), _JSTRING(uri));
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 		activity_start(env, activity);
@@ -439,30 +408,15 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	/* -- misc -- */
 
-	window = gtk_application_window_new(app);
-
 	const char *disable_decoration_env = getenv("ATL_DISABLE_WINDOW_DECORATIONS");
-	gboolean decorated;
+	bool decorated = true;
 	if (disable_decoration_env)
 		decorated = !strcmp(disable_decoration_env, "0") || !strcmp(disable_decoration_env, "false");
-	else { // by default only enable decorations if there are any action buttons to show in the title bar
-		char *decoration_layout;
-		g_object_get(G_OBJECT(gtk_settings_get_default()), "gtk-decoration-layout", &decoration_layout, NULL);
-		GString *gstring = g_string_new_take(decoration_layout);
-		g_string_replace(gstring, "menu", "", 0); // ignore menu button
-		g_string_replace(gstring, ":", "", 0);    // ignore leading or trailing colon
-		decorated = gstring->len > 0;
-		g_string_free(gstring, TRUE);
-	}
-	gtk_window_set_decorated(GTK_WINDOW(window), decorated);
 
-	if (getenv("ATL_FORCE_FULLSCREEN"))
-		gtk_window_fullscreen(GTK_WINDOW(window));
-
-	// Load default css stylesheet
-	GtkCssProvider *cssProvider = gtk_css_provider_new();
-	gtk_css_provider_load_from_resource(cssProvider, "/com/gitlab/android-translation-layer/android-translation-layer/default-stylesheet.css");
-	gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(cssProvider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+	atl_windows_init();
+	atl_window = atl_window_new(d->window_width ? d->window_width : 540,
+	                            d->window_height ? d->window_height : 960,
+	                            true, decorated);
 
 	prepare_main_looper(env);
 
@@ -472,7 +426,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	// construct Application
 	application_object = (*env)->CallStaticObjectMethod(env, handle_cache.context.class,
-	                                                    _STATIC_METHOD(handle_cache.context.class, "createApplication", "(J)Landroid/app/Application;"), window);
+	                                                    _STATIC_METHOD(handle_cache.context.class, "createApplication", "(J)Landroid/app/Application;"), _INTPTR(atl_window));
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 
@@ -513,7 +467,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	if (!d->apk_instrumentation_class && !d->install_internal) {
 		activity_object = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
 		                                                 _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
-		                                                 _JSTRING(d->apk_main_activity_class), _INTPTR(window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
+		                                                 _JSTRING(d->apk_main_activity_class), _INTPTR(atl_window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 		if (uri_option)
@@ -641,51 +595,17 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	}
 
 	if (!d->apk_instrumentation_class)
-		gtk_window_set_title(GTK_WINDOW(window), package_name);
-	gtk_window_set_default_size(GTK_WINDOW(window), d->window_width, d->window_height);
-	g_signal_connect(window, "close-request", G_CALLBACK(app_exit), env);
+		atl_window_set_title(atl_window, package_name);
 
-	GtkWidget *header_bar = gtk_header_bar_new();
-	GtkWidget *back_button = back_button_new();
-
-	gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), back_button);
-	gtk_window_set_titlebar(GTK_WINDOW(window), header_bar);
-	GtkDropTarget *drop_target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
-	g_signal_connect(drop_target, "drop", G_CALLBACK(on_drop), NULL);
-	gtk_widget_add_controller(window, GTK_EVENT_CONTROLLER(drop_target));
-	gtk_window_present(GTK_WINDOW(window));
-
-	// set package name as application id for window icon on Wayland. Needs a {package_name}.desktop file defining the icon
-	GdkToplevel *toplevel = GDK_TOPLEVEL(gtk_native_get_surface(GTK_NATIVE(window)));
-	if (GDK_IS_WAYLAND_TOPLEVEL(toplevel) && !d->apk_instrumentation_class) {
-		gdk_wayland_toplevel_set_application_id(GDK_WAYLAND_TOPLEVEL(toplevel), package_name);
-	}
-	GdkMonitor *monitor = gdk_display_get_monitor_at_surface(gdk_display_get_default(), GDK_SURFACE(toplevel));
-	GdkRectangle monitor_geometry;
-	gdk_monitor_get_geometry(monitor, &monitor_geometry);
+	const GLFWvidmode *monitor_mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
 	jobject resources = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "r", "Landroid/content/res/Resources;");
 	jobject configuration = _GET_OBJ_FIELD(resources, "mConfiguration", "Landroid/content/res/Configuration;");
-	if (monitor_geometry.width >= 800 && monitor_geometry.height >= 800)
+	if (monitor_mode && monitor_mode->width >= 800 && monitor_mode->height >= 800)
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_LARGE*/ 0x03);
 	else
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02);
 
-	if (!d->apk_instrumentation_class && app_icon_path) {
-		char *app_icon_path_full = malloc(strlen(app_data_dir) + 1 + strlen(app_icon_path) + 1); // +1 for /, +1 for NULL
-		sprintf(app_icon_path_full, "%s/%s", app_data_dir, app_icon_path);
-
-		extract_from_apk(app_icon_path, app_icon_path);
-
-		GError *error = NULL;
-		GList *icon_list = g_list_append(NULL, gdk_texture_new_from_filename(app_icon_path_full, &error));
-		if (error) {
-			fprintf(stderr, "gdk_texture_new_from_filename: %s\n", error->message);
-			g_clear_error(&error);
-		}
-		icon_override(window, icon_list);
-		/* if Gtk sets the icon list to NULL, override it again */
-		g_signal_connect_after(window, "realize", G_CALLBACK(icon_override), icon_list);
-	}
+	// TODO: window icon (GLFW only supports this on X11; Wayland needs an app-id + .desktop file)
 
 	if (!d->apk_instrumentation_class) {
 		activity_start(env, activity_object);
@@ -693,14 +613,6 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		g_timeout_add(10, G_SOURCE_FUNC(hacky_on_window_focus_changed_callback), env);
 	}
 
-	jobject input_queue_callback = g_object_get_data(G_OBJECT(window), "input_queue_callback");
-	if (input_queue_callback) {
-		jobject input_queue = g_object_get_data(G_OBJECT(window), "input_queue");
-
-		(*env)->CallVoidMethod(env, input_queue_callback, handle_cache.input_queue_callback.onInputQueueCreated, input_queue);
-		if ((*env)->ExceptionCheck(env))
-			(*env)->ExceptionDescribe(env);
-	}
 
 	const char *app_id = g_application_get_application_id(G_APPLICATION(app));
 	if (strcmp(app_id, "com.example.demo_application")) {
@@ -718,8 +630,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 static void activate(GtkApplication *app, struct jni_callback_data *d)
 {
-	if (window) { // this is not the first launch, but a DBus activate request to the running app
-		gtk_window_present(GTK_WINDOW(window));
+	if (atl_window) { // this is not the first launch, but a DBus activate request to the running app
+		atl_window_focus(atl_window);
 		return;
 	}
 	fprintf(stderr, "error: usage: ./android-translation-layer [app.apk] [-l path/to/activity]\n"

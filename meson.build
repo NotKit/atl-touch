@@ -141,7 +141,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
                                                                   	'src/api-impl-jni/text/android_text_Layout.cpp',
                                                                   	'src/api-impl-jni/util.c',
-                                                                  	'src/api-impl-jni/views/ATLSceneWidget.c',
+                                                                  	'src/api-impl-jni/ATLWindow.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
                                                                   	mpris,
@@ -159,6 +159,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
+                                                                  	dependency('glfw3'), dependency('pangocairo'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'),
                                                                         libart_dep, wayland_protos_dep, skia_dep
@@ -181,14 +182,13 @@ resources = gnome.compile_resources('com.gitlab.android_translation_layer.androi
 executable('android-translation-layer', [
                                         	'src/main-executable/main.c',
                                         	'src/main-executable/actions.c',
-                                        	'src/main-executable/back_button.c',
                                         	'src/main-executable/bionic_compat.c',
                                         	'src/main-executable/libc_bio_path_overrides.c',
                                         	resources
                                         ],
                                         install: true,
                                         dependencies: [
-                                        	dependency('gtk4'), dependency('jni'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'),
+                                        	dependency('gtk4'), dependency('jni'), dependency('glfw3'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'),
                                         ],
                                         link_args: [
                                         	'-rdynamic'

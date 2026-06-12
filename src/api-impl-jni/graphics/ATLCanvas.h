@@ -82,9 +82,11 @@ sk_sp<SkTypeface> atl_default_typeface(void);
 extern "C" {
 #endif
 
-/* C bridge for the GTK-side code (WrapperWidget, SurfaceView, paintables) */
+/* C bridge for windowing and legacy GDK paintable code */
 void *atl_canvas_new_raster(int width, int height);
 void atl_canvas_free(void *atl_canvas);
+/* direct access to a raster canvas's RGBA pixels (premultiplied) */
+const void *atl_canvas_get_pixels(void *atl_canvas, int *width, int *height, int *stride);
 GdkTexture *atl_canvas_to_gdk_texture(void *atl_canvas);
 GdkTexture *atl_skbitmap_to_gdk_texture(void *skbitmap);
 /* download a GdkTexture into an SkBitmap; the result is cached on the
