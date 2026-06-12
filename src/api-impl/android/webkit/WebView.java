@@ -124,8 +124,6 @@ public class WebView extends ViewGroup {
 		return new Object();
 	}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);
-	private native void native_loadUrl(long widget, String url);
+	private void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding) {}
+	private void native_loadUrl(long widget, String url) {}
 }

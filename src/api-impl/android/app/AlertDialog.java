@@ -9,9 +9,10 @@ public class AlertDialog extends Dialog implements DialogInterface {
 
 	private Button[] buttons;
 
-	private native void nativeConstruct(long ptr, long button_positive, long button_negative, long button_neutral);
-	private native void nativeSetMessage(long ptr, String message);
-	private native void nativeSetItems(long ptr, String[] items, DialogInterface.OnClickListener listener);
+	/* TODO: rebuild the alert layout with canvas-drawn widgets */
+	private void nativeConstruct(long ptr, long button_positive, long button_negative, long button_neutral) {}
+	private void nativeSetMessage(long ptr, String message) {}
+	private void nativeSetItems(long ptr, String[] items, DialogInterface.OnClickListener listener) {}
 
 	public AlertDialog(Context context) {
 		this(context, 0);

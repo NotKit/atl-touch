@@ -48,9 +48,7 @@ public class ProgressBar extends View {
 		this(context, null, 0);
 	}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	protected native void native_setProgress(long widget, float fraction);
+	protected void native_setProgress(long widget, float fraction) {}
 
 	public boolean isIndeterminate() {
 		return indeterminate;
@@ -105,7 +103,7 @@ public class ProgressBar extends View {
 		this.progressDrawable = progressDrawable;
 	}
 
-	public native void native_setIndeterminate(boolean indeterminate);
+	public void native_setIndeterminate(boolean indeterminate) {}
 
 	public void incrementProgressBy(int diff) {
 		setProgress(progress + diff);

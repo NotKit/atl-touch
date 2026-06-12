@@ -10,6 +10,7 @@ import android.graphics.Matrix;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
+import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.view.View;
 
@@ -45,7 +46,6 @@ public class ImageView extends View {
 			drawable.setCallback(this);
 			if (colorFilter != null)
 				drawable.setColorFilter(colorFilter);
-			native_setDrawable(widget, drawable.paintable);
 		}
 		if (a.hasValue(com.android.internal.R.styleable.ImageView_scaleType))
 			setScaleType(scaletype_from_int[a.getInt(com.android.internal.R.styleable.ImageView_scaleType, 3 /*CENTER*/)]);
@@ -58,13 +58,14 @@ public class ImageView extends View {
 			return;
 		}
 		bitmap = BitmapFactory.decodeResource(Context.this_application.getResources(), resid);
-		native_setDrawable(widget, bitmap != null ? bitmap.getGdkTexture() : 0);
+		requestLayout();
+		invalidate();
 	}
 	public void setAdjustViewBounds(boolean adjustViewBounds) {}
 
 	public void setScaleType(ScaleType scaleType) {
 		this.scaleType = scaleType;
-		native_setScaleType(widget, scaleType.nativeInt);
+		invalidate();
 	}
 
 	public ScaleType getScaleType() {
@@ -87,13 +88,18 @@ public class ImageView extends View {
 		if (drawable != null) {
 			drawable.setCallback(this);
 		}
-		native_setDrawable(widget, drawable != null ? drawable.paintable : 0);
+		bitmap = null;
+		requestLayout();
+		invalidate();
 	}
 
 	public void setImageMatrix(Matrix matrix) {}
 
 	public void setImageBitmap(Bitmap bitmap) {
-		native_setDrawable(widget, bitmap != null ? bitmap.getGdkTexture() : 0);
+		this.bitmap = bitmap;
+		this.drawable = null;
+		requestLayout();
+		invalidate();
 	}
 
 	/**
@@ -203,8 +209,76 @@ public class ImageView extends View {
 		return Matrix.IDENTITY_MATRIX;
 	}
 
+	private int contentWidth() {
+		if (bitmap != null)
+			return bitmap.getWidth();
+		if (drawable != null)
+			return Math.max(0, drawable.getIntrinsicWidth());
+		return 0;
+	}
+
+	private int contentHeight() {
+		if (bitmap != null)
+			return bitmap.getHeight();
+		if (drawable != null)
+			return Math.max(0, drawable.getIntrinsicHeight());
+		return 0;
+	}
+
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	protected native void native_setDrawable(long widget, long paintable);
-	protected native void native_setScaleType(long widget, int scale_type);
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		setMeasuredDimension(resolveSize(Math.max(contentWidth() + paddingLeft + paddingRight, getSuggestedMinimumWidth()), widthMeasureSpec),
+		                     resolveSize(Math.max(contentHeight() + paddingTop + paddingBottom, getSuggestedMinimumHeight()), heightMeasureSpec));
+	}
+
+	@Override
+	public void onDraw(Canvas canvas) {
+		int innerWidth = getWidth() - paddingLeft - paddingRight;
+		int innerHeight = getHeight() - paddingTop - paddingBottom;
+		int contentWidth = contentWidth();
+		int contentHeight = contentHeight();
+		if (innerWidth <= 0 || innerHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
+			return;
+		float scaleX;
+		float scaleY;
+		switch (scaleType) {
+			case FIT_XY:
+				scaleX = (float)innerWidth / contentWidth;
+				scaleY = (float)innerHeight / contentHeight;
+				break;
+			case CENTER:
+				scaleX = scaleY = 1;
+				break;
+			case CENTER_CROP:
+				scaleX = scaleY = Math.max((float)innerWidth / contentWidth, (float)innerHeight / contentHeight);
+				break;
+			case CENTER_INSIDE:
+				scaleX = scaleY = Math.min(1, Math.min((float)innerWidth / contentWidth, (float)innerHeight / contentHeight));
+				break;
+			case FIT_START:
+			case FIT_CENTER:
+			case FIT_END:
+			default:
+				scaleX = scaleY = Math.min((float)innerWidth / contentWidth, (float)innerHeight / contentHeight);
+				break;
+		}
+		int drawWidth = (int)(contentWidth * scaleX);
+		int drawHeight = (int)(contentHeight * scaleY);
+		int x = paddingLeft;
+		int y = paddingTop;
+		if (scaleType != ScaleType.FIT_START) {
+			x += (innerWidth - drawWidth) / 2;
+			y += (innerHeight - drawHeight) / 2;
+		}
+		canvas.save();
+		canvas.clipRect(paddingLeft, paddingTop, paddingLeft + innerWidth, paddingTop + innerHeight);
+		if (bitmap != null) {
+			canvas.drawBitmap(bitmap, new android.graphics.Rect(0, 0, contentWidth, contentHeight),
+			                  new android.graphics.Rect(x, y, x + drawWidth, y + drawHeight), null);
+		} else if (drawable != null) {
+			drawable.setBounds(x, y, x + drawWidth, y + drawHeight);
+			drawable.draw(canvas);
+		}
+		canvas.restore();
+	}
 }

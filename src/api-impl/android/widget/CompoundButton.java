@@ -9,6 +9,8 @@ import android.util.AttributeSet;
 public abstract class CompoundButton extends Button implements Checkable {
 	Drawable button_drawable = null;
 	public Drawable mButtonDrawable; // directly accessed by androidx
+	private boolean checked = false;
+	private OnCheckedChangeListener on_checked_change_listener = null;
 
 	public CompoundButton(Context context) {
 		this(context, null);
@@ -26,22 +28,34 @@ public abstract class CompoundButton extends Button implements Checkable {
 		super(context, attrs, defStyleAttr, defStyleRes);
 	}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	@Override
-	public native void native_setText(long widget, String text);
-
 	public static interface OnCheckedChangeListener {
 		public void onCheckedChanged(CompoundButton buttonView, boolean isChecked);
 	}
 
-	public native void setOnCheckedChangeListener(OnCheckedChangeListener listener);
+	public void setOnCheckedChangeListener(OnCheckedChangeListener listener) {
+		on_checked_change_listener = listener;
+	}
 
 	@Override
-	public native void setChecked(boolean checked);
+	public void setChecked(boolean checked) {
+		if (this.checked != checked) {
+			this.checked = checked;
+			if (on_checked_change_listener != null)
+				on_checked_change_listener.onCheckedChanged(this, checked);
+			invalidate();
+		}
+	}
 
 	@Override
-	public native boolean isChecked();
+	public boolean isChecked() {
+		return checked;
+	}
+
+	@Override
+	public boolean performClick() {
+		toggle();
+		return super.performClick();
+	}
 
 	public void toggle() {
 		setChecked(!isChecked());

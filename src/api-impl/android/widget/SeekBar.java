@@ -14,11 +14,11 @@ public class SeekBar extends AbsSeekBar {
 	}
 
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	@Override
-	protected native void native_setProgress(long widget, float fraction);
-	protected native int native_getProgress(long widget);
-	protected native void native_setMax(long widget, int max);
+	protected void native_setProgress(long widget, float fraction) {}
+	protected int native_getProgress(long widget) {
+		return progress;
+	}
+	protected void native_setMax(long widget, int max) {}
 	@Override
 	public void native_setIndeterminate(boolean indeterminate) {}
 
@@ -33,7 +33,7 @@ public class SeekBar extends AbsSeekBar {
 		native_setProgress(widget, progress);
 	}
 
-	public native void setOnSeekBarChangeListener(final OnSeekBarChangeListener l);
+	public void setOnSeekBarChangeListener(final OnSeekBarChangeListener l) {}
 
 	@Override
 	public int getProgress() {

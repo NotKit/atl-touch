@@ -175,18 +175,28 @@ public class PopupWindow {
 
 	public void setSoftInputMode(int mode) {}
 
-	protected native long native_constructor();
-	protected native void native_setContentView(long widget, long contentView);
-	protected native void native_showAsDropDown(long widget, long anchor, int xoff, int yoff, int gravity);
-	protected native boolean native_isShowing(long widget);
-	protected native void native_setTouchable(long widget, boolean touchable);
-	protected native void native_setTouchModal(long widget, boolean touchable);
-	protected native void native_dismiss(long widget);
-	protected native void native_update(long widget, long anchor, int xoff, int yoff, int width, int height);
-	public native void setOnDismissListener(OnDismissListener listener);
-	public native void native_setWidth(long widget, int width);
-	public native void native_setHeight(long widget, int height);
-	public native int native_getWidth(long widget);
-	public native int native_getHeight(long widget);
-	public native boolean native_isTouchable(long widget);
+	protected long native_constructor() {
+		return 0;
+	}
+	protected void native_setContentView(long widget, long contentView) {}
+	protected void native_showAsDropDown(long widget, long anchor, int xoff, int yoff, int gravity) {}
+	protected boolean native_isShowing(long widget) {
+		return false;
+	}
+	protected void native_setTouchable(long widget, boolean touchable) {}
+	protected void native_setTouchModal(long widget, boolean touchable) {}
+	protected void native_dismiss(long widget) {}
+	protected void native_update(long widget, long anchor, int xoff, int yoff, int width, int height) {}
+	public void setOnDismissListener(OnDismissListener listener) {}
+	public void native_setWidth(long widget, int width) {}
+	public void native_setHeight(long widget, int height) {}
+	public int native_getWidth(long widget) {
+		return 0;
+	}
+	public int native_getHeight(long widget) {
+		return 0;
+	}
+	public boolean native_isTouchable(long widget) {
+		return false;
+	}
 }

@@ -30,13 +30,7 @@ public class Spinner extends AbsSpinner {
 		a.recycle();
 	}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	protected native void native_setAdapter(long widget, SpinnerAdapter adapter);
-	@Override
-	protected native void native_setBackgroundDrawable(long widget, long paintable);
-	@Override
-	protected native void native_setBackgroundColor(long widget, int color);
+	protected void native_setAdapter(long widget, SpinnerAdapter adapter) {}
 
 	public void setAdapter(SpinnerAdapter adapter) {
 		if (observer == null)
@@ -53,9 +47,6 @@ public class Spinner extends AbsSpinner {
 	public SpinnerAdapter getAdapter() {
 		return (SpinnerAdapter)super.getAdapter();
 	}
-
-	@Override
-	public native void setOnItemSelectedListener(AdapterView.OnItemSelectedListener listener);
 
 	private class Observer extends DataSetObserver {
 

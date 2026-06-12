@@ -29,33 +29,11 @@ public class Button extends TextView {
 			setText(a.getText(com.android.internal.R.styleable.TextView_text));
 		}
 
-		if (getBackground() != null) {
-			native_addClass(widget, "ATL-no-border");
-		}
 		a.recycle();
 	}
 
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	public native void native_setText(long widget, String text);
-	@Override
-	protected native void nativeSetOnClickListener(long widget);
-	protected native void native_setCompoundDrawables(long widget, long paintable);
-
-	@Override
-	public void setText(CharSequence text) {
-		native_setText(widget, String.valueOf(text));
-	}
-
-	@Override
-	public native CharSequence getText();
-
-	@Override
-	public void setTextSize(float size) {}
-
-	@Override
 	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
 		compoundDrawableLeft = left;
-		native_setCompoundDrawables(widget, left != null ? left.paintable : 0);
 	}
 }

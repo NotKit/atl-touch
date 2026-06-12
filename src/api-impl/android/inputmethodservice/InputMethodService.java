@@ -31,14 +31,30 @@ public class InputMethodService extends AbstractInputMethodService {
 	class ATLInputConnection extends BaseInputConnection {
 		protected long nativePtr;
 
-		private native long nativeInit();
-		private native boolean nativeSetCompositingText(long ptr, String text, int newCursorPosition);
-		private native boolean nativeSetCompositingRegion(long ptr, int start, int end);
-		private native boolean nativeFinishComposingText(long ptr);
-		private native boolean nativeCommitText(long ptr, String text, int newCursorPosition);
-		private native boolean nativeDeleteSurroundingText(long ptr, int beforeLength, int afterLength);
-		private native boolean nativeSetSelection(long ptr, int start, int end);
-		private native boolean nativeSendKeyEvent(long ptr, long time, long key, long state);
+		private long nativeInit() {
+			return 0;
+		}
+		private boolean nativeSetCompositingText(long ptr, String text, int newCursorPosition) {
+			return false;
+		}
+		private boolean nativeSetCompositingRegion(long ptr, int start, int end) {
+			return false;
+		}
+		private boolean nativeFinishComposingText(long ptr) {
+			return false;
+		}
+		private boolean nativeCommitText(long ptr, String text, int newCursorPosition) {
+			return false;
+		}
+		private boolean nativeDeleteSurroundingText(long ptr, int beforeLength, int afterLength) {
+			return false;
+		}
+		private boolean nativeSetSelection(long ptr, int start, int end) {
+			return false;
+		}
+		private boolean nativeSendKeyEvent(long ptr, long time, long key, long state) {
+			return false;
+		}
 
 		ATLInputConnection() {
 			super(null, false);

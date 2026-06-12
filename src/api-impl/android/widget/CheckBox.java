@@ -16,20 +16,8 @@ public class CheckBox extends CompoundButton {
 	public void setLines(int lines) {}
 
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-
-	@Override
-	public native void setOnCheckedChangeListener(OnCheckedChangeListener listener);
-
-	@Override
-	public native void setChecked(boolean checked);
-
-	@Override
-	public native boolean isChecked();
-
-	@Override
 	public void setText(CharSequence text) {
-		native_setText(widget, text == null ? "" : text.toString());
+		super.setText(text);
 	}
 
 	// following methods are overridden to prevent calling incompatible methods from superclasses
@@ -39,7 +27,4 @@ public class CheckBox extends CompoundButton {
 	public void setTextColor(int color) {}
 	@Override
 	public void setTextSize(float size) {}
-
-	@Override
-	public native void native_setText(long widget, String text);
 }

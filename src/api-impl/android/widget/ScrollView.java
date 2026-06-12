@@ -15,13 +15,6 @@ public class ScrollView extends ViewGroup {
 	}
 
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	@Override
-	protected native void native_addView(long widget, long child, int index, LayoutParams params);
-	@Override
-	protected native void native_removeView(long widget, long child);
-
-	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		int width = 0;
 		int height = 0;
@@ -35,6 +28,14 @@ public class ScrollView extends ViewGroup {
 			height = child.getMeasuredHeight();
 		}
 		setMeasuredDimension(resolveSize(width, widthMeasureSpec), resolveSize(height, heightMeasureSpec));
+	}
+
+	@Override
+	protected void onLayout(boolean changed, int l, int t, int r, int b) {
+		if (getChildCount() > 0) {
+			View child = getChildAt(0);
+			child.layout(0, 0, child.getMeasuredWidth(), child.getMeasuredHeight());
+		}
 	}
 
 	public void setFillViewport(boolean fillViewport) {}

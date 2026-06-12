@@ -84,13 +84,12 @@ public class TimePicker extends FrameLayout {
 		}
 	}
 
-	protected native void nativeSetOnTimeChangedListener(long widget);
+	protected void nativeSetOnTimeChangedListener(long widget) {}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-
-	private native void nativeSetSpinBtnValue(long widget, int value);
-	private native int nativeGetSpinBtnValue(long widget);
+	private void nativeSetSpinBtnValue(long widget, int value) {}
+	private int nativeGetSpinBtnValue(long widget) {
+		return 0;
+	}
 
 	public static interface OnTimeChangedListener {
 		void onTimeChanged(TimePicker view, int hourOfDay, int minute);

@@ -8,6 +8,9 @@ import android.text.TextWatcher;
 import android.util.AttributeSet;
 
 public class EditText extends TextView {
+	private String text = "";
+	private CharSequence hint = "";
+
 	public EditText(Context context) {
 		super(context);
 	}
@@ -20,15 +23,21 @@ public class EditText extends TextView {
 		super(context, attrs, defStyle, defStyleRes);
 	}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	protected native String native_getText(long widget);
-	protected native void native_addTextChangedListener(long widget, TextWatcher watcher);
-	protected native void native_removeTextChangedListener(long widget, TextWatcher watcher);
-	protected native void native_setOnEditorActionListener(long widget, OnEditorActionListener l);
-	protected native void native_setText(long widget, String text);
-	protected native void native_setHint(long widget, CharSequence s);
-	protected native CharSequence native_getHint(long widget); // gtk_entry_set_placeholder_text
+	protected String native_getText(long widget) {
+		return text;
+	}
+	protected void native_addTextChangedListener(long widget, TextWatcher watcher) {}
+	protected void native_removeTextChangedListener(long widget, TextWatcher watcher) {}
+	protected void native_setOnEditorActionListener(long widget, OnEditorActionListener l) {}
+	protected void native_setText(long widget, String text) {
+		this.text = text == null ? "" : text;
+	}
+	protected void native_setHint(long widget, CharSequence s) {
+		this.hint = s == null ? "" : s;
+	}
+	protected CharSequence native_getHint(long widget) {
+		return hint;
+	}
 
 	public Editable getText() {
 		return new SpannableStringBuilder(native_getText(widget));

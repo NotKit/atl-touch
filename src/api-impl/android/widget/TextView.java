@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.graphics.Canvas;
 import android.text.BoringLayout;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -96,11 +97,62 @@ public class TextView extends View {
 		}
 
 		a.recycle();
-		haveCustomMeasure = false;
+	}
+
+	private Layout text_layout;
+
+	private Layout makeLayout(int width) {
+		return new BoringLayout(text, paint, width, getLayoutAlignment(), 1, 0, new BoringLayout.Metrics(), false);
 	}
 
 	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+		int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+		int desiredWidth = (int)Math.ceil(Layout.getDesiredWidth(text, paint)) + paddingLeft + paddingRight;
+		int width;
+		if (widthMode == MeasureSpec.EXACTLY)
+			width = widthSize;
+		else if (widthMode == MeasureSpec.AT_MOST)
+			width = Math.min(Math.max(desiredWidth, getSuggestedMinimumWidth()), widthSize);
+		else
+			width = Math.max(desiredWidth, getSuggestedMinimumWidth());
+		text_layout = makeLayout(Math.max(0, width - paddingLeft - paddingRight));
+		int desiredHeight = text_layout.getHeight() + paddingTop + paddingBottom;
+		setMeasuredDimension(width, resolveSize(Math.max(desiredHeight, getSuggestedMinimumHeight()), heightMeasureSpec));
+	}
+
+	@Override
+	public void onDraw(Canvas canvas) {
+		if (text_layout == null)
+			text_layout = makeLayout(Math.max(0, getWidth() - paddingLeft - paddingRight));
+		float tx = paddingLeft;
+		float ty = paddingTop;
+		int innerWidth = getWidth() - paddingLeft - paddingRight;
+		int innerHeight = getHeight() - paddingTop - paddingBottom;
+		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (verticalGravity == Gravity.CENTER_VERTICAL)
+			ty += Math.max(0, (innerHeight - text_layout.getHeight()) / 2);
+		else if (verticalGravity == Gravity.BOTTOM)
+			ty += Math.max(0, innerHeight - text_layout.getHeight());
+		int horizontalGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+		if (horizontalGravity == Gravity.CENTER_HORIZONTAL) {
+			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
+			tx += Math.max(0, (innerWidth - desired) / 2);
+		} else if (horizontalGravity == Gravity.RIGHT) {
+			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
+			tx += Math.max(0, innerWidth - desired);
+		}
+		canvas.save();
+		canvas.translate(tx, ty);
+		text_layout.draw(canvas);
+		canvas.restore();
+	}
+
+	public void setGravity(int gravity) {
+		this.gravity = gravity;
+		invalidate();
+	}
 
 	public void setText(int resId) {
 		setText(getContext().getResources().getText(resId));
@@ -112,37 +164,37 @@ public class TextView extends View {
 
 	public void setText(CharSequence text, BufferType type) {
 		this.text = text == null ? "" : text;
-		native_setText(text != null ? text.toString() : null);
-
-		if (text instanceof android.text.Spanned)
-			native_set_markup(1);
+		text_layout = null;
 		if (!isLayoutRequested())
 			requestLayout();
+		invalidate();
 	}
 
 	public void setText(char[] text, int start, int len) {
 		setText(new String(text, start, len));
 	}
 
-	private native final void native_set_markup(int bool);
-
-	public native final void native_setText(String text);
 
 	public void setTextSize(int unit, float size) {
 		if (unit != TypedValue.COMPLEX_UNIT_SP)
 			System.out.println("setTextSize called with non-SP unit (" + unit + "), we don't currently handle that");
 		setTextSize(size);
 	}
-	public native void setTextSize(float size);
+	public void setTextSize(float size) {
+		paint.setTextSize(size);
+		text_layout = null;
+		requestLayout();
+		invalidate();
+	}
 
-	public native final void native_setTextColor(int color);
 	public void setTextColor(int color) {
-		native_setTextColor(color);
+		paint.setColor(color);
+		invalidate();
 	}
 	public void setTextColor(ColorStateList colors) {
 		if (colors != null) {
 			this.colors = colors;
-			native_setTextColor(colors.getDefaultColor()); // TODO: do this properly
+			paint.setColor(colors.getDefaultColor()); // TODO: do this properly
 		}
 	}
 	public void setTypeface(Typeface tf, int style) {
@@ -215,7 +267,9 @@ public class TextView extends View {
 
 	public Typeface getTypeface() { return null; }
 
-	public float getTextSize() { return 10; }
+	public float getTextSize() {
+		return paint.getTextSize();
+	}
 
 	public int getGravity() {
 		return gravity;
@@ -230,7 +284,7 @@ public class TextView extends View {
 
 	public void setCompoundDrawablePadding(int pad) {}
 
-	protected native void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom);
+	protected void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom) {}
 
 	// just to prevent garbage collection while native side uses it
 	private Drawable drawableLeft = null;
@@ -314,11 +368,13 @@ public class TextView extends View {
 	}
 
 	public Layout getLayout() {
-		return new BoringLayout(getText(), getPaint(), getWidth(), Layout.Alignment.ALIGN_NORMAL, 1, 0, new BoringLayout.Metrics(), false);
+		if (text_layout == null)
+			text_layout = makeLayout(Math.max(0, getWidth() - paddingLeft - paddingRight));
+		return text_layout;
 	}
 
 	public int getCurrentTextColor() {
-		return Color.CYAN;
+		return paint.getColor();
 	}
 
 	public void setSingleLine(boolean singleLine) {}

@@ -65,13 +65,19 @@ public class DatePicker extends FrameLayout {
 		nativeUpdateDate(widget, year, month, dayOfMonth);
 	}
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	protected native void nativeSetOnDateChangedListener(long widget);
+	protected void nativeSetOnDateChangedListener(long widget) {}
 
-	protected native int nativeGetYear(long widget);
-	protected native int nativeGetMonth(long widget);
-	protected native int nativeGetDay(long widget);
+	protected int nativeGetYear(long widget) {
+		return 0;
+	}
 
-	protected native void nativeUpdateDate(long widget, int year, int month, int dayOfMonth);
+	protected int nativeGetMonth(long widget) {
+		return 0;
+	}
+
+	protected int nativeGetDay(long widget) {
+		return 0;
+	}
+
+	protected void nativeUpdateDate(long widget, int year, int month, int dayOfMonth) {}
 }

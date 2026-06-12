@@ -126,12 +126,16 @@ public class PopupMenu {
 		mOnDismissListener = listener;
 	}
 
-	protected native long native_init();
-	protected native void native_insertItem(long menu, int position, String item, int id);
-	protected native void native_insertSubmenu(long menu, int position, String item, long submenu);
-	protected native void native_removeItem(long menu, int position);
-	protected native long native_buildPopover(long menu);
-	protected native void native_show(long popover, long anchor);
+	protected long native_init() {
+		return 0;
+	}
+	protected void native_insertItem(long menu, int position, String item, int id) {}
+	protected void native_insertSubmenu(long menu, int position, String item, long submenu) {}
+	protected void native_removeItem(long menu, int position) {}
+	protected long native_buildPopover(long menu) {
+		return 0;
+	}
+	protected void native_show(long popover, long anchor) {}
 
 	// callback from native code
 	protected void menuItemClickCallback(final int id) {
