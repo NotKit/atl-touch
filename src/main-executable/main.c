@@ -418,6 +418,13 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	                            d->window_height ? d->window_height : 960,
 	                            true, decorated);
 
+	/* Our windows are GLFW windows, not GtkWindows, so the GtkApplication has
+	 * no windows of its own and would auto-quit as soon as `activate`/`open`
+	 * returns, making g_application_run() return and the app exit immediately.
+	 * Hold the application open for our lifetime; we exit explicitly when the
+	 * last activity/window goes away. */
+	g_application_hold(G_APPLICATION(app));
+
 	prepare_main_looper(env);
 
 	/* extract native libraries from apk*/
