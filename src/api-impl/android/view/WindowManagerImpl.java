@@ -80,6 +80,16 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	}
 
 	@Override
+	public WindowMetrics getCurrentWindowMetrics() {
+		return new WindowMetrics(new Rect(0, 0, Display.window_width, Display.window_height), WindowInsets.CONSUMED);
+	}
+
+	@Override
+	public WindowMetrics getMaximumWindowMetrics() {
+		return getCurrentWindowMetrics();
+	}
+
+	@Override
 	public void addView(View view, android.view.ViewGroup.LayoutParams params) {
 		Slog.v(TAG, "addView(" + view + ", " + params + ") called");
 		view.setLayoutParams(params);

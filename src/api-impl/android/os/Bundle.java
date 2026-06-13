@@ -793,6 +793,38 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 		}
 	}
 
+	/* API 33 type-safe getters: the runtime stores objects untyped, so we just
+	 * cast to the requested class and tolerate mismatches like the legacy ones */
+	public <T> T getParcelable(String key, Class<T> clazz) {
+		Object o = mMap.get(key);
+		return clazz.isInstance(o) ? (T)o : null;
+	}
+
+	public <T> T getSerializable(String key, Class<T> clazz) {
+		Object o = mMap.get(key);
+		return clazz.isInstance(o) ? (T)o : null;
+	}
+
+	public <T> java.util.ArrayList<T> getParcelableArrayList(String key, Class<? extends T> clazz) {
+		Object o = mMap.get(key);
+		try {
+			return (java.util.ArrayList<T>)o;
+		} catch (ClassCastException e) {
+			typeWarning(key, o, "ArrayList", e);
+			return null;
+		}
+	}
+
+	public <T> T[] getParcelableArray(String key, Class<T> clazz) {
+		Object o = mMap.get(key);
+		try {
+			return (T[])o;
+		} catch (ClassCastException e) {
+			typeWarning(key, o, "Parcelable[]", e);
+			return null;
+		}
+	}
+
 	/**
 	 * Returns the value associated with the given key, or null if
 	 * no mapping of the desired type exists for the given key or a null

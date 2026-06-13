@@ -61,6 +61,74 @@ public class PackageManager {
 
 	private final static String TAG = "PackageManager";
 
+	/* API 33 typed flag wrappers. Real Android makes these abstract sealed
+	 * helpers carrying a long; we just box the value and delegate to the
+	 * existing int-flag methods. */
+	public static class Flags {
+		private final long value;
+		Flags(long value) { this.value = value; }
+		public long getValue() { return value; }
+	}
+	public static final class PackageInfoFlags extends Flags {
+		private PackageInfoFlags(long value) { super(value); }
+		public static PackageInfoFlags of(long value) { return new PackageInfoFlags(value); }
+	}
+	public static final class ApplicationInfoFlags extends Flags {
+		private ApplicationInfoFlags(long value) { super(value); }
+		public static ApplicationInfoFlags of(long value) { return new ApplicationInfoFlags(value); }
+	}
+	public static final class ComponentInfoFlags extends Flags {
+		private ComponentInfoFlags(long value) { super(value); }
+		public static ComponentInfoFlags of(long value) { return new ComponentInfoFlags(value); }
+	}
+	public static final class ResolveInfoFlags extends Flags {
+		private ResolveInfoFlags(long value) { super(value); }
+		public static ResolveInfoFlags of(long value) { return new ResolveInfoFlags(value); }
+	}
+
+	public PackageInfo getPackageInfo(String packageName, PackageInfoFlags flags) throws NameNotFoundException {
+		return getPackageInfo(packageName, (int)flags.getValue());
+	}
+	public ApplicationInfo getApplicationInfo(String packageName, ApplicationInfoFlags flags) throws NameNotFoundException {
+		return getApplicationInfo(packageName, (int)flags.getValue());
+	}
+	public ActivityInfo getActivityInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		return getActivityInfo(component, (int)flags.getValue());
+	}
+	public ActivityInfo getReceiverInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		return getReceiverInfo(component, (int)flags.getValue());
+	}
+	public ServiceInfo getServiceInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		return getServiceInfo(component, (int)flags.getValue());
+	}
+	public ProviderInfo getProviderInfo(ComponentName component, ComponentInfoFlags flags) throws Exception {
+		return getProviderInfo(component, (int)flags.getValue());
+	}
+	public java.util.List<PackageInfo> getInstalledPackages(PackageInfoFlags flags) {
+		return getInstalledPackages((int)flags.getValue());
+	}
+	public java.util.List<ApplicationInfo> getInstalledApplications(ApplicationInfoFlags flags) {
+		return getInstalledApplications((int)flags.getValue());
+	}
+	public ResolveInfo resolveActivity(Intent intent, ResolveInfoFlags flags) {
+		return resolveActivity(intent, (int)flags.getValue());
+	}
+	public java.util.List<ResolveInfo> queryIntentActivities(Intent intent, ResolveInfoFlags flags) {
+		return queryIntentActivities(intent, (int)flags.getValue());
+	}
+	public java.util.List<ResolveInfo> queryBroadcastReceivers(Intent intent, ResolveInfoFlags flags) {
+		return queryBroadcastReceivers(intent, (int)flags.getValue());
+	}
+	public java.util.List<ResolveInfo> queryIntentServices(Intent intent, ResolveInfoFlags flags) {
+		return queryIntentServices(intent, (int)flags.getValue());
+	}
+	public ProviderInfo resolveContentProvider(String authority, ComponentInfoFlags flags) {
+		return resolveContentProvider(authority, (int)flags.getValue());
+	}
+	public ResolveInfo resolveService(Intent intent, ResolveInfoFlags flags) {
+		return resolveService(intent, (int)flags.getValue());
+	}
+
 	/**
 	 * This exception is thrown when a given package, application, or component
 	 * name cannot be found.

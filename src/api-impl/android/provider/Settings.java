@@ -97,6 +97,16 @@ public class Settings {
 			return Uri.withAppendedPath(CONTENT_URI, name);
 		}
 
+		public static String getString(ContentResolver content_resolver, String key) {
+			switch (key) {
+				case "time_12_24":
+					return "24";
+				default:
+					Slog.w(TAG, "!!!! getString: unknown key: >" + key + "<");
+					return null;
+			}
+		}
+
 		protected static Integer getIntOrNull(ContentResolver cr, String key) {
 			switch (key) {
 				case "accelerometer_rotation":

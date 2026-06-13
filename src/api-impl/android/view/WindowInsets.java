@@ -1,5 +1,7 @@
 package android.view;
 
+import android.graphics.Insets;
+
 public class WindowInsets {
 
 	public static final WindowInsets CONSUMED = new WindowInsets();
@@ -7,6 +9,19 @@ public class WindowInsets {
 	public WindowInsets() {}
 
 	public WindowInsets(WindowInsets windowInsets) {}
+
+	/* we have no system bars / cutouts, so all inset queries are empty */
+	public Insets getInsets(int typeMask) {
+		return Insets.NONE;
+	}
+
+	public Insets getInsetsIgnoringVisibility(int typeMask) {
+		return Insets.NONE;
+	}
+
+	public boolean isVisible(int typeMask) {
+		return false;
+	}
 
 	public WindowInsets consumeStableInsets() {
 		return this;

@@ -368,6 +368,24 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		startActivityForResult(intent, requestCode, null);
 	}
 
+	private final android.window.OnBackInvokedDispatcher onBackInvokedDispatcher = new android.window.OnBackInvokedDispatcher() {
+		public void registerOnBackInvokedCallback(int priority, android.window.OnBackInvokedCallback callback) {}
+		public void unregisterOnBackInvokedCallback(android.window.OnBackInvokedCallback callback) {}
+	};
+
+	public android.window.OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
+		return onBackInvokedDispatcher;
+	}
+
+	public boolean startActivityIfNeeded(Intent intent, int requestCode) {
+		return startActivityIfNeeded(intent, requestCode, null);
+	}
+
+	public boolean startActivityIfNeeded(Intent intent, int requestCode, Bundle options) {
+		startActivityForResult(intent, requestCode, options);
+		return true;
+	}
+
 	public void setResult(int resultCode, Intent data) {
 		if (resultActivity != null) {
 			resultActivity.onActivityResult(resultRequestCode, resultCode, data);

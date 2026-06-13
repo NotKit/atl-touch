@@ -33,7 +33,10 @@ public abstract class ContentProvider {
 				provider.attachInfo(Context.this_application, provider_parsed.info);
 				provider.onCreate();
 				providers.put(provider_parsed.info.authority, provider);
-			} catch (Exception e) {
+			} catch (Throwable e) {
+				// a failing auxiliary provider (e.g. LeakCanary/WorkManager startup) must not
+				// take down the whole app; NoClassDefFoundError is an Error, not an Exception
+				System.out.println("failed to create content provider " + provider_parsed.className + ":");
 				e.printStackTrace();
 			}
 		}

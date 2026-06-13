@@ -22,6 +22,11 @@ public class JobScheduler {
 		this.context = context;
 	}
 
+	/* namespaced JobScheduler (API 34): we don't separate namespaces, hand back the same instance */
+	public JobScheduler forNamespace(String namespace) {
+		return this;
+	}
+
 	/**
 	 * Retrieve all jobs that have been scheduled by the calling application.
 	 *

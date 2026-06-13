@@ -760,6 +760,15 @@ public abstract class Context {
 		return registerReceiver(receiver, filter);
 	}
 
+	/* API 26+: the RECEIVER_EXPORTED/RECEIVER_NOT_EXPORTED flags variant */
+	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, int flags) {
+		return registerReceiver(receiver, filter);
+	}
+
+	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, Handler scheduler, int flags) {
+		return registerReceiver(receiver, filter);
+	}
+
 	public String[] fileList() {
 		return new String[0];
 	}

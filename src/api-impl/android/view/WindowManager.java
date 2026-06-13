@@ -5,6 +5,10 @@ import android.os.IBinder;
 public interface WindowManager {
 	public android.view.Display getDefaultDisplay();
 
+	public WindowMetrics getCurrentWindowMetrics();
+
+	public WindowMetrics getMaximumWindowMetrics();
+
 	public void addView(View view, ViewGroup.LayoutParams params);
 
 	public void updateViewLayout(View view, ViewGroup.LayoutParams params);
