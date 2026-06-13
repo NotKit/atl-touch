@@ -279,12 +279,34 @@ static gboolean atl_windows_tick(gpointer user_data)
 	return G_SOURCE_CONTINUE;
 }
 
+static void atl_glfw_error_callback(int code, const char *desc)
+{
+	fprintf(stderr, "GLFW error 0x%x: %s\n", code, desc);
+}
+
 void atl_windows_init(void)
 {
+	glfwSetErrorCallback(atl_glfw_error_callback);
+
+	/* GLFW auto-detects Wayland vs X11; ATL_GLFW_PLATFORM=x11|wayland forces one
+	 * (useful to fall back to XWayland, or to confirm which backend is in use) */
+	const char *platform = getenv("ATL_GLFW_PLATFORM");
+	if (platform) {
+		if (!strcmp(platform, "x11"))
+			glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+		else if (!strcmp(platform, "wayland"))
+			glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+	}
+
 	if (!glfwInit()) {
-		fprintf(stderr, "atl_windows_init: glfwInit failed\n");
+		const char *desc = NULL;
+		glfwGetError(&desc);
+		fprintf(stderr, "atl_windows_init: glfwInit failed: %s\n", desc ? desc : "(no detail)");
 		exit(1);
 	}
+	fprintf(stderr, "ATLWindow: GLFW platform = %s\n",
+	        glfwGetPlatform() == GLFW_PLATFORM_WAYLAND ? "wayland" :
+	        glfwGetPlatform() == GLFW_PLATFORM_X11 ? "x11" : "other");
 	g_timeout_add(4, atl_windows_tick, NULL);
 }
 
@@ -298,7 +320,9 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 	window->glfw_window = glfwCreateWindow(width, height, "android-translation-layer", NULL, NULL);
 	if (!window->glfw_window) {
-		fprintf(stderr, "atl_window_new: glfwCreateWindow failed\n");
+		const char *desc = NULL;
+		glfwGetError(&desc);
+		fprintf(stderr, "atl_window_new: glfwCreateWindow failed: %s\n", desc ? desc : "(no detail)");
 		exit(1);
 	}
 	glfwSetWindowUserPointer(window->glfw_window, window);
@@ -309,6 +333,16 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwSetWindowCloseCallback(window->glfw_window, on_window_close);
 	glfwMakeContextCurrent(window->glfw_window);
 	glfwSwapInterval(0); // frame pacing comes from the render tick, don't block on vsync
+
+	/* Commit an initial frame immediately. On Wayland a surface is not mapped
+	 * until its first buffer is committed; without this the window would stay
+	 * invisible until the app's first real frame (which only happens once a
+	 * ViewRootImpl attaches, several seconds into startup) — or never, if the
+	 * app never draws. On X11 the window maps regardless, so this is harmless. */
+	glClearColor(1, 1, 1, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glfwSwapBuffers(window->glfw_window);
+	glfwPollEvents();
 
 	window->next = windows;
 	windows = window;
