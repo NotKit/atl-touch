@@ -188,8 +188,10 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 		activity_close(env, removed_activity);
 		_UNREF(removed_activity);
 	}
-	if (activity_backlog == NULL && window)
+	if (activity_backlog == NULL && window) {
+		fprintf(stderr, "Activity.nativeFinish: last activity finished, backlog empty -> exiting\n");
 		exit(0); // the last activity is gone; quit like the window was closed
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env, jclass class, jobject activity)

@@ -198,6 +198,7 @@ static void on_window_close(GLFWwindow *glfw_window)
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 	} else {
+		fprintf(stderr, "ATLWindow: window close event from compositor -> closing all activities and exiting\n");
 		activity_close_all();
 		exit(0);
 	}
