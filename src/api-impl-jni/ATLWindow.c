@@ -51,18 +51,33 @@ static void dispatch_pointer_event(ATLWindow *window, int action)
 	if (!window->view_root)
 		return;
 	JNIEnv *env = get_jni_env();
+	/* GLFW reports the cursor in window (logical) coordinates, but the scene is
+	 * laid out and rendered in framebuffer pixels. On a scaled/HiDPI output the
+	 * two differ by the content scale, so convert before dispatching or touches
+	 * land in the wrong place and miss their targets. */
+	int fb_w = 0, fb_h = 0, win_w = 0, win_h = 0;
+	glfwGetFramebufferSize(window->glfw_window, &fb_w, &fb_h);
+	glfwGetWindowSize(window->glfw_window, &win_w, &win_h);
+	float scale_x = win_w > 0 ? (float)fb_w / win_w : 1.0f;
+	float scale_y = win_h > 0 ? (float)fb_h / win_h : 1.0f;
+	float px = (float)window->pointer_x * scale_x;
+	float py = (float)window->pointer_y * scale_y;
+	if (getenv("ATL_DEBUG_INPUT"))
+		fprintf(stderr, "ATLWindow: pointer action=%d window=(%.1f,%.1f) scale=(%.2f,%.2f) scene=(%.1f,%.1f) fb=%dx%d win=%dx%d\n",
+		        action, window->pointer_x, window->pointer_y, scale_x, scale_y, px, py, fb_w, fb_h, win_w, win_h);
 	jint id = 1;
-	jfloat values[4] = {(float)window->pointer_x, (float)window->pointer_y,
-	                    (float)window->pointer_x, (float)window->pointer_y};
+	jfloat values[4] = {px, py, px, py};
 	jintArray ids = (*env)->NewIntArray(env, 1);
 	jfloatArray coords = (*env)->NewFloatArray(env, 4);
 	(*env)->SetIntArrayRegion(env, ids, 0, 1, &id);
 	(*env)->SetFloatArrayRegion(env, coords, 0, 4, values);
 	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor,
 	                                         SOURCE_TOUCHSCREEN, action, (jlong)(glfwGetTime() * 1000), ids, coords);
-	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_touch_event, motion_event);
+	jboolean handled = (*env)->CallBooleanMethod(env, window->view_root, window->dispatch_touch_event, motion_event);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	if (getenv("ATL_DEBUG_INPUT"))
+		fprintf(stderr, "ATLWindow: dispatchTouchEvent handled=%d\n", handled);
 	(*env)->DeleteLocalRef(env, motion_event);
 	(*env)->DeleteLocalRef(env, ids);
 	(*env)->DeleteLocalRef(env, coords);
