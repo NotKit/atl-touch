@@ -201,6 +201,12 @@ public class Drawable {
 		return this;
 	}
 
+	/* conservatively report possible transparency so callers don't apply
+	 * opaque-only optimizations (deprecated since API 29 but still called) */
+	public int getOpacity() {
+		return android.graphics.PixelFormat.TRANSLUCENT;
+	}
+
 	public int getIntrinsicWidth() { return -1; }
 	public int getIntrinsicHeight() { return -1; }
 
