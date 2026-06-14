@@ -195,6 +195,12 @@ public class Drawable {
 		return this;
 	}
 
+	/* container drawables (StateListDrawable, etc.) override this; a plain
+	 * drawable is its own current drawable */
+	public Drawable getCurrent() {
+		return this;
+	}
+
 	public int getIntrinsicWidth() { return -1; }
 	public int getIntrinsicHeight() { return -1; }
 
