@@ -1213,7 +1213,35 @@ public class View implements Drawable.Callback {
 		return handled;
 	}
 
+	private boolean clickable = false;
+	private boolean longClickable = false;
+
+	private boolean isClickableForTouch() {
+		return clickable || longClickable || on_click_listener != null || on_long_click_listener != null;
+	}
+
 	public boolean onTouchEvent(MotionEvent event) {
+		/* A clickable view consumes the whole gesture (so the parent keeps
+		 * routing events to it through to ACTION_UP) and fires performClick on
+		 * release. Without this a clickable child never claims ACTION_DOWN, so
+		 * ViewGroup never makes it the touch target and the click is lost. */
+		if (isClickableForTouch()) {
+			switch (event.getActionMasked()) {
+				case MotionEvent.ACTION_DOWN:
+					setPressed(true);
+					break;
+				case MotionEvent.ACTION_UP:
+					if (isPressed()) {
+						performClick();
+						setPressed(false);
+					}
+					break;
+				case MotionEvent.ACTION_CANCEL:
+					setPressed(false);
+					break;
+			}
+			return true;
+		}
 		return false;
 	}
 
@@ -1223,6 +1251,7 @@ public class View implements Drawable.Callback {
 	private OnClickListener on_click_listener = null;
 	public void setOnClickListener(OnClickListener l) {
 		on_click_listener = l;
+		clickable = true;
 	}
 
 	private OnScrollChangeListener on_scroll_change_listener = null;
@@ -1510,7 +1539,9 @@ public class View implements Drawable.Callback {
 		return background;
 	}
 
-	public void setClickable(boolean clickable) {}
+	public void setClickable(boolean clickable) {
+		this.clickable = clickable;
+	}
 
 	public void setEnabled(boolean enabled) {}
 
@@ -1527,9 +1558,12 @@ public class View implements Drawable.Callback {
 	}
 	public void setOnLongClickListener(OnLongClickListener listener) {
 		on_long_click_listener = listener;
+		longClickable = true;
 	}
 
-	public void setLongClickable(boolean longClickable) {}
+	public void setLongClickable(boolean longClickable) {
+		this.longClickable = longClickable;
+	}
 
 	public void setOnHoverListener(OnHoverListener listener) {}
 
@@ -2178,7 +2212,7 @@ public class View implements Drawable.Callback {
 
 	public void requestFitSystemWindows() {}
 
-	public boolean isPressed() { return false; }
+	public boolean isPressed() { return pressed; }
 
 	public void getWindowVisibleDisplayFrame(Rect rect) {
 		ViewRootImpl root = getViewRootImpl();
