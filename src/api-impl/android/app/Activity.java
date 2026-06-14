@@ -685,12 +685,25 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return false;
 	}
 
-	public void requestPermissions(String[] permissions, int requestCode) {
-		Slog.w(TAG, "requestPermissions(" + Arrays.toString(permissions) + "): not handled");
+	public void requestPermissions(final String[] permissions, final int requestCode) {
+		/* ATL has no permission dialog; resolve against checkPermission (which grants
+		 * everything except env-gated location/mic) and deliver the result asynchronously
+		 * so the app's onRequestPermissionsResult / ActivityResult callback completes. */
+		final int[] grantResults = new int[permissions.length];
+		for (int i = 0; i < permissions.length; i++)
+			grantResults[i] = getPackageManager().checkPermission(permissions[i], getPackageName());
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				onRequestPermissionsResult(requestCode, permissions, grantResults);
+			}
+		});
 	}
 
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {}
+
 	public boolean shouldShowRequestPermissionRationale(String permission) {
-		return true;
+		return false;
 	}
 
 	public ActionBar getActionBar() {

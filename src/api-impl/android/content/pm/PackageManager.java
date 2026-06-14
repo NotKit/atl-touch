@@ -1945,8 +1945,10 @@ public class PackageManager {
 				else
 					return PERMISSION_DENIED;
 			default:
-				System.out.println("PackageManager.checkPermission: >" + permName + "< not handled\n");
-				return PERMISSION_DENIED;
+				// ATL runs with the host user's privileges and the app declared these in
+				// its manifest, so grant by default; only the env-gated dangerous ones above
+				// (location, microphone) are withheld.
+				return PERMISSION_GRANTED;
 		}
 	}
 
