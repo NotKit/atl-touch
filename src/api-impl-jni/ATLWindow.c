@@ -298,6 +298,14 @@ void atl_windows_init(void)
 			glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
 	}
 
+	/* Do NOT let GLFW load libdecor for Wayland window decorations: libdecor's
+	 * GTK plugin pulls in GTK3, and ATL already has GTK4 loaded (GApplication,
+	 * libandroid), so both try to register types like GtkWidget into one
+	 * process -> GType meltdown ("cannot register existing type 'GtkWidget'")
+	 * and the app hangs. We draw our own chrome anyway; the compositor can
+	 * still provide server-side decorations via xdg-decoration. */
+	glfwInitHint(GLFW_WAYLAND_LIBDECOR, GLFW_WAYLAND_DISABLE_LIBDECOR);
+
 	if (!glfwInit()) {
 		const char *desc = NULL;
 		glfwGetError(&desc);
