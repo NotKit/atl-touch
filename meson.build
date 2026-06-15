@@ -126,6 +126,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/android_graphics_Matrix.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Paint.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Path.cpp',
+                                                                  	'src/api-impl-jni/graphics/android_graphics_Shader.cpp',
                                                                   	'src/api-impl-jni/graphics/android_view_RenderNode.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_Drawable.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_DrawableContainer.c',

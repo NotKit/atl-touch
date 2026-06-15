@@ -2,6 +2,7 @@
 
 #include "../defines.h"
 #include "ATLCanvas.h"
+#include "ATLShader.h"
 #include "AndroidPaint.h"
 
 #include "include/core/SkBlendMode.h"
@@ -41,6 +42,17 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1color(JNIEnv *en
 {
 	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
 	paint->paint.setColor((SkColor)(uint32_t)color);
+}
+
+/* not in the generated header until the Java side is recompiled, so give it
+ * explicit C linkage to keep the JNI symbol name unmangled */
+extern "C" JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1shader(JNIEnv *env, jclass clazz, jlong paint_ptr, jlong shader_ptr)
+{
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	if (shader_ptr)
+		paint->paint.setShader(((ATLShader *)_PTR(shader_ptr))->effective());
+	else
+		paint->paint.setShader(nullptr);
 }
 
 JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1get_1color(JNIEnv *env, jclass clazz, jlong paint_ptr)

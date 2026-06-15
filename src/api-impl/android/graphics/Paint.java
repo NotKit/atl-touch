@@ -129,6 +129,7 @@ public class Paint {
 
 	public Shader setShader(Shader shader) {
 		this.shader = shader;
+		native_set_shader(paint, shader != null ? shader.native_instance : 0);
 		return shader;
 	}
 
@@ -391,6 +392,7 @@ public class Paint {
 	private static native long native_clone(long paint);
 	private static native void native_recycle(long paint);
 	private static native void native_set_color(long paint, int color);
+	private static native void native_set_shader(long paint, long shader);
 	private static native int native_get_color(long paint);
 	private static native void native_set_alpha(long paint, int alpha);
 	private static native int native_get_alpha(long paint);
