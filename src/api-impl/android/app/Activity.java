@@ -79,10 +79,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		// Setting up a window requires a context.
 		activity.window = new Window(activity, activity);
 		activity.window.set_native_window(native_window);
+		// Set the field directly rather than calling the (overridable) setTitle():
+		// for an AppCompatActivity, setTitle() routes through AppCompatDelegate and
+		// prematurely installs the sub-decor — resolving windowBackground from the
+		// manifest (launcher) theme before the app's own onCreate gets to switch
+		// themes. The native window title is applied later from this field in onStart().
 		if (label_res != 0) {
-			activity.setTitle(r.getText(label_res));
+			activity.title = r.getText(label_res);
 		} else if (app_label_res != 0) {
-			activity.setTitle(r.getText(app_label_res));
+			activity.title = r.getText(app_label_res);
 		}
 		return activity;
 	}
