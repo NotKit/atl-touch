@@ -258,7 +258,29 @@ public class TextView extends View {
 
 	public void setEllipsize(TextUtils.TruncateAt truncateAt) {}
 
-	public void setTextAppearance(Context context, int appearance) {}
+	public void setTextAppearance(Context context, int appearance) {
+		applyTextAppearance(context, appearance);
+	}
+
+	private void applyTextAppearance(Context context, int appearance) {
+		if (appearance == 0)
+			return;
+		TypedArray aa = context.obtainStyledAttributes(appearance, com.android.internal.R.styleable.TextAppearance);
+		try {
+			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textColor))
+				setTextColor(aa.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor));
+			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textSize))
+				setTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
+			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textStyle))
+				setTypeface(getTypeface(), aa.getInt(com.android.internal.R.styleable.TextAppearance_textStyle, 0));
+			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textAllCaps))
+				setAllCaps(aa.getBoolean(com.android.internal.R.styleable.TextAppearance_textAllCaps, false));
+		} catch (java.lang.Exception e) {
+			e.printStackTrace();
+		} finally {
+			aa.recycle();
+		}
+	}
 
 	public void setMaxLines(int maxLines) {}
 
@@ -407,7 +429,9 @@ public class TextView extends View {
 
 	public Drawable[] getCompoundDrawables() { return new Drawable[4]; }
 
-	public void setTextAppearance(int dummy) {}
+	public void setTextAppearance(int appearance) {
+		applyTextAppearance(getContext(), appearance);
+	}
 
 	public int length() {
 		return getText().length();
