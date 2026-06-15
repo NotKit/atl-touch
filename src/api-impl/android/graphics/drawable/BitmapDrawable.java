@@ -10,6 +10,8 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
+import android.view.Gravity;
+import android.atl.GskCanvas;
 import com.android.internal.R;
 import java.io.IOException;
 import org.xmlpull.v1.XmlPullParser;
@@ -18,6 +20,8 @@ import org.xmlpull.v1.XmlPullParserException;
 public class BitmapDrawable extends Drawable {
 
 	private Bitmap bitmap;
+	private int gravity = Gravity.FILL;
+	private final Rect dstRect = new Rect();
 
 	public BitmapDrawable() {
 	}
@@ -53,6 +57,7 @@ public class BitmapDrawable extends Drawable {
 			if (dr != null)
 				bitmap = dr.bitmap;
 		}
+		gravity = a.getInt(R.styleable.BitmapDrawable_gravity, Gravity.FILL);
 		a.recycle();
 		if (bitmap == null)
 			throw new XmlPullParserException("<bitmap> needs a valid `src' attribute");
@@ -79,5 +84,32 @@ public class BitmapDrawable extends Drawable {
 		return new Paint();
 	}
 
-	public void setGravity(int g) {}
+	public void setGravity(int g) {
+		if (gravity != g) {
+			gravity = g;
+			invalidateSelf();
+		}
+	}
+
+	public int getGravity() {
+		return gravity;
+	}
+
+	@Override
+	public void draw(Canvas canvas) {
+		if (bitmap == null)
+			return;
+
+		Rect bounds = getBounds();
+		// Gravity.FILL stretches to the full bounds (the default), which matches
+		// the base Drawable behaviour. Any other gravity positions the bitmap at
+		// its intrinsic size within the bounds (e.g. android:gravity="center").
+		Gravity.apply(gravity, bitmap.getWidth(), bitmap.getHeight(), bounds, dstRect);
+
+		if (canvas instanceof GskCanvas) {
+			canvas.translate(dstRect.left, dstRect.top);
+			native_draw(paintable, ((GskCanvas)canvas).snapshot, dstRect.width(), dstRect.height());
+			canvas.translate(-dstRect.left, -dstRect.top);
+		}
+	}
 }
