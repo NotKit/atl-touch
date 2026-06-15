@@ -36,6 +36,7 @@ public class Window {
 	public long native_window;
 	private ViewGroup decorView;
 	private ViewRootImpl viewRootImpl;
+	private boolean backgroundSetByApp = false;
 
 	private Window.Callback callback;
 	private Context context;
@@ -64,10 +65,16 @@ public class Window {
 	}
 
 	public void setContentView(View view) {
-		if (decorView.getBackground() == null) {
+		// Re-resolve the theme's windowBackground every time, unless the app set its
+		// own background. A setContentView can happen (e.g. AppCompat sub-decor) while
+		// the activity still carries the manifest/launcher theme, before the app's
+		// onCreate switches themes; resolving only once would leave the launcher's
+		// splash drawable (windowBackground) stuck as the decor background. Re-resolving
+		// lets the real setContentView (after the theme switch) pick up the right one.
+		if (!backgroundSetByApp) {
 			TypedArray ta = context.obtainStyledAttributes(new int[] {R.attr.windowBackground});
 			if (ta.hasValue(0))
-				setBackgroundDrawable(ta.getDrawable(0));
+				setThemeBackground(ta.getDrawable(0));
 			ta.recycle();
 		}
 		decorView.removeAllViews();
@@ -119,6 +126,17 @@ public class Window {
 	}
 
 	public void setBackgroundDrawable(Drawable drawable) {
+		backgroundSetByApp = true;
+		applyBackground(drawable);
+	}
+
+	/** apply the theme-derived windowBackground without marking it app-set, so a later
+	 *  setContentView (after a theme switch) can still replace it */
+	private void setThemeBackground(Drawable drawable) {
+		applyBackground(drawable);
+	}
+
+	private void applyBackground(Drawable drawable) {
 		// HACK: disable transparent background for WhatsApp dialogs
 		// For some unknown reason, the language picker in WhatsApp doesn't render the BottomSheet background currently.
 		if (!"com.whatsapp".equals(context.getPackageName()))
