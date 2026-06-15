@@ -91,6 +91,25 @@ public class GskCanvas extends DisplayListCanvas {
 	}
 
 	@Override
+	public boolean clipPath(Path path) {
+		if (path == null)
+			return false;
+		native_clipPath(snapshot, path.getGskPath());
+		int save_count = getSaveCount();
+		if (push_history == null)
+			push_history = new int[save_count + 1];
+		else if (push_history.length <= save_count)
+			push_history = Arrays.copyOf(push_history, save_count + 1);
+		push_history[save_count]++;
+		return true;
+	}
+
+	@Override
+	public boolean clipPath(Path path, Region.Op op) {
+		return clipPath(path);
+	}
+
+	@Override
 	public void drawBitmap(Bitmap bitmap, Rect src, Rect dst, Paint paint) {
 		if (src == null)
 			native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
@@ -165,6 +184,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_scale(long snapshot, float sx, float sy);
 	protected native void native_concat(long snapshot, long matrix);
 	protected native void native_clipRect(long snapshot, float left, float top, float right, float bottom);
+	protected native void native_clipPath(long snapshot, long path);
 	protected native void native_pop(long snapshot, int pop_count);
 	protected native void native_drawRenderNode(long snapshot, long render_node);
 }

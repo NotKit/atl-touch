@@ -130,6 +130,12 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipRect(JNIEnv *env, 
 	((ATLCanvas *)_PTR(snapshot_ptr))->canvas->clipRect(SkRect::MakeLTRB(left, top, right, bottom));
 }
 
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipPath(JNIEnv *env, jobject this_class, jlong snapshot_ptr, jlong path_ptr)
+{
+	SkPath *path = (SkPath *)_PTR(path_ptr);
+	((ATLCanvas *)_PTR(snapshot_ptr))->canvas->clipPath(*path, true /* doAntiAlias */);
+}
+
 /* clips are part of the save/restore stack in Skia (unlike GSK's push/pop),
  * so there is nothing to pop here; the Java side's push counting is harmless */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pop(JNIEnv *env, jobject this_class, jlong snapshot_ptr, jint count)
