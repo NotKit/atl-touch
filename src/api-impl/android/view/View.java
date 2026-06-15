@@ -1283,6 +1283,28 @@ public class View implements Drawable.Callback {
 		return view.viewRootImpl;
 	}
 
+	/* API 33 predictive back: hand out a no-op dispatcher (callbacks never invoked;
+	 * back still routes through the legacy onBackPressed path). */
+	private static final android.window.OnBackInvokedDispatcher NOOP_BACK_DISPATCHER = new android.window.OnBackInvokedDispatcher() {
+		public void registerOnBackInvokedCallback(int priority, android.window.OnBackInvokedCallback callback) {}
+		public void unregisterOnBackInvokedCallback(android.window.OnBackInvokedCallback callback) {}
+	};
+
+	public android.window.OnBackInvokedDispatcher findOnBackInvokedDispatcher() {
+		return NOOP_BACK_DISPATCHER;
+	}
+
+	/* Rich-content receipt is not wired up; record the listener but never invoke it. */
+	private OnReceiveContentListener onReceiveContentListener;
+
+	public void setOnReceiveContentListener(String[] mimeTypes, OnReceiveContentListener listener) {
+		onReceiveContentListener = listener;
+	}
+
+	public ContentInfo onReceiveContent(ContentInfo payload) {
+		return payload;
+	}
+
 	void dispatchAttachedToWindow() {
 		onAttachedToWindow();
 	}
