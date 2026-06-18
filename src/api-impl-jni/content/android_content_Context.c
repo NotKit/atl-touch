@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
@@ -33,10 +34,10 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namestpace, gc
 	JNIEnv *env;
 	if (!strcmp(namestpace, "org.freedesktop.appearance") && !strcmp(key, "color-scheme")) {
 		int color_sheme = g_variant_get_uint32(value);
+		bool at_runtime = !configuration;
 		env = get_jni_env();
 		if (!configuration) {
-			jobject resources = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "r", "Landroid/content/res/Resources;");
-			configuration = _GET_OBJ_FIELD(resources, "mConfiguration", "Landroid/content/res/Configuration;");
+			configuration = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "sys_config", "Landroid/content/res/Configuration;");
 		}
 		if (color_sheme == 1) // Prefer dark appearance
 			_SET_INT_FIELD(configuration, "uiMode", /*UI_MODE_NIGHT_YES*/ 0x20);
@@ -44,6 +45,11 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namestpace, gc
 			_SET_INT_FIELD(configuration, "uiMode", /*UI_MODE_NIGHT_NO*/ 0x10);
 		else // No preference
 			_SET_INT_FIELD(configuration, "uiMode", /*UI_MODE_NIGHT_UNDEFINED*/ 0x00);
+		/* the boot-time call is made from Context's own static initialiser, which
+		 * hands us the Configuration and copies it into Resources itself */
+		if (at_runtime)
+			(*env)->CallStaticVoidMethod(env, handle_cache.context.class,
+			                             _STATIC_METHOD(handle_cache.context.class, "onSystemConfigChanged", "()V"));
 	}
 }
 

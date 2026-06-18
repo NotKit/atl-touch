@@ -1,6 +1,6 @@
 package android.app.job;
 
-import android.app.ContextImpl;
+import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
@@ -58,11 +58,14 @@ public class JobScheduler {
 			public void run() {
 				try {
 					String className = job.getService().getClassName();
-					Class<? extends JobService> cls = ClassLoader.getSystemClassLoader().loadClass(className).asSubclass(JobService.class);
+					Class<? extends JobService> cls = context.get_atl_loaded_app()
+					                                      .loadClass(className)
+					                                      .asSubclass(JobService.class);
 					if (!runningServices.containsKey(cls)) {
 						JobService service = cls.getConstructor().newInstance();
-						service.attachBaseContext(new ContextImpl(
-						    context.getResources(), context.getApplicationInfo(), context.getTheme()));
+						ATLLoadedApp atlLoadedApp = context.get_atl_loaded_app();
+						service.attachBaseContext(atlLoadedApp.createContext(null, null,
+						                                                     atlLoadedApp.pkg.applicationInfo.theme));
 						service.onCreate();
 						runningServices.put(cls, service);
 					}

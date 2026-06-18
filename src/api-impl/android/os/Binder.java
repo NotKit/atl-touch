@@ -1,5 +1,6 @@
 package android.os;
 
+import android.atl.ATLLoadedApp;
 import android.content.Context;
 
 import java.io.FileDescriptor;
@@ -65,7 +66,7 @@ public class Binder implements IBinder {
 	@Override
 	public boolean unlinkToDeath(DeathRecipient recipient, int flags) { return true; }
 
-	public static int getCallingUid() { return Context.this_application.getApplicationInfo().uid; }
+	public static int getCallingUid() { return ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.uid; }
 
 	public static int getCallingPid() { return 0; }
 

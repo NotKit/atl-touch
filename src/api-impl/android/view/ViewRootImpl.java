@@ -104,9 +104,9 @@ public class ViewRootImpl implements ViewParent {
 	 * callback is delivered either way.
 	 */
 	public void dispatchConfigurationChanged() {
-		if (Context.r == null)
+		if (Context.sys_config == null)
 			return;
-		Configuration config = Context.r.getConfiguration();
+		Configuration config = Context.sys_config;
 		/* AOSP delivers the callback only when the Configuration really differs
 		 * (ViewRootImpl.updateConfiguration diffs it against the last one), and
 		 * it calls requestLayout() straight after. Re-delivering an identical

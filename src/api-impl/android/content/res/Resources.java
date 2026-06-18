@@ -215,12 +215,13 @@ public class Resources {
 	/**
 	 * Returns the drawable inflater used by this resources object.
 	 *
-	 * ATL: the system classloader loads the app APK, so it can also find
-	 * app-defined custom drawable classes.
+	 * ATL: the app's own class loader, so it can also find app-defined custom
+	 * drawable classes.
 	 */
 	public android.graphics.drawable.DrawableInflater getDrawableInflater() {
 		if (mDrawableInflater == null) {
-			mDrawableInflater = new android.graphics.drawable.DrawableInflater(this, ClassLoader.getSystemClassLoader());
+			mDrawableInflater = new android.graphics.drawable.DrawableInflater(
+			    this, android.atl.ATLLoadedApp.getPrimaryApplication().class_loader);
 		}
 		return mDrawableInflater;
 	}
@@ -247,18 +248,20 @@ public class Resources {
 	 * on orientation, etc).
 	 */
 	public static Resources getSystem() {
-		// Not this_application: it has no base context until attachBaseContext
-		// has run, and apps call this from inside their own attachBaseContext.
-		return Context.r;
-		//synchronized (sSync) {
-		//	Resources ret = mSystem;
-		//	if (ret == null) {
-		//		ret = new Resources();
-		//		mSystem = ret;
-		//	}
-		//
-		//	return ret;
-		//}
+		Resources ret = mSystem;
+		if (ret != null) {
+			return ret;
+		}
+		synchronized (sSync) {
+			ret = mSystem;
+			if (ret == null) {
+				ret = new Resources(new AssetManager(Resources.class.getClassLoader()),
+				                    new DisplayMetrics(), Context.sys_config);
+				mSystem = ret;
+			}
+
+			return ret;
+		}
 	}
 
 	/**
@@ -1166,10 +1169,12 @@ public class Resources {
 	 */
 	public void getValue(int id, TypedValue outValue, boolean resolveRefs)
 	    throws NotFoundException {
-		boolean found = mAssets.getResourceValue(id, 0, outValue, resolveRefs);
+		boolean found = mAssets.getResourceValue(id, mCompatibilityInfo.applicationDensity, outValue, resolveRefs);
 		if (found) {
 			return;
 		}
+		if (mSystem != null && mSystem.mAssets == this.mAssets)
+			throw new NotFoundException("Resource ID #0x" + Integer.toHexString(id) + " (System assets)");
 		throw new NotFoundException("Resource ID #0x" + Integer.toHexString(id));
 	}
 

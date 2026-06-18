@@ -2,6 +2,7 @@ package android.app;
 
 import android.app.ActionBar;
 import android.atl.ATLFilePicker;
+import android.atl.ATLLoadedApp;
 import android.content.BroadcastReceiver;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
@@ -59,43 +60,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	private boolean finishing = false;
 
 	public static Activity internalCreateActivity(String className, long native_window, Intent intent) throws ReflectiveOperationException {
-		int theme_res = 0;
-		int label_res = 0;
-		int app_label_res = 0;
-		int soft_input_mode = 0;
-		for (PackageParser.Activity activity : pkg.activities) {
-			if (className.equals(activity.className)) {
-				label_res = activity.info.labelRes;
-				theme_res = activity.info.getThemeResource();
-				soft_input_mode = activity.info.softInputMode;
-				break;
-			}
-		}
-
-		app_label_res = pkg.applicationInfo.labelRes;
-		theme_res = Resources.selectDefaultTheme(theme_res,
-		                                         Math.min(pkg.applicationInfo.targetSdkVersion, Build.VERSION.SDK_INT));
-
-		Class<? extends Activity> cls = ClassLoader.getSystemClassLoader().loadClass(className).asSubclass(Activity.class);
-		Constructor<? extends Activity> constructor = cls.getConstructor();
-		Activity activity = constructor.newInstance();
-		intent.setComponent(new ComponentName(pkg.packageName, className));
-		activity.intent = intent;
-		activity.attachBaseContext(new ContextImpl(r, pkg.applicationInfo, theme_res));
-		// Setting up a window requires a context.
-		activity.window = new Window(activity, activity);
-		activity.window.setSoftInputMode(soft_input_mode);
+		Activity activity = ATLLoadedApp.getPrimaryApplication().createActivity(className, intent);
 		activity.window.set_native_window(native_window);
-		// Set the field directly rather than calling the (overridable) setTitle():
-		// for an AppCompatActivity, setTitle() routes through AppCompatDelegate and
-		// prematurely installs the sub-decor — resolving windowBackground from the
-		// manifest (launcher) theme before the app's own onCreate gets to switch
-		// themes. The native window title is applied later from this field in onStart().
-		if (label_res != 0) {
-			activity.title = r.getText(label_res);
-		} else if (app_label_res != 0) {
-			activity.title = r.getText(app_label_res);
-		}
 		return activity;
 	}
 
@@ -106,10 +72,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	 * @return  instance of main activity class
 	 * @throws Exception
 	 */
-	private static Activity createMainActivity(String className, long native_window, String uriString) throws Exception {
+	private static Activity createMainActivity(String className, long native_window, String uriString) throws ReflectiveOperationException {
 		Uri uri = uriString != null ? Uri.parse(uriString) : null;
 		if (className == null) {
-			for (PackageParser.Activity activity : pkg.activities) {
+			for (PackageParser.Activity activity : ATLLoadedApp.getPrimaryApplication().pkg.activities) {
 				if (!activity.info.enabled)
 					continue;
 				boolean done = false;
@@ -862,7 +828,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public int getTaskId() {
 		/* we don't support multiple activity stacks, so this is probably fine? */
-		return System.identityHashCode(this_application);
+		return System.identityHashCode(this.getApplicationContext());
 	}
 
 	boolean moveTaskToBack(boolean nonroot) {
@@ -911,6 +877,28 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public ActionBar getActionBar() {
 		return null;
+	}
+
+	@Override
+	public void atl_attach_base_context(Context baseContext) {
+		super.atl_attach_base_context(baseContext);
+		// Setting up a window requires a context.
+		this.window = new Window(this, this);
+	}
+
+	/**
+	 * Manifest-driven setup, run by ATLLoadedApp.createActivity once the window exists.
+	 *
+	 * The title goes onto the field rather than through the (overridable) setTitle():
+	 * for an AppCompatActivity setTitle() routes through AppCompatDelegate and
+	 * prematurely installs the sub-decor - resolving windowBackground from the
+	 * manifest (launcher) theme before the app's own onCreate gets to switch themes.
+	 * onStart() applies the field to the native window title.
+	 */
+	public void atl_apply_manifest(int softInputMode, CharSequence title) {
+		this.window.setSoftInputMode(softInputMode);
+		if (title != null)
+			this.title = title;
 	}
 
 	public android.view.ActionMode startActionMode(android.view.ActionMode.Callback a0) { return null; }

@@ -109,7 +109,7 @@ public class MediaPlayer {
 	/* GStreamer wants a URI; materialize the fd range as a cache file */
 	public void setDataSource(FileDescriptor fd, long offset, long length) throws IOException {
 		File cacheFile = File.createTempFile("mediaplayer", null,
-		                                     Context.this_application.getCacheDir());
+		                                     android.atl.ATLLoadedApp.getPrimaryApplication().getApplication().getCacheDir());
 		cacheFile.deleteOnExit();
 		try (InputStream in = new FileInputStream(fd);
 		     FileOutputStream out = new FileOutputStream(cacheFile)) {

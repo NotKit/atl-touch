@@ -191,7 +191,7 @@ public class ATLMediaContentProvider extends ContentProvider {
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
-				new ATLContentHubPicker(android.content.Context.this_application, null,
+				new ATLContentHubPicker(ATLLoadedApp.getPrimaryApplication().getApplication(), null,
 				                        peers, new ATLContentHubPicker.ResultListener() {
 					@Override
 					public void onResult(String peerId) {
@@ -216,7 +216,7 @@ public class ATLMediaContentProvider extends ContentProvider {
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
-				new ATLFilePicker(android.content.Context.this_application, ATLFilePicker.ACTION_SELECT_FOLDER,
+				new ATLFilePicker(ATLLoadedApp.getPrimaryApplication().getApplication(), ATLFilePicker.ACTION_SELECT_FOLDER,
 				                  "Open Media Folder", null, new ATLFilePicker.ResultListener() {
 					@Override
 					public void onResult(File file) {

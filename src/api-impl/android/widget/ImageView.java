@@ -58,11 +58,11 @@ public class ImageView extends View {
 			setImageDrawable(null);
 			return;
 		}
-		if (Context.this_application.getResources().getString(resid).endsWith(".xml")) {
+		if (this.getResources().getString(resid).endsWith(".xml")) {
 			setImageDrawable(getContext().getDrawable(resid));
 			return;
 		}
-		bitmap = BitmapFactory.decodeResource(Context.this_application.getResources(), resid);
+		bitmap = BitmapFactory.decodeResource(this.getResources(), resid);
 		requestLayout();
 		invalidate();
 	}

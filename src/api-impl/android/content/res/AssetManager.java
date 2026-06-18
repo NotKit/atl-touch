@@ -23,11 +23,9 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Slog;
 import android.util.TypedValue;
-import java.io.FileDescriptor;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -106,6 +104,17 @@ public final class AssetManager {
 	 * {@hide}
 	 */
 	public AssetManager() {
+		this(null);
+	}
+
+	/**
+	 * Create a new AssetManager containing only the basic system assets.
+	 * Applications will not generally use this method, instead retrieving the
+	 * appropriate asset manager with {@link Resources#getAssets}.    Not for
+	 * use by applications.
+	 * {@hide}
+	 */
+	public AssetManager(ClassLoader classLoader) {
 		synchronized (this) {
 			if (DEBUG_REFS) {
 				mNumRefs = 0;
@@ -115,7 +124,7 @@ public final class AssetManager {
 			if (localLOGV)
 				Log.v(TAG, "New asset manager: " + this);
 			//            ensureSystemAssets()
-			asset_paths.addAll(findApkPaths());
+			asset_paths.addAll(findApkPaths(classLoader));
 			asset_paths.add(android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/");
 			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
 			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
@@ -129,9 +138,10 @@ public final class AssetManager {
 	 * The launcher names them in system properties. Only the dex launcher, which
 	 * sets none, still has to be asked through the class path — a jar-based
 	 * runtime need not have the apks on it at all, and a native image has no
-	 * class path to scan.
+	 * class path to scan. There the app has a class loader of its own, so both
+	 * it and the system one are scanned: framework-res.apk is on the latter.
 	 */
-	private static synchronized ArrayList<String> findApkPaths() {
+	private static synchronized ArrayList<String> findApkPaths(ClassLoader classLoader) {
 		if (apk_paths != null)
 			return apk_paths;
 
@@ -144,16 +154,20 @@ public final class AssetManager {
 			found.add(apk_path);
 		} else {
 			try {
-				Enumeration<URL> resources = ClassLoader.getSystemClassLoader().getResources("AndroidManifest.xml");
-				ArrayList<String> paths = new ArrayList<String>();
+				ArrayList<String> paths = new ArrayList<>();
 				paths.add(null); // reserve first slot for framework-res.apk
-				while (resources.hasMoreElements()) {
-					String path = resources.nextElement().getPath();
-					path = URLDecoder.decode(path, "UTF-8");
-					if (path.contains("framework-res.apk")) // needs to be first, so it can be overridden
-						paths.set(0, path);
-					else
-						paths.add(path);
+				for (ClassLoader loader : new ClassLoader[] {classLoader, ClassLoader.getSystemClassLoader()}) {
+					if (loader == null)
+						continue;
+					Enumeration<URL> resources = loader.getResources("AndroidManifest.xml");
+					while (resources.hasMoreElements()) {
+						String path = resources.nextElement().getPath();
+						path = URLDecoder.decode(path, "UTF-8");
+						if (path.contains("framework-res.apk")) // needs to be first, so it can be overridden
+							paths.set(0, path);
+						else if (!paths.contains(path))
+							paths.add(path);
+					}
 				}
 				for (String path : paths) {
 					if (path != null) {
@@ -676,7 +690,7 @@ public final class AssetManager {
 	public static void extractFromAPK(String apk_path, String path, String target) throws IOException {
 		if (extract(apk_path, path, target))
 			return;
-		for (String other : findApkPaths()) {
+		for (String other : findApkPaths(null)) {
 			if (!other.equals(apk_path) && extract(other, path, target))
 				return;
 		}

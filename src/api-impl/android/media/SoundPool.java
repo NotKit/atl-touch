@@ -1,5 +1,6 @@
 package android.media;
 
+import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
@@ -54,7 +55,8 @@ public class SoundPool {
 	}
 
 	public int load(AssetFileDescriptor afd, int priority) throws IOException {
-		AssetManager.extractFromAPK(Context.this_application.getPackageCodePath(), afd.fileName, afd.fileName);
+		String packageCodePath = ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.sourceDir;
+		AssetManager.extractFromAPK(packageCodePath, afd.fileName, afd.fileName);
 		return registerLoad(nativeLoad(nativePool, android.os.Environment.getExternalStorageDirectory().getPath() + "/" + afd.fileName));
 	}
 

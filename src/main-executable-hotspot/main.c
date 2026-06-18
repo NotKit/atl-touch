@@ -474,12 +474,8 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 		atl_window_set_title(atl_window, _CSTRING(package_name_jstr));
 
 	const GLFWvidmode *monitor_mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-	jobject resources = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "r", "Landroid/content/res/Resources;");
-	fatal_exception_check(env, "reading Context.r");
-	/* _GET_OBJ_FIELD/_SET_INT_FIELD take the object's class first, and
-	 * GetObjectClass(NULL) is another crash inside the VM */
-	jobject configuration = resources ? _GET_OBJ_FIELD(resources, "mConfiguration", "Landroid/content/res/Configuration;") : NULL;
-	fatal_exception_check(env, "reading Resources.mConfiguration");
+	jobject configuration = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "sys_config", "Landroid/content/res/Configuration;");
+	fatal_exception_check(env, "reading Context.sys_config");
 	if (!configuration) {
 		fprintf(stderr, "error: the framework booted without a Configuration\n");
 		exit(1);
@@ -489,6 +485,10 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	else
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02);
 	fatal_exception_check(env, "setting Configuration.screenLayout");
+	/* Resources copied sys_config when the app was loaded; push the edit into it */
+	(*env)->CallStaticVoidMethod(env, handle_cache.context.class,
+	                             static_method(env, handle_cache.context.class, "onSystemConfigChanged", "()V"));
+	fatal_exception_check(env, "Context.onSystemConfigChanged");
 
 	activity_start(env, activity_object);
 	fatal_exception_check(env, "Activity.onStart");

@@ -58,7 +58,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 */
 	public Bundle() {
 		super();
-		mClassLoader = ClassLoader.getSystemClassLoader(); // app classes live on the class path, we live on the boot class path
 	}
 
 	/**
@@ -81,7 +80,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 */
 	public Bundle(int capacity) {
 		mMap = new ArrayMap<String, Object>(capacity);
-		mClassLoader = ClassLoader.getSystemClassLoader(); // app classes live on the class path, we live on the boot class path
 	}
 
 	/**
@@ -101,7 +99,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 
 	public Bundle(PersistableBundle b) {
 		mMap = new ArrayMap<String, Object>(b.mMap);
-		mClassLoader = ClassLoader.getSystemClassLoader(); // app classes live on the class path, we live on the boot class path
 	}
 
 	/**
@@ -156,6 +153,10 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 * Return the ClassLoader currently associated with this Bundle.
 	 */
 	public ClassLoader getClassLoader() {
+		/* the loader that holds the app's classes, resolved late: a Bundle is built
+		 * while the app itself is still being loaded */
+		if (mClassLoader == null)
+			mClassLoader = android.atl.ATLLoadedApp.getPrimaryClassLoader();
 		return mClassLoader;
 	}
 

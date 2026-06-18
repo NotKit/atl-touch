@@ -136,7 +136,7 @@ JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runne
 	JNIEnv *env;
 	JavaVMInitArgs args = {
 		.version = JNI_VERSION_1_6,
-		.nOptions = 2,
+		.nOptions = 4,
 	};
 	JavaVMOption *options;
 
@@ -157,23 +157,28 @@ JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runne
 		args.nOptions += g_strv_length(extra_jvm_options);
 	options = malloc(sizeof(JavaVMOption) * args.nOptions);
 
-	int option_counter = 2; // slots 0 and 1 are always filled below
+	int option_counter = 4; // slots 0 to 3 are always filled below
 
 	/* Absolute, because BaseDexClassLoader.findLibrary() hands the path it
 	 * finds straight to the app, and a caller that takes dirname() of it gets
 	 * "." - which Gecko, for one, then rejects as MOZ_ANDROID_LIBDIR */
+	char *natives_dir = api_impl_natives_dir;
+	char *builddir = NULL;
 	if (getenv("RUN_FROM_BUILDDIR")) {
-		char *builddir = g_get_current_dir();
-		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){builddir, app_lib_dir}, 2);
-		g_free(builddir);
-	} else {
-		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){api_impl_natives_dir, app_lib_dir}, 2);
+		builddir = g_get_current_dir();
+		natives_dir = builddir;
 	}
+	options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){natives_dir, app_lib_dir}, 2);
 
-	/* api-impl.jar is on the boot class path (see set_up_boot_class_path); framework-res.apk
-	 * stays here because it holds no classes and AssetManager finds it by scanning the
-	 * system class loader's resources */
-	options[1].optionString = construct_classpath("-Djava.class.path=", (char *[]){apk_classpath, framework_res_apk, test_runner_jar}, 3);
+	/* api-impl.jar is on the boot class path (see set_up_boot_class_path) and the apk on
+	 * ATLLoadedApp's own class loader; framework-res.apk stays here because it holds no
+	 * classes and AssetManager finds it by scanning the system class loader's resources */
+	options[1].optionString = construct_classpath("-Djava.class.path=", (char *[]){framework_res_apk}, 1);
+	/* the test runner goes with the app: the test classes in the apk extend it.
+	 * ATLLoadedApp relies on the first element in atl.app.class.path being the main apk */
+	options[2].optionString = construct_classpath("-Datl.app.class.path=", (char *[]){apk_classpath, test_runner_jar}, 2);
+	options[3].optionString = construct_classpath("-Datl.app.library.path=", (char *[]){natives_dir, app_lib_dir}, 2);
+	g_free(builddir);
 	if (getenv("ATL_CHECK_JNI"))
 		options[option_counter++].optionString = "-Xcheck:jni";
 	if (jdwp_port) {
@@ -648,12 +653,14 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 		atl_window_set_title(atl_window, package_name);
 
 	const GLFWvidmode *monitor_mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-	jobject resources = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "r", "Landroid/content/res/Resources;");
-	jobject configuration = _GET_OBJ_FIELD(resources, "mConfiguration", "Landroid/content/res/Configuration;");
+	jobject configuration = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "sys_config", "Landroid/content/res/Configuration;");
 	if (monitor_mode && monitor_mode->width >= 800 && monitor_mode->height >= 800)
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_LARGE*/ 0x03);
 	else
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02);
+	/* Resources copied sys_config when the app was loaded; push the edit into it */
+	(*env)->CallStaticVoidMethod(env, handle_cache.context.class,
+	                             _STATIC_METHOD(handle_cache.context.class, "onSystemConfigChanged", "()V"));
 
 	// TODO: window icon (GLFW only supports this on X11; Wayland needs an app-id + .desktop file)
 

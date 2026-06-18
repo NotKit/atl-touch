@@ -1,5 +1,6 @@
 package android.app;
 
+import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.content.pm.ConfigurationInfo;
 import android.graphics.Bitmap;
@@ -37,7 +38,8 @@ public class ActivityManager {
 	}
 
 	public List<RunningAppProcessInfo> getRunningAppProcesses() {
-		return Arrays.asList(new RunningAppProcessInfo(Process.myPid(), Context.pkg.applicationInfo.packageName));
+		return Arrays.asList(new RunningAppProcessInfo(Process.myPid(),
+		                                               ATLLoadedApp.getPrimaryApplication().pkg.packageName));
 	}
 
 	public boolean isLowRamDevice() { return false; }
