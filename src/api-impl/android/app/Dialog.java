@@ -92,28 +92,51 @@ public class Dialog implements Window.Callback, DialogInterface {
 				// Non-floating are typically constructed with MATCH_PARENT layout params and thus get the exact size of the main window.
 				// Most non-floating dialogs are technically dialogs, but are expected to behave more like full size activities.
 				Rect displayFrame = new Rect();
-				getWindow().getDecorView().getWindowVisibleDisplayFrame(displayFrame);
+				View decor = getWindow().getDecorView();
+				decor.getWindowVisibleDisplayFrame(displayFrame);
 
 				TypedArray a = context.obtainStyledAttributes(R.styleable.Window);
+				boolean floating = a.getBoolean(R.styleable.Window_windowIsFloating, false);
 				float windowWidthFraction = 1;
-				if (a.getBoolean(R.styleable.Window_windowIsFloating, false)) {
+				if (floating) {
 					if (displayFrame.width() > displayFrame.height())
 						windowWidthFraction = a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1);
 					else
 						windowWidthFraction = a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
 				}
-				a.recycle();
-
 				LayoutParams lp = getWindow().getAttributes();
-				int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.width >= 0 ? lp.width : (int)(displayFrame.width() * windowWidthFraction),
-				                                                        lp.width == LayoutParams.WRAP_CONTENT ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
 
-				int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.height >= 0 ? lp.height : (int)(displayFrame.height()),
-				                                                         lp.height == LayoutParams.WRAP_CONTENT ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
+				// Width: a floating dialog uses windowMinWidth* as a fixed fraction of the
+				// display, so measure it EXACTLY at that width. Otherwise honor an explicit
+				// width, wrap (AT_MOST) a WRAP_CONTENT window, or fill the display.
+				int widthSize = lp.width >= 0 ? lp.width : (int)(displayFrame.width() * windowWidthFraction);
+				if (floating && lp.width < 0) {
+					// On a wide (desktop) window, windowMinWidth* (a fraction of the display)
+					// produces an over-wide dialog. Cap at Material's 560dp max dialog width.
+					int maxWidth = (int)(560 * context.getResources().getDisplayMetrics().density);
+					widthSize = Math.min(widthSize, maxWidth);
+				}
+				int widthMode = (lp.width == LayoutParams.WRAP_CONTENT && !floating)
+				    ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY;
+				int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(widthSize, widthMode);
 
-				getWindow().getDecorView().internalSetDefaultMeasureSpec(widthMeasureSpec, heightMeasureSpec);
+				// Height always wraps its content for a WRAP_CONTENT window, capped at the display.
+				int heightSize = lp.height >= 0 ? lp.height : displayFrame.height();
+				int heightMode = lp.height == LayoutParams.WRAP_CONTENT
+				    ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY;
+				int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(heightSize, heightMode);
+
+				// Measure the content and size the native window to it. Without this the
+				// window keeps its native default size and performLayout() stretches the
+				// decor EXACTLY to fill it, leaving the content cramped at the top.
+				decor.measure(widthMeasureSpec, heightMeasureSpec);
+				int measuredWidth = decor.getMeasuredWidth();
+				int measuredHeight = decor.getMeasuredHeight();
+				if (measuredWidth > 0 && measuredHeight > 0)
+					getWindow().setLayout(measuredWidth, measuredHeight);
 
 				nativeShow(nativePtr);
+
 				if (onShowListener != null)
 					onShowListener.onShow(Dialog.this);
 			}
