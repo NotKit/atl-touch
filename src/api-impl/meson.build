@@ -738,6 +738,7 @@ srcs = [
 	'android/widget/TextClock.java',
 	'android/widget/TextSwitcher.java',
 	'android/widget/TextView.java',
+	'android/widget/ThemedSpinnerAdapter.java',
 	'android/widget/TimePicker.java',
 	'android/widget/Toast.java',
 	'android/widget/ToggleButton.java',
