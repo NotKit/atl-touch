@@ -13,6 +13,11 @@ public class AccessibilityManager {
 
 	public boolean isEnabled() { return false; }
 
+	/* No accessibility services, so just honor the app's requested timeout. */
+	public int getRecommendedTimeoutMillis(int originalTimeout, int uiContentFlags) {
+		return originalTimeout;
+	}
+
 	public List getEnabledAccessibilityServiceList(int feedbackTypeFlags) {
 		return new ArrayList<>();
 	}
