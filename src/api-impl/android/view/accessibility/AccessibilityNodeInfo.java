@@ -4,6 +4,28 @@ import java.lang.CharSequence;
 
 public class AccessibilityNodeInfo {
 	public static final class AccessibilityAction {
+		public static final AccessibilityAction ACTION_FOCUS = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_CLEAR_FOCUS = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SELECT = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_CLEAR_SELECTION = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_CLICK = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_LONG_CLICK = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_ACCESSIBILITY_FOCUS = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_CLEAR_ACCESSIBILITY_FOCUS = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_NEXT_AT_MOVEMENT_GRANULARITY = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_NEXT_HTML_ELEMENT = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_PREVIOUS_HTML_ELEMENT = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SCROLL_FORWARD = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SCROLL_BACKWARD = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_COPY = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_PASTE = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_CUT = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SET_SELECTION = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_EXPAND = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_COLLAPSE = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_DISMISS = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SET_TEXT = new AccessibilityAction(0, null);
 		public static final AccessibilityAction ACTION_CONTEXT_CLICK = new AccessibilityAction(0, null);
 		public static final AccessibilityAction ACTION_SET_PROGRESS = new AccessibilityAction(0, null);
 		public static final AccessibilityAction ACTION_SHOW_ON_SCREEN = new AccessibilityAction(0, null);
@@ -19,6 +41,13 @@ public class AccessibilityNodeInfo {
 		public static final AccessibilityAction ACTION_MOVE_WINDOW = new AccessibilityAction(0, null);
 		public static final AccessibilityAction ACTION_SHOW_TOOLTIP = new AccessibilityAction(0, null);
 		public static final AccessibilityAction ACTION_HIDE_TOOLTIP = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_PRESS_AND_HOLD = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_IME_ENTER = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_DRAG_START = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_DRAG_DROP = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_DRAG_CANCEL = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SHOW_TEXT_SUGGESTIONS = new AccessibilityAction(0, null);
+		public static final AccessibilityAction ACTION_SCROLL_IN_DIRECTION = new AccessibilityAction(0, null);
 
 		public AccessibilityAction(int actionId, CharSequence label) {}
 
