@@ -5,19 +5,33 @@ import android.graphics.Rect;
 
 public class InsetDrawable extends DrawableWrapper {
 
+	private int insetLeft, insetTop, insetRight, insetBottom;
+
 	public InsetDrawable(Drawable drawable, int insetLeft, int insetTop, int insetRight, int insetBottom) {
 		super(drawable);
+		this.insetLeft = insetLeft;
+		this.insetTop = insetTop;
+		this.insetRight = insetRight;
+		this.insetBottom = insetBottom;
 	}
 
 	public InsetDrawable(Drawable drawable, int inset) {
-		super(drawable);
+		this(drawable, inset, inset, inset, inset);
 	}
 
 	InsetDrawable() {
 		super(new InsetState(null, null), null);
 	}
 
-	public boolean getPadding(Rect padding) { return false; }
+	@Override
+	public boolean getPadding(Rect padding) {
+		boolean pad = super.getPadding(padding); // wrapped drawable's padding
+		padding.left += insetLeft;
+		padding.top += insetTop;
+		padding.right += insetRight;
+		padding.bottom += insetBottom;
+		return pad || (insetLeft | insetTop | insetRight | insetBottom) != 0;
+	}
 
 	static final class InsetState extends DrawableWrapper.DrawableWrapperState {
 

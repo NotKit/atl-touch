@@ -968,6 +968,9 @@ public class View implements Drawable.Callback {
 	protected int paddingTop = 0;
 	protected int paddingRight = 0;
 	protected int paddingBottom = 0;
+	/** true once padding has been set explicitly (by the app or an XML padding attr),
+	 *  so a background drawable's own padding must no longer override it. */
+	private boolean userPaddingSet = false;
 
 	public static final Property<View, Float> TRANSLATION_X = new Property<View, Float>(Float.class, "translationX") {
 		@Override
@@ -1061,32 +1064,53 @@ public class View implements Drawable.Callback {
 		int paddingStart = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingStart, -1);
 		int paddingEnd = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingEnd, -1);
 
+		// Only override padding (possibly already derived from the background drawable
+		// above) when an explicit padding attribute is actually present.
 		if (padding >= 0) {
 			paddingLeft = padding;
 			paddingTop = padding;
 			paddingRight = padding;
 			paddingBottom = padding;
+			userPaddingSet = true;
 		} else {
 			if (paddingVertical >= 0) {
 				paddingTop = paddingVertical;
 				paddingBottom = paddingVertical;
+				userPaddingSet = true;
 			} else {
-				paddingTop = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingTop, 0);
-				paddingBottom = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingBottom, 0);
+				if (a.hasValue(com.android.internal.R.styleable.View_paddingTop)) {
+					paddingTop = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingTop, 0);
+					userPaddingSet = true;
+				}
+				if (a.hasValue(com.android.internal.R.styleable.View_paddingBottom)) {
+					paddingBottom = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingBottom, 0);
+					userPaddingSet = true;
+				}
 			}
 
 			if (paddingHorizontal >= 0) {
 				paddingLeft = paddingHorizontal;
 				paddingRight = paddingHorizontal;
+				userPaddingSet = true;
 			} else {
-				paddingLeft = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingLeft, 0);
-				paddingRight = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingRight, 0);
+				if (a.hasValue(com.android.internal.R.styleable.View_paddingLeft)) {
+					paddingLeft = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingLeft, 0);
+					userPaddingSet = true;
+				}
+				if (a.hasValue(com.android.internal.R.styleable.View_paddingRight)) {
+					paddingRight = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingRight, 0);
+					userPaddingSet = true;
+				}
 
-				if (paddingStart >= 0)
+				if (paddingStart >= 0) {
 					paddingLeft = paddingStart;
+					userPaddingSet = true;
+				}
 
-				if (paddingEnd >= 0)
+				if (paddingEnd >= 0) {
 					paddingRight = paddingEnd;
+					userPaddingSet = true;
+				}
 			}
 		}
 
@@ -1433,6 +1457,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setPadding(int left, int top, int right, int bottom) {
+		userPaddingSet = true;
 		paddingLeft = left;
 		paddingTop = top;
 		paddingRight = right;
@@ -1599,7 +1624,9 @@ public class View implements Drawable.Callback {
 	}
 
 	public final int getMeasuredState() {
-		return 0;
+		return (measuredWidth & MEASURED_STATE_MASK)
+		    | ((measuredHeight >> MEASURED_HEIGHT_STATE_SHIFT)
+		       & (MEASURED_STATE_MASK >> MEASURED_HEIGHT_STATE_SHIFT));
 	}
 
 	public static int combineMeasuredStates(int curState, int newState) {
@@ -1705,6 +1732,19 @@ public class View implements Drawable.Callback {
 			backgroundDrawable.setCallback(this);
 			if (backgroundTint != 0)
 				backgroundDrawable.setTint(backgroundTint);
+			// Adopt the drawable's padding (e.g. an EditText's editbox nine-patch),
+			// unless the view has explicitly-set padding. Matches AOSP and is what
+			// gives backgrounded widgets their intrinsic content height.
+			if (!userPaddingSet) {
+				Rect pad = new Rect();
+				if (backgroundDrawable.getPadding(pad)) {
+					paddingLeft = pad.left;
+					paddingTop = pad.top;
+					paddingRight = pad.right;
+					paddingBottom = pad.bottom;
+					requestLayout();
+				}
+			}
 		}
 		invalidate();
 	}
