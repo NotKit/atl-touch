@@ -13,6 +13,7 @@ public class ViewRootImpl implements ViewParent {
 	public long scene; // ATLSceneWidget*, set by native code on attach
 	public Window window;
 	private View view;
+	private View focusedView; // the view currently receiving key input, if any
 	private int width;
 	private int height;
 
@@ -25,6 +26,7 @@ public class ViewRootImpl implements ViewParent {
 			return;
 		if (this.view != null)
 			this.view.dispatchDetachedFromWindow();
+		focusedView = null;
 		this.view = view;
 		if (view != null) {
 			view.parent = this;
@@ -73,7 +75,27 @@ public class ViewRootImpl implements ViewParent {
 	}
 
 	protected boolean dispatchKeyEvent(KeyEvent event) {
+		// Route to the focused view first (e.g. a focused EditText), then fall back
+		// to the decor (back button, accelerators, etc.).
+		if (focusedView != null && focusedView != view && focusedView.dispatchKeyEvent(event))
+			return true;
 		return view != null && view.dispatchKeyEvent(event);
+	}
+
+	public View getFocusedView() {
+		return focusedView;
+	}
+
+	/** Move input focus to the given view (or null to clear), notifying both. */
+	public void setFocusedView(View v) {
+		if (focusedView == v)
+			return;
+		View old = focusedView;
+		focusedView = v;
+		if (old != null)
+			old.dispatchFocusChanged(false);
+		if (v != null)
+			v.dispatchFocusChanged(true);
 	}
 
 	public void invalidate() {

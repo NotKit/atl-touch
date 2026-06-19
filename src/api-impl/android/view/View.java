@@ -727,7 +727,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public interface OnFocusChangeListener {
-		// TODO
+		void onFocusChange(View v, boolean hasFocus);
 	}
 
 	public interface OnCreateContextMenuListener {
@@ -1299,6 +1299,8 @@ public class View implements Drawable.Callback {
 	protected void native_removeClasses(long widget, String[] classNames) {}
 
 	ViewRootImpl viewRootImpl; // set on the root view by ViewRootImpl.setView
+	private boolean focused = false;
+	private OnFocusChangeListener onFocusChangeListener;
 
 	public ViewRootImpl getViewRootImpl() {
 		View view = this;
@@ -1357,8 +1359,24 @@ public class View implements Drawable.Callback {
 		return requestFocus(direction, null);
 	}
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
+		ViewRootImpl root = getViewRootImpl();
+		if (root != null)
+			root.setFocusedView(this);
 		return true;
 	}
+
+	/** Called by ViewRootImpl when this view gains or loses input focus. */
+	void dispatchFocusChanged(boolean gainFocus) {
+		if (focused == gainFocus)
+			return;
+		focused = gainFocus;
+		onFocusChanged(gainFocus, FOCUS_DOWN, null);
+		if (onFocusChangeListener != null)
+			onFocusChangeListener.onFocusChange(this, gainFocus);
+		invalidate();
+	}
+
+	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {}
 	public final boolean requestFocusFromTouch() {
 		// TODO: if (isInTouchMode()) leave touch mode
 		return requestFocus(View.FOCUS_DOWN);
@@ -1865,12 +1883,12 @@ public class View implements Drawable.Callback {
 	public void bringToFront() {}
 
 	public boolean isEnabled() { return true; }
-	public boolean hasFocus() { return false; }
+	public boolean hasFocus() { return focused; }
 	public boolean isLayoutRequested() { return layoutRequested; }
 	public int getBaseline() { return -1; }
 	public boolean hasFocusable() { return false; }
 	public boolean isFocused() {
-		return false;
+		return focused;
 	}
 
 	public void clearAnimation() {}
@@ -1961,7 +1979,11 @@ public class View implements Drawable.Callback {
 	public static class BaseSavedState extends AbsSavedState {
 	}
 
-	public void clearFocus() {}
+	public void clearFocus() {
+		ViewRootImpl root = getViewRootImpl();
+		if (root != null && root.getFocusedView() == this)
+			root.setFocusedView(null);
+	}
 
 	public static View inflate(Context context, int resource, ViewGroup root) {
 		LayoutInflater factory = LayoutInflater.from(context);
@@ -1982,7 +2004,8 @@ public class View implements Drawable.Callback {
 
 	public void jumpDrawablesToCurrentState() {}
 
-	public void setOnFocusChangeListener(View.OnFocusChangeListener l) {}
+	public void setOnFocusChangeListener(View.OnFocusChangeListener l) { onFocusChangeListener = l; }
+	public View.OnFocusChangeListener getOnFocusChangeListener() { return onFocusChangeListener; }
 
 	public boolean hasWindowFocus() { return true; }
 
