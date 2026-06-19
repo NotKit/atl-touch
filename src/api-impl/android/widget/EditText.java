@@ -13,14 +13,35 @@ public class EditText extends TextView {
 
 	public EditText(Context context) {
 		super(context);
+		initDefaultSize();
 	}
 
 	public EditText(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		initDefaultSize();
+	}
+
+	public EditText(Context context, AttributeSet attrs, int defStyle) {
+		super(context, attrs, defStyle);
+		initDefaultSize();
 	}
 
 	public EditText(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		super(context, attrs, defStyle, defStyleRes);
+		initDefaultSize();
+	}
+
+	/**
+	 * Give the field a touch-target-sized minimum height and vertically center its
+	 * content. ATL doesn't resolve the editbox/OutlinedBox style padding that would
+	 * normally supply this, so without a floor a single-line field collapses to the
+	 * bare text height (~23px) and is effectively invisible/unusable. Only applied
+	 * when nothing more specific was set.
+	 */
+	private void initDefaultSize() {
+		if (getMinimumHeight() <= 0)
+			setMinimumHeight((int)(48 * getResources().getDisplayMetrics().density));
+		setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
 	}
 
 	protected String native_getText(long widget) {
