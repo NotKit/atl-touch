@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <GL/gl.h>
 #include <GLFW/glfw3.h>
@@ -46,6 +47,20 @@ extern void activity_close_all(void); // app/android_app_Activity.c
 #define KEY_ACTION_DOWN 0
 #define KEY_ACTION_UP   1
 
+/* MotionEvent/KeyEvent times must share the time base of SystemClock.uptimeMillis()
+ * (CLOCK_MONOTONIC ms), because GestureDetector and the Handler/Looper schedule
+ * timeout messages (LONG_PRESS, tap) at event.getDownTime()+timeout against that
+ * clock. Using glfwGetTime() (seconds since GLFW init) put events in a tiny,
+ * unrelated time base, so those messages were always "overdue" and fired
+ * immediately — every tap was misread as a long-press and onSingleTapUp never ran,
+ * making clickable widgets like the FAB only fire intermittently. */
+static jlong atl_uptime_millis(void)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (jlong)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
 static void dispatch_pointer_event(ATLWindow *window, int action)
 {
 	if (!window->view_root)
@@ -72,7 +87,7 @@ static void dispatch_pointer_event(ATLWindow *window, int action)
 	(*env)->SetIntArrayRegion(env, ids, 0, 1, &id);
 	(*env)->SetFloatArrayRegion(env, coords, 0, 4, values);
 	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor,
-	                                         SOURCE_TOUCHSCREEN, action, (jlong)(glfwGetTime() * 1000), ids, coords);
+	                                         SOURCE_TOUCHSCREEN, action, atl_uptime_millis(), ids, coords);
 	jboolean handled = (*env)->CallBooleanMethod(env, window->view_root, window->dispatch_touch_event, motion_event);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
