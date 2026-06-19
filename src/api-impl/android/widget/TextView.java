@@ -38,7 +38,7 @@ public class TextView extends View {
 	private boolean include_padding = false;
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
-	private int gravity = Gravity.CENTER;
+	private int gravity = Gravity.TOP | Gravity.START;
 
 	public TextView(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
@@ -57,6 +57,9 @@ public class TextView extends View {
 
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.TextView, defStyleAttr, 0);
 		try {
+			if (a.hasValue(com.android.internal.R.styleable.TextView_gravity)) {
+				setGravity(a.getInt(com.android.internal.R.styleable.TextView_gravity, gravity));
+			}
 			if (a.hasValue(com.android.internal.R.styleable.TextView_text)) {
 				setText(a.getText(com.android.internal.R.styleable.TextView_text));
 			}
