@@ -276,7 +276,13 @@ public class ImageView extends View {
 			canvas.drawBitmap(bitmap, new android.graphics.Rect(0, 0, contentWidth, contentHeight),
 			                  new android.graphics.Rect(x, y, x + drawWidth, y + drawHeight), null);
 		} else if (drawable != null) {
-			drawable.setBounds(x, y, x + drawWidth, y + drawHeight);
+			// Match AOSP ImageView: the drawable's bounds are always its intrinsic size
+			// anchored at the origin, and positioning/scaling is applied to the canvas.
+			// Offsetting the bounds rect instead breaks drawables (e.g. DrawerArrowDrawable)
+			// that compute their content position from bounds assuming a (0,0) origin.
+			drawable.setBounds(0, 0, contentWidth, contentHeight);
+			canvas.translate(x, y);
+			canvas.scale(scaleX, scaleY);
 			drawable.draw(canvas);
 		}
 		canvas.restore();
