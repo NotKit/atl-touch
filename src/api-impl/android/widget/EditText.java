@@ -40,11 +40,13 @@ public class EditText extends TextView {
 	}
 
 	public Editable getText() {
-		return new SpannableStringBuilder(native_getText(widget));
+		CharSequence text = native_getText(widget);
+		return new SpannableStringBuilder(text == null ? "" : text);
 	}
 
 	public Editable getEditableText() {
-		return new SpannableStringBuilder(native_getText(widget));
+		CharSequence text = native_getText(widget);
+		return new SpannableStringBuilder(text == null ? "" : text);
 	}
 
 	@Override
