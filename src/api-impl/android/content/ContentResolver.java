@@ -95,7 +95,7 @@ public class ContentResolver {
 		if ("file".equals(uri.getScheme())) {
 			return ParcelFileDescriptor.open(new File(uri.getPath()), ParcelFileDescriptor.parseMode(mode));
 		} else {
-			ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+			ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 			if (provider != null)
 				return provider.openFile(uri, mode);
 			else
@@ -111,7 +111,7 @@ public class ContentResolver {
 		if ("file".equals(uri.getScheme())) {
 			return new AssetFileDescriptor(ParcelFileDescriptor.open(new File(uri.getPath()), ParcelFileDescriptor.parseMode(mode)), 0, AssetFileDescriptor.UNKNOWN_LENGTH);
 		} else {
-			ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+			ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 			if (provider != null)
 				return provider.openAssetFile(uri, mode);
 			else
@@ -155,7 +155,7 @@ public class ContentResolver {
 	}
 
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-		ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null) {
 			return provider.query(uri, projection, selection, selectionArgs, sortOrder);
 		} else if ("file".equals(uri.getScheme())) {
@@ -174,7 +174,7 @@ public class ContentResolver {
 	}
 
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
-		ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
 			return provider.delete(uri, selection, selectionArgs);
 		else
@@ -182,7 +182,7 @@ public class ContentResolver {
 	}
 
 	public Uri insert(Uri uri, ContentValues values) {
-		ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
 			return provider.insert(uri, values);
 		else
@@ -190,7 +190,7 @@ public class ContentResolver {
 	}
 
 	public String getType(Uri uri) {
-		ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
 			return provider.getType(uri);
 		else
@@ -198,7 +198,7 @@ public class ContentResolver {
 	}
 
 	public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-		ContentProvider provider = ContentProvider.providers.get(uri.getAuthority());
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
 			return provider.update(uri, values, selection, selectionArgs);
 		else
