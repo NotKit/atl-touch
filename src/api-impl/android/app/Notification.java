@@ -76,11 +76,11 @@ public class Notification implements Parcelable {
 	public String getChannelId() { return channelId; }
 
 	public static class Builder {
-		private Context context;
+		private final Context mContext;
 		private Notification notification;
 
 		public Builder(Context context) {
-			this.context = context;
+			mContext = context;
 			notification = new Notification();
 		}
 
@@ -97,7 +97,7 @@ public class Notification implements Parcelable {
 		public Builder setWhen(long when) { return this; }
 
 		public Builder setSmallIcon(int icon, int level) {
-			notification.iconPath = this.context.getString(icon);
+			notification.iconPath = mContext.getString(icon);
 			return this;
 		}
 
