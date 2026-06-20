@@ -2435,6 +2435,11 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
+	/** A typed character (Unicode codepoint, post keyboard-layout). Editable views override. */
+	public boolean onTextInput(int codePoint) {
+		return false;
+	}
+
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		if (event.getAction() == KeyEvent.ACTION_DOWN)
 			return onKeyDown(event.getKeyCode(), event);

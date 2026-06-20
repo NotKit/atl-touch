@@ -169,12 +169,18 @@ public class EditText extends TextView {
 					editorActionListener.onEditorAction(this, 6 /* EditorInfo.IME_ACTION_DONE */, event);
 				return true; // don't insert a newline into a single-line field
 		}
-		int unicode = event.getUnicodeChar();
-		if (unicode != 0) {
-			replaceSelection(new String(Character.toChars(unicode)));
-			return true;
-		}
+		// Printable characters arrive via onTextInput() (the GLFW char callback),
+		// which resolves the OS keyboard layout (Cyrillic, dead keys, ...). Don't
+		// insert from the keycode here or every character would be entered twice.
 		return super.onKeyDown(keyCode, event);
+	}
+
+	@Override
+	public boolean onTextInput(int codePoint) {
+		if (codePoint == 0)
+			return false;
+		replaceSelection(new String(Character.toChars(codePoint)));
+		return true;
 	}
 
 	@Override

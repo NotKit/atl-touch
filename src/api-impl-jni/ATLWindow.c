@@ -21,6 +21,7 @@ struct ATLWindow {
 	jmethodID perform_draw;
 	jmethodID dispatch_touch_event;
 	jmethodID dispatch_key_event;
+	jmethodID dispatch_character;
 	jobject dismiss_target; // global ref: java Dialog to dismiss on close
 	jobject window_jobj;    // weak ref to the java android.view.Window
 	bool needs_redraw;
@@ -194,20 +195,38 @@ static int key_unicode(int key, int mods)
 static void on_key(GLFWwindow *glfw_window, int key, int scancode, int action, int mods)
 {
 	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
-	if (!window->view_root || action == GLFW_REPEAT)
+	if (!window->view_root)
 		return;
 	JNIEnv *env = get_jni_env();
 	int meta_state = ((mods & GLFW_MOD_SHIFT) ? META_SHIFT_ON : 0) |
 	                 ((mods & GLFW_MOD_CONTROL) ? META_CTRL_ON : 0) |
 	                 ((mods & GLFW_MOD_ALT) ? META_ALT_ON : 0);
+	// PRESS and REPEAT both dispatch a key-down so held control keys (Backspace,
+	// arrows, Delete) auto-repeat; printable repeats arrive via the char callback.
+	int repeat_count = (action == GLFW_REPEAT) ? 1 : 0;
 	jobject key_event = (*env)->NewObject(env, handle_cache.key_event.class, handle_cache.key_event.constructor,
-	                                      (jlong)0, (jlong)0, action == GLFW_PRESS ? KEY_ACTION_DOWN : KEY_ACTION_UP,
-	                                      map_key_code(key), 0, meta_state);
+	                                      (jlong)0, (jlong)0, action == GLFW_RELEASE ? KEY_ACTION_UP : KEY_ACTION_DOWN,
+	                                      map_key_code(key), repeat_count, meta_state);
 	_SET_INT_FIELD(key_event, "unicodeValue", key_unicode(key, mods));
 	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_key_event, key_event);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 	(*env)->DeleteLocalRef(env, key_event);
+}
+
+/* Text entry: GLFW delivers the final Unicode codepoint here after applying the
+ * OS keyboard layout (Cyrillic, dead keys, AltGr, etc.), so this — not the key
+ * callback's keycode mapping — is what produces typed characters. Control keys
+ * (backspace, arrows, enter) do not generate char events and stay on on_key. */
+static void on_char(GLFWwindow *glfw_window, unsigned int codepoint)
+{
+	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	if (!window->view_root || !window->dispatch_character)
+		return;
+	JNIEnv *env = get_jni_env();
+	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_character, (jint)codepoint);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
 }
 
 static void on_framebuffer_size(GLFWwindow *glfw_window, int width, int height)
@@ -368,6 +387,7 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwSetCursorPosCallback(window->glfw_window, on_cursor_pos);
 	glfwSetMouseButtonCallback(window->glfw_window, on_mouse_button);
 	glfwSetKeyCallback(window->glfw_window, on_key);
+	glfwSetCharCallback(window->glfw_window, on_char);
 	glfwSetFramebufferSizeCallback(window->glfw_window, on_framebuffer_size);
 	glfwSetWindowCloseCallback(window->glfw_window, on_window_close);
 	glfwMakeContextCurrent(window->glfw_window);
@@ -398,6 +418,7 @@ void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
 	window->perform_draw = (*env)->GetMethodID(env, view_root_class, "performDraw", "(JII)V");
 	window->dispatch_touch_event = (*env)->GetMethodID(env, view_root_class, "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z");
 	window->dispatch_key_event = (*env)->GetMethodID(env, view_root_class, "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
+	window->dispatch_character = (*env)->GetMethodID(env, view_root_class, "dispatchCharacter", "(I)Z");
 	(*env)->SetLongField(env, view_root, (*env)->GetFieldID(env, view_root_class, "scene", "J"), _INTPTR(window));
 	window->layout_width = window->layout_height = 0; // force a layout pass
 	window->needs_redraw = true;

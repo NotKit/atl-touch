@@ -82,6 +82,12 @@ public class ViewRootImpl implements ViewParent {
 		return view != null && view.dispatchKeyEvent(event);
 	}
 
+	/* called from native (ATLSceneWidget char callback): a typed Unicode codepoint,
+	 * already resolved through the OS keyboard layout. */
+	protected boolean dispatchCharacter(int codePoint) {
+		return focusedView != null && focusedView.onTextInput(codePoint);
+	}
+
 	public View getFocusedView() {
 		return focusedView;
 	}
