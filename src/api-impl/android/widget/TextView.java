@@ -454,6 +454,8 @@ public class TextView extends View {
 
 	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
+	public void setCustomInsertionActionModeCallback(ActionMode.Callback actionModeCallback) {}
+
 	public int getExtendedPaddingTop() { return 0; }
 
 	public void setRawInputType(int type) {}
