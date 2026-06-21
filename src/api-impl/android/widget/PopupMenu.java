@@ -563,6 +563,12 @@ public class PopupMenu {
 		}
 
 		@Override
+		public boolean collapseActionView() {
+			// no action view to collapse
+			return false;
+		}
+
+		@Override
 		public boolean isActionViewExpanded() {
 			// TODO Auto-generated method stub
 			throw new UnsupportedOperationException("Unimplemented method 'isActionViewExpanded'");

@@ -147,17 +147,21 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 			    com.android.internal.R.styleable.LayerDrawableItem_right, 0);
 			int bottom = a.getDimensionPixelOffset(
 			    com.android.internal.R.styleable.LayerDrawableItem_bottom, 0);
-			int drawableRes = a.getResourceId(
-			    com.android.internal.R.styleable.LayerDrawableItem_drawable, 0);
+			// Use getDrawable() rather than getResourceId() so that an
+			// android:drawable that resolves to a bare color (directly or via
+			// a theme attribute, e.g. ?attr/currentDeckBackgroundColor) is
+			// wrapped in a ColorDrawable instead of being treated as "no
+			// drawable" (an inline color has no resource id). Matches AOSP.
+			Drawable dr = null;
+			if (a.hasValue(com.android.internal.R.styleable.LayerDrawableItem_drawable)) {
+				dr = a.getDrawable(com.android.internal.R.styleable.LayerDrawableItem_drawable);
+			}
 			int id = a.getResourceId(com.android.internal.R.styleable.LayerDrawableItem_id,
 			                         View.NO_ID);
 
 			a.recycle();
 
-			Drawable dr;
-			if (drawableRes != 0) {
-				dr = r.getDrawable(drawableRes);
-			} else {
+			if (dr == null) {
 				while ((type = parser.next()) == XmlPullParser.TEXT) {
 				}
 				if (type != XmlPullParser.START_TAG) {

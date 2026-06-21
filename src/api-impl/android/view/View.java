@@ -1484,7 +1484,10 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setBackgroundResource(int resid) {
-		setBackgroundDrawable(resid == 0 ? null : getResources().getDrawable(resid));
+		// Load through the context theme so theme attribute references
+		// (?attr/...) inside the drawable XML are resolved against the
+		// active theme, matching AOSP's mContext.getDrawable(resid).
+		setBackgroundDrawable(resid == 0 ? null : getContext().getDrawable(resid));
 	}
 
 	public void getHitRect(Rect outRect) {

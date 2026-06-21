@@ -54,7 +54,7 @@ public class ImageView extends View {
 
 	public void setImageResource(final int resid) {
 		if (Context.this_application.getResources().getString(resid).endsWith(".xml")) {
-			setImageDrawable(getResources().getDrawable(resid));
+			setImageDrawable(getContext().getDrawable(resid));
 			return;
 		}
 		bitmap = BitmapFactory.decodeResource(Context.this_application.getResources(), resid);
