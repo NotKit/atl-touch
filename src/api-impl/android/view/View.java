@@ -2355,7 +2355,11 @@ public class View implements Drawable.Callback {
 		return false; // FIXME
 	}
 
-	public void setTextDirection(int textDirection) {}
+	private int textDirection = TEXT_DIRECTION_INHERIT;
+
+	public void setTextDirection(int textDirection) { this.textDirection = textDirection; }
+
+	public int getTextDirection() { return textDirection; }
 
 	public Drawable getForeground() { return null; }
 
