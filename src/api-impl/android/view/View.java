@@ -2520,6 +2520,8 @@ public class View implements Drawable.Callback {
 
 	public void setNextFocusUpId(int id) {}
 
+	public void setNextFocusForwardId(int id) {}
+
 	public void setHasTransientState(boolean hasTransientState) {}
 
 	protected void onConfigurationChanged(Configuration newConfig) {}
