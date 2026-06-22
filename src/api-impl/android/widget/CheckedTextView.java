@@ -16,5 +16,9 @@ public class CheckedTextView extends TextView {
 
 	public void setChecked(boolean checked) {}
 
-	public void setCheckMarkDrawable(Drawable d) {}
+	private Drawable checkMarkDrawable;
+
+	public void setCheckMarkDrawable(Drawable d) { this.checkMarkDrawable = d; }
+
+	public Drawable getCheckMarkDrawable() { return checkMarkDrawable; }
 }
