@@ -318,6 +318,13 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		setText(new String(text, start, len));
 	}
 
+	public final void append(CharSequence text) {
+		append(text, 0, text.length());
+	}
+
+	public void append(CharSequence text, int start, int end) {
+		setText(SpannableStringBuilder.valueOf(this.text).append(text, start, end));
+	}
 
 	public void setTextSize(float size) {
 		setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
