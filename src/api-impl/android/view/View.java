@@ -710,6 +710,10 @@ public class View implements Drawable.Callback {
 		public boolean onLongClick(View v);
 	}
 
+	public interface OnContextClickListener {
+		boolean onContextClick(View v);
+	}
+
 	public interface OnHoverListener {
 		// TODO
 	}
@@ -1631,6 +1635,11 @@ public class View implements Drawable.Callback {
 
 	public void setLongClickable(boolean longClickable) {
 		this.longClickable = longClickable;
+	}
+
+	private OnContextClickListener on_context_click_listener = null;
+	public void setOnContextClickListener(OnContextClickListener listener) {
+		on_context_click_listener = listener;
 	}
 
 	public void setOnHoverListener(OnHoverListener listener) {}
