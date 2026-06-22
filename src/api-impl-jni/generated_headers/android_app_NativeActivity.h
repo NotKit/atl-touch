@@ -15,6 +15,12 @@ extern "C" {
 #define android_app_NativeActivity_BIND_IMPORTANT 64L
 #undef android_app_NativeActivity_BIND_WAIVE_PRIORITY
 #define android_app_NativeActivity_BIND_WAIVE_PRIORITY 32L
+#undef android_app_NativeActivity_CONTEXT_INCLUDE_CODE
+#define android_app_NativeActivity_CONTEXT_INCLUDE_CODE 1L
+#undef android_app_NativeActivity_CONTEXT_IGNORE_SECURITY
+#define android_app_NativeActivity_CONTEXT_IGNORE_SECURITY 2L
+#undef android_app_NativeActivity_CONTEXT_RESTRICTED
+#define android_app_NativeActivity_CONTEXT_RESTRICTED 4L
 #undef android_app_NativeActivity_RESULT_CANCELED
 #define android_app_NativeActivity_RESULT_CANCELED 0L
 #undef android_app_NativeActivity_RESULT_OK

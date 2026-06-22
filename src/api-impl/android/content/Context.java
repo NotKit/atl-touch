@@ -521,7 +521,7 @@ public abstract class Context {
 		return getResources().getDrawable(resId, getTheme());
 	}
 
-	public boolean isRestricted() { return false; }
+	public abstract boolean isRestricted();
 
 	/** @hide */
 	public boolean canLoadUnsafeResources() { return true; }
@@ -558,6 +558,10 @@ public abstract class Context {
 		while (receiverMap.values().remove(receiver))
 			;
 	}
+
+	public static final int CONTEXT_INCLUDE_CODE = 0x00000001;
+	public static final int CONTEXT_IGNORE_SECURITY = 0x00000002;
+	public static final int CONTEXT_RESTRICTED = 0x00000004;
 
 	public abstract Context createPackageContext(String packageName, int flags);
 
@@ -615,9 +619,7 @@ public abstract class Context {
 	public String getAttributionTag() {
 		return null;
 	}
-	public boolean isDeviceProtectedStorage() {
-		return false;
-	}
+	public abstract boolean isDeviceProtectedStorage();
 
 	public Drawable getWallpaper() {
 		return null;

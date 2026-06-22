@@ -15,6 +15,12 @@ extern "C" {
 #define android_content_Context_BIND_IMPORTANT 64L
 #undef android_content_Context_BIND_WAIVE_PRIORITY
 #define android_content_Context_BIND_WAIVE_PRIORITY 32L
+#undef android_content_Context_CONTEXT_INCLUDE_CODE
+#define android_content_Context_CONTEXT_INCLUDE_CODE 1L
+#undef android_content_Context_CONTEXT_IGNORE_SECURITY
+#define android_content_Context_CONTEXT_IGNORE_SECURITY 2L
+#undef android_content_Context_CONTEXT_RESTRICTED
+#define android_content_Context_CONTEXT_RESTRICTED 4L
 /*
  * Class:     android_content_Context
  * Method:    native_get_apk_path

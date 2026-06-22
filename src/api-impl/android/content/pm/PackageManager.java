@@ -20,6 +20,7 @@ import android.annotation.NonNull;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.atl.ATLLoadedApp;
+import android.atl.ATLLoadedAppManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -1425,24 +1426,6 @@ public class PackageManager {
 		package_info = PackageParser.generatePackageInfo(ATLLoadedApp.getPrimaryApplication().pkg, new int[0], PackageManager.GET_META_DATA, 0, 0, new HashSet<>(), new PackageUserState());
 	}
 
-	private ATLLoadedApp atl_get_loaded_app(String packageName) {
-		ATLLoadedApp app = ATLLoadedApp.getPrimaryApplication();
-		if (app.pkg.packageName.equals(packageName)) {
-			return app;
-		}
-		if ("android".equals(packageName)) {
-			return ATLLoadedApp.getSystemApplication();
-		}
-		return null;
-	}
-
-	private ATLLoadedApp atl_get_loaded_app_or_primary(String packageName) {
-		ATLLoadedApp app = this.atl_get_loaded_app(packageName);
-		if (app == null)
-			app = ATLLoadedApp.getPrimaryApplication();
-		return app;
-	}
-
 	/**
 	 * Retrieve overall information about an application package that is
 	 * installed on the system.
@@ -1487,14 +1470,19 @@ public class PackageManager {
 			if ((flags & GET_SERVICES) != 0 && info.services == null)
 				info.services = new ServiceInfo[0];
 			return info;
-		} else if (packageName.equals("atl") || packageName.equals("android")) {
+		}
+		if (packageName.equals("atl") || packageName.equals("android")) {
 			PackageInfo info = new PackageInfo();
 			info.packageName = packageName;
 			info.signatures = new Signature[] {new Signature(new byte[0])};
 			return info;
-		} else {
-			throw new NameNotFoundException(packageName);
 		}
+		PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
+		if (pkg != null) {
+			return PackageParser.generatePackageInfo(pkg, new int[0],
+			                                         flags, 0, 0, new HashSet<>(), new PackageUserState());
+		}
+		throw new NameNotFoundException(packageName);
 	}
 
 	/**
@@ -1536,10 +1524,14 @@ public class PackageManager {
 	 * not contain such an activity.
 	 */
 	public Intent getLaunchIntentForPackage(String packageName) {
-		ATLLoadedApp primary = ATLLoadedApp.getPrimaryApplication();
-		if (!primary.pkg.packageName.equals(packageName))
+		PackageParser.Package pkg = ATLLoadedApp.getPrimaryApplication().pkg;
+		if (!pkg.packageName.equals(packageName)) {
+			pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
+		}
+		if (pkg == null) {
 			return null;
-		for (PackageParser.Activity activity : primary.pkg.activities) {
+		}
+		for (PackageParser.Activity activity : pkg.activities) {
 			for (PackageParser.IntentInfo intent : activity.intents) {
 				Slog.i(TAG, intent.toString());
 				if (intent.hasCategory("android.intent.category.LAUNCHER")) {
@@ -1687,10 +1679,14 @@ public class PackageManager {
 	 */
 	public ApplicationInfo getApplicationInfo(String packageName,
 	                                          int flags) throws NameNotFoundException {
-		if (package_info.packageName.equals(packageName))
+		if (package_info.packageName.equals(packageName)) {
 			return package_info.applicationInfo;
-		else
-			throw new NameNotFoundException(packageName);
+		}
+		PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
+		if (pkg != null) {
+			return PackageParser.generateApplicationInfo(pkg, flags, new PackageUserState());
+		}
+		throw new NameNotFoundException(packageName);
 	}
 
 	/**
@@ -2574,7 +2570,15 @@ public class PackageManager {
 	public List<ResolveInfo> queryIntentServices(Intent intent,
 	                                             int flags) {
 		List<ResolveInfo> list = new ArrayList<ResolveInfo>(1);
-		for (Service s : ATLLoadedApp.getPrimaryApplication().pkg.services) {
+		String packageName;
+		PackageParser.Package pkg = null;
+		if ((packageName = intent.getPackage()) != null) {
+			pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
+		}
+		if (pkg == null) {
+			pkg = ATLLoadedApp.getPrimaryApplication().pkg;
+		}
+		for (Service s : pkg.services) {
 			for (ServiceIntentInfo intentinfo : s.intents) {
 				if (s.getComponentName().equals(intent.getComponent()) || intentinfo.matchAction(intent.getAction())) {
 					ResolveInfo ri = new ResolveInfo();
@@ -2736,7 +2740,7 @@ public class PackageManager {
 	 * an image could not be found for any reason.
 	 */
 	public Drawable getDrawable(String packageName, int resid, ApplicationInfo appInfo) {
-		ATLLoadedApp app = this.atl_get_loaded_app(packageName);
+		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(packageName);
 		if (app == null)
 			return null;
 		return app.default_resources.getDrawable(resid, app.getDefaultTheme());
@@ -2804,7 +2808,7 @@ public class PackageManager {
 	 * @see #getApplicationIcon(String)
 	 */
 	public Drawable getApplicationIcon(ApplicationInfo info) {
-		ATLLoadedApp app = this.atl_get_loaded_app(info.packageName);
+		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(info.packageName);
 		if (app == null)
 			return null;
 		return app.default_resources.getDrawable(info.icon, app.getDefaultTheme());
@@ -2827,7 +2831,7 @@ public class PackageManager {
 	 * @see #getApplicationIcon(ApplicationInfo)
 	 */
 	public Drawable getApplicationIcon(String packageName) throws NameNotFoundException {
-		ATLLoadedApp app = this.atl_get_loaded_app(packageName);
+		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(packageName);
 		if (app == null)
 			return null;
 		return app.default_resources.getDrawable(app.pkg.applicationInfo.icon, app.getDefaultTheme());
@@ -2929,7 +2933,7 @@ public class PackageManager {
 	 * if the text could not be found for any reason.
 	 */
 	public CharSequence getText(String packageName, int resid, ApplicationInfo appInfo) {
-		ATLLoadedApp app = this.atl_get_loaded_app(packageName);
+		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(packageName);
 		if (app == null)
 			return null;
 		return app.default_resources.getText(resid);
@@ -2952,7 +2956,7 @@ public class PackageManager {
 	 * reason.
 	 */
 	public XmlResourceParser getXml(String packageName, int resid, ApplicationInfo appInfo) throws Exception {
-		ATLLoadedApp app = this.atl_get_loaded_app(packageName);
+		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(packageName);
 		if (app == null)
 			return null;
 		return app.default_resources.getXml(resid);
@@ -3018,7 +3022,7 @@ public class PackageManager {
 	 * @see #getResourcesForApplication(ApplicationInfo)
 	 */
 	public Resources getResourcesForApplication(String appPackageName) throws NameNotFoundException {
-		ATLLoadedApp app = this.atl_get_loaded_app(appPackageName);
+		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(appPackageName);
 		if (app == null)
 			throw new NameNotFoundException();
 		return app.default_resources;
