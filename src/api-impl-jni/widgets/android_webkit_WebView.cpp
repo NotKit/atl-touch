@@ -16,7 +16,9 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
+#include <gio/gio.h>
 #include <GL/gl.h>
 #include <EGL/egl.h>
 
@@ -62,6 +64,85 @@ struct webview_peer {
 
 static bool wpe_initialized = false;
 static PFN_glEGLImageTargetTexture2DOES image_target_texture_2d = nullptr;
+/* an app AssetManager (global ref), captured from the first WebView created, so
+ * the android-asset:// scheme handler can serve files out of the APK. */
+static jobject g_asset_manager = nullptr;
+
+/* minimal content-type guess: the values that matter for cards are CSS and JS
+ * (browsers ignore <link>/<script> resources served with the wrong type). */
+static const char *guess_content_type(const char *path)
+{
+	const char *dot = strrchr(path, '.');
+	if (!dot)
+		return "application/octet-stream";
+	if (!strcmp(dot, ".css"))  return "text/css";
+	if (!strcmp(dot, ".js"))   return "text/javascript";
+	if (!strcmp(dot, ".html") || !strcmp(dot, ".htm")) return "text/html";
+	if (!strcmp(dot, ".json") || !strcmp(dot, ".map")) return "application/json";
+	if (!strcmp(dot, ".svg"))  return "image/svg+xml";
+	if (!strcmp(dot, ".png"))  return "image/png";
+	if (!strcmp(dot, ".jpg") || !strcmp(dot, ".jpeg")) return "image/jpeg";
+	if (!strcmp(dot, ".gif"))  return "image/gif";
+	if (!strcmp(dot, ".webp")) return "image/webp";
+	if (!strcmp(dot, ".woff2")) return "font/woff2";
+	if (!strcmp(dot, ".woff")) return "font/woff";
+	if (!strcmp(dot, ".ttf"))  return "font/ttf";
+	if (!strcmp(dot, ".otf"))  return "font/otf";
+	if (!strcmp(dot, ".mp3"))  return "audio/mpeg";
+	if (!strcmp(dot, ".ogg"))  return "audio/ogg";
+	if (!strcmp(dot, ".wav"))  return "audio/wav";
+	return "application/octet-stream";
+}
+
+/* serve android-asset:///<path> from the app's AssetManager. Registered on the
+ * default web context, so it runs on the GLib main thread (a Java thread). It
+ * is NOT a JNI entry point, so its local refs must be freed explicitly. */
+static void android_asset_scheme_handler(WebKitURISchemeRequest *request, gpointer user_data)
+{
+	const char *path = webkit_uri_scheme_request_get_path(request);
+	if (!g_asset_manager || !path) {
+		GError *e = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "no asset manager / path");
+		webkit_uri_scheme_request_finish_error(request, e);
+		g_error_free(e);
+		return;
+	}
+	const char *asset = path[0] == '/' ? path + 1 : path;
+
+	JNIEnv *env = get_jni_env();
+	env->PushLocalFrame(8);
+
+	jclass am_cls = env->GetObjectClass(g_asset_manager);
+	jmethodID open = env->GetMethodID(am_cls, "open", "(Ljava/lang/String;)Ljava/io/InputStream;");
+	jobject is = env->CallObjectMethod(g_asset_manager, open, env->NewStringUTF(asset));
+	if (env->ExceptionCheck() || !is) {
+		env->ExceptionClear();
+		env->PopLocalFrame(NULL);
+		GError *e = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "asset not found: %s", asset);
+		webkit_uri_scheme_request_finish_error(request, e);
+		g_error_free(e);
+		return;
+	}
+
+	jclass is_cls = env->GetObjectClass(is);
+	jmethodID read = env->GetMethodID(is_cls, "read", "([B)I");
+	jmethodID close = env->GetMethodID(is_cls, "close", "()V");
+	jbyteArray buf = env->NewByteArray(65536);
+	GByteArray *out = g_byte_array_new();
+	jint n;
+	while ((n = env->CallIntMethod(is, read, buf)) > 0) {
+		jbyte *p = env->GetByteArrayElements(buf, NULL);
+		g_byte_array_append(out, (guint8 *)p, n);
+		env->ReleaseByteArrayElements(buf, p, JNI_ABORT);
+	}
+	env->CallVoidMethod(is, close);
+	env->PopLocalFrame(NULL);
+
+	gsize len = out->len;
+	guint8 *data = g_byte_array_free(out, FALSE);
+	GInputStream *stream = g_memory_input_stream_new_from_data(data, len, g_free);
+	webkit_uri_scheme_request_finish(request, stream, (gint64)len, guess_content_type(asset));
+	g_object_unref(stream);
+}
 
 static bool ensure_wpe_initialized(void)
 {
@@ -86,6 +167,15 @@ static bool ensure_wpe_initialized(void)
 	 * explicitly; this also propagates to the WPEWebProcess subprocess. */
 	wpe_loader_init("libWPEBackend-fdo-1.0.so");
 	wpe_fdo_initialize_for_egl_display(display);
+
+	/* serve the app's assets (card CSS/JS/images linked as file:///android_asset,
+	 * rewritten to android-asset:// in WebView.loadDataWithBaseURL) */
+	WebKitWebContext *ctx = webkit_web_context_get_default();
+	webkit_web_context_register_uri_scheme(ctx, "android-asset", android_asset_scheme_handler, NULL, NULL);
+	WebKitSecurityManager *sm = webkit_web_context_get_security_manager(ctx);
+	webkit_security_manager_register_uri_scheme_as_secure(sm, "android-asset");
+	webkit_security_manager_register_uri_scheme_as_cors_enabled(sm, "android-asset");
+
 	wpe_initialized = true;
 	return true;
 }
@@ -143,6 +233,15 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1create(JNIEnv *env, 
 	peer->width = width > 0 ? width : 1;
 	peer->height = height > 0 ? height : 1;
 	peer->java_webview = env->NewGlobalRef(thiz);
+
+	/* capture an AssetManager for the android-asset:// scheme handler */
+	if (!g_asset_manager) {
+		jmethodID get_am = env->GetMethodID(env->GetObjectClass(thiz),
+			"internalGetAssetManager", "()Landroid/content/res/AssetManager;");
+		jobject am = env->CallObjectMethod(thiz, get_am);
+		if (am)
+			g_asset_manager = env->NewGlobalRef(am);
+	}
 
 	static const struct wpe_view_backend_exportable_fdo_egl_client client = {
 		.export_egl_image = nullptr,

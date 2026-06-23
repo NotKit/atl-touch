@@ -100,9 +100,12 @@ public class WebView extends ViewGroup {
 		if (mimeType != null && mimeType.contains(";")) {
 			mimeType = mimeType.substring(0, mimeType.indexOf(";"));
 		}
-		if (baseUrl == null)
-			baseUrl = "about:blank";
-		native_loadHtml(ensurePeer(), data, baseUrl);
+		/* WebKit won't let a page fetch the file:// scheme; map the app's asset
+		 * URLs onto our android-asset:// scheme (served from the AssetManager by
+		 * native code) and load the page at that same origin so the stylesheets
+		 * and scripts the card links to count as same-origin subresources. */
+		data = data.replace("file:///android_asset/", "android-asset:///");
+		native_loadHtml(ensurePeer(), data, "android-asset:///");
 	}
 
 	public void loadUrl(String url) {
