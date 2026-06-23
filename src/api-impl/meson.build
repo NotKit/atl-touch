@@ -688,6 +688,7 @@ srcs = [
 	'android/widget/Checkable.java',
 	'android/widget/CheckBox.java',
 	'android/widget/CheckedTextView.java',
+	'android/widget/Chronometer.java',
 	'android/widget/CompoundButton.java',
 	'android/widget/CursorAdapter.java',
 	'android/widget/DatePicker.java',

@@ -228,6 +228,8 @@ public class TextView extends View {
 	public void setCursorVisible(boolean visible) {}
 	public void setImeOptions(int imeOptions) {}
 
+	public void setImeHintLocales(android.os.LocaleList hintLocales) {}
+
 	public final ColorStateList getTextColors() { return colors; }
 	public static ColorStateList getTextColors(Context context, TypedArray attrs) { return new ColorStateList(new int[][] {new int[0]}, new int[1]); }
 

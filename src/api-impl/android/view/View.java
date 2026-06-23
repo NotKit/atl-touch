@@ -2063,6 +2063,7 @@ public class View implements Drawable.Callback {
 	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {}
 
 	public final boolean isFocusable() { return true; }
+	public final boolean isFocusableInTouchMode() { return true; }
 	public boolean isClickable() { return true; }
 	public boolean isLongClickable() { return true; }
 
