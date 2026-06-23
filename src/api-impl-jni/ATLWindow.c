@@ -4,6 +4,8 @@
 
 #include <GL/gl.h>
 #include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_EGL
+#include <GLFW/glfw3native.h>
 #include <glib.h>
 
 #include "defines.h"
@@ -376,6 +378,14 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwWindowHint(GLFW_DECORATED, decorated ? GLFW_TRUE : GLFW_FALSE);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	/* WPE WebKit (android.webkit.WebView) needs an EGLDisplay to share its
+	 * rendered EGLImages with. On Wayland GLFW only ever uses EGL, so
+	 * glfwGetEGLDisplay() works and WebView is available. On X11 GLFW defaults
+	 * to GLX (glfwGetEGLDisplay() then returns EGL_NO_DISPLAY and WebView
+	 * disables itself gracefully); ATL_WEBVIEW_EGL=1 forces EGL there too for
+	 * users who want WebView on X11, at the cost of switching the GL backend. */
+	if (getenv("ATL_WEBVIEW_EGL"))
+		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 	window->glfw_window = glfwCreateWindow(width, height, "android-translation-layer", NULL, NULL);
 	if (!window->glfw_window) {
 		const char *desc = NULL;
@@ -406,6 +416,31 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	window->next = windows;
 	windows = window;
 	return window;
+}
+
+/* --- accessors for the WPE WebView offscreen integration --- */
+
+/* the EGLDisplay GLFW created its contexts on; WPE renders its EGLImages here */
+void *atl_primary_egl_display(void)
+{
+	return (void *)glfwGetEGLDisplay();
+}
+
+/* make a GL context current on the calling (main) thread so WebView can bind a
+ * WPE-exported EGLImage to a texture and read it back. Any window's context
+ * works since they share the same EGLDisplay; the render tick re-makes its own
+ * context current before blitting, so leaving this one current is harmless. */
+void atl_primary_make_context_current(void)
+{
+	if (windows)
+		glfwMakeContextCurrent(windows->glfw_window);
+}
+
+/* schedule a repaint (e.g. when a WebView has a fresh frame to composite) */
+void atl_window_invalidate_all(void)
+{
+	for (ATLWindow *window = windows; window; window = window->next)
+		window->needs_redraw = true;
 }
 
 void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)

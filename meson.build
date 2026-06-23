@@ -145,6 +145,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/ATLWindow.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
+                                                                  	'src/api-impl-jni/widgets/android_webkit_WebView.cpp',
                                                                   	mpris,
                                                                   	portal_openuri,
                                                                   	portal_email,
@@ -162,7 +163,8 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
                                                                   	dependency('glfw3'), dependency('pangocairo'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
-                                                                  	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'),
+                                                                  	dependency('gudev-1.0'), dependency('libswscale'),
+                                                                  	dependency('wpe-webkit-2.0'), dependency('wpebackend-fdo-1.0'), dependency('wpe-1.0'),
                                                                         libart_dep, wayland_protos_dep, skia_dep
                                                                   ],
                                                                   link_with: [ libandroid_so ],

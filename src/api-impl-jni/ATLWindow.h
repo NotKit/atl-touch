@@ -33,3 +33,15 @@ int atl_window_get_width(ATLWindow *window);
 void atl_window_set_dismiss_target(ATLWindow *window, JNIEnv *env, jobject target);
 void atl_window_set_jobject(ATLWindow *window, JNIEnv *env, jobject window_obj);
 jobject atl_window_get_jobject(ATLWindow *window);
+
+/* WPE WebView offscreen integration. Called from the C++ WebView module, so
+ * these must keep C linkage to match their definitions in ATLWindow.c. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+void *atl_primary_egl_display(void);
+void atl_primary_make_context_current(void);
+void atl_window_invalidate_all(void);
+#ifdef __cplusplus
+}
+#endif

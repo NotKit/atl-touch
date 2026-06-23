@@ -243,19 +243,19 @@ extern "C" {
 #define android_webkit_WebView_FLAG_TOUCHSCREEN_BLOCKS_FOCUS 67108864L
 /*
  * Class:     android_webkit_WebView
- * Method:    native_constructor
- * Signature: (Landroid/content/Context;Landroid/util/AttributeSet;)J
+ * Method:    native_create
+ * Signature: (II)J
  */
-JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor
-  (JNIEnv *, jobject, jobject, jobject);
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1create
+  (JNIEnv *, jobject, jint, jint);
 
 /*
  * Class:     android_webkit_WebView
- * Method:    native_loadDataWithBaseURL
- * Signature: (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+ * Method:    native_setSize
+ * Signature: (JII)V
  */
-JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL
-  (JNIEnv *, jobject, jlong, jstring, jstring, jstring, jstring);
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setSize
+  (JNIEnv *, jobject, jlong, jint, jint);
 
 /*
  * Class:     android_webkit_WebView
@@ -264,6 +264,22 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL
  */
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl
   (JNIEnv *, jobject, jlong, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_loadHtml
+ * Signature: (JLjava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadHtml
+  (JNIEnv *, jobject, jlong, jstring, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_draw
+ * Signature: (JJII)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1draw
+  (JNIEnv *, jobject, jlong, jlong, jint, jint);
 
 #ifdef __cplusplus
 }

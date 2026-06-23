@@ -2,6 +2,8 @@ package android.webkit;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.Canvas;
+import android.atl.GskCanvas;
 import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.ViewGroup;
@@ -9,6 +11,10 @@ import android.view.ViewGroup;
 public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
+
+	/* native WPE WebKit peer (webview_peer*); created lazily once a window/EGL
+	 * context exists. 0 until then. */
+	private long peer;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -20,6 +26,29 @@ public class WebView extends ViewGroup {
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
+	}
+
+	private long ensurePeer() {
+		if (peer == 0) {
+			int w = getWidth() > 0 ? getWidth() : 1;
+			int h = getHeight() > 0 ? getHeight() : 1;
+			peer = native_create(w, h);
+		}
+		return peer;
+	}
+
+	@Override
+	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+		super.onSizeChanged(w, h, oldw, oldh);
+		if (peer != 0 && w > 0 && h > 0)
+			native_setSize(peer, w, h);
+	}
+
+	@Override
+	public void onDraw(Canvas canvas) {
+		long p = ensurePeer();
+		if (p != 0 && canvas instanceof GskCanvas)
+			native_draw(p, ((GskCanvas)canvas).snapshot, getWidth(), getHeight());
 	}
 
 	public WebSettings getSettings() {
@@ -71,9 +100,9 @@ public class WebView extends ViewGroup {
 		if (mimeType != null && mimeType.contains(";")) {
 			mimeType = mimeType.substring(0, mimeType.indexOf(";"));
 		}
-		// webkit doesn't allow overwriting the file:// uri scheme. So we replace it with the android-asset:// scheme
-		data = data.replace("file:///android_asset/", "android-asset:///assets/");
-		native_loadDataWithBaseURL(widget, baseUrl, data, mimeType, encoding);
+		if (baseUrl == null)
+			baseUrl = "about:blank";
+		native_loadHtml(ensurePeer(), data, baseUrl);
 	}
 
 	public void loadUrl(String url) {
@@ -81,7 +110,7 @@ public class WebView extends ViewGroup {
 			System.out.println("loadUrl: " + url + " - not implemented yet");
 			return;
 		}
-		native_loadUrl(widget, url);
+		native_loadUrl(ensurePeer(), url);
 	}
 
 	public void stopLoading() {}
@@ -124,6 +153,9 @@ public class WebView extends ViewGroup {
 		return new Object();
 	}
 
-	private void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding) {}
-	private void native_loadUrl(long widget, String url) {}
+	private native long native_create(int width, int height);
+	private native void native_setSize(long peer, int width, int height);
+	private native void native_loadUrl(long peer, String url);
+	private native void native_loadHtml(long peer, String html, String baseUri);
+	private native void native_draw(long peer, long canvasPtr, int width, int height);
 }
