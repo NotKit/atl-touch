@@ -150,6 +150,15 @@ void activity_close_all(void)
 	g_list_free(activities);
 }
 
+static gboolean delayed_close_window(gpointer window)
+{
+	if (activity_backlog == NULL) {
+		fprintf(stderr, "Activity.nativeFinish: last activity finished, backlog empty -> exiting\n");
+		exit(0); // the last activity is gone; quit like the window was closed
+	}
+	return G_SOURCE_REMOVE;
+}
+
 void activity_start(JNIEnv *env, jobject activity_object)
 {
 	if (activity_current)
@@ -187,10 +196,8 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 		activity_close(env, removed_activity);
 		_UNREF(removed_activity);
 	}
-	if (activity_backlog == NULL && window) {
-		fprintf(stderr, "Activity.nativeFinish: last activity finished, backlog empty -> exiting\n");
-		exit(0); // the last activity is gone; quit like the window was closed
-	}
+	if (activity_backlog == NULL && window)
+		g_idle_add(delayed_close_window, _PTR(window));
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env, jclass class, jobject activity)
