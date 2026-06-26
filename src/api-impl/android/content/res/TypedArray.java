@@ -441,7 +441,7 @@ public class TypedArray implements AutoCloseable {
 			return defValue;
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
@@ -546,7 +546,7 @@ public class TypedArray implements AutoCloseable {
 			return data[index + AssetManager.STYLE_DATA];
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
@@ -591,7 +591,7 @@ public class TypedArray implements AutoCloseable {
 			    data[index + AssetManager.STYLE_DATA], mMetrics);
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
@@ -637,7 +637,7 @@ public class TypedArray implements AutoCloseable {
 			    data[index + AssetManager.STYLE_DATA], mMetrics);
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
@@ -684,7 +684,7 @@ public class TypedArray implements AutoCloseable {
 			    data[index + AssetManager.STYLE_DATA], mMetrics);
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
@@ -725,7 +725,7 @@ public class TypedArray implements AutoCloseable {
 			    data[index + AssetManager.STYLE_DATA], mMetrics);
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
@@ -798,7 +798,7 @@ public class TypedArray implements AutoCloseable {
 			    data[index + AssetManager.STYLE_DATA], base, pbase);
 		} else if (type == TypedValue.TYPE_ATTRIBUTE) {
 			final TypedValue value = mValue;
-			getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value);
+			getValueAt(index, value);
 			throw new UnsupportedOperationException(
 			    "Failed to resolve attribute at index " + index + ": " + value);
 		}
