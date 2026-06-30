@@ -19,7 +19,9 @@ import android.util.Slog;
 import dalvik.system.PathClassLoader;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import org.xmlpull.v1.XmlPullParserException;
 
 /**
@@ -27,6 +29,8 @@ import org.xmlpull.v1.XmlPullParserException;
  */
 public final class ATLLoadedApp {
 	private final static String TAG = "ATLLoadedApp";
+	static final HashSet<String> play_services = new HashSet<>(Arrays.asList(
+	    "com.android.vending", "com.google.android.gms", "com.google.android.gsf"));
 	private static ATLLoadedApp system_application;
 	private static ATLLoadedApp primary_application;
 	public final Resources default_resources;
@@ -126,6 +130,10 @@ public final class ATLLoadedApp {
 		}
 		packageParser.collectCertificates(pkg, 0);
 		resources.applyPackageQuirks(pkg.applicationInfo.minSdkVersion);
+		// Support for MicroG and other custom GMS implementations.
+		if (play_services.contains(pkg.packageName)) {
+			ATLSigHelper.addGMSSignatures(pkg);
+		}
 		return new ATLLoadedApp(resources, classLoader, pkg);
 	}
 
