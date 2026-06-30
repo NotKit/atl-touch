@@ -364,6 +364,15 @@ custom_target('api-impl.jar', build_by_default: true, input: [hax_jar], output: 
               # so every in-place rebuild kept the classes of every build before it
               command: ['dx', '--dex', '--output='+join_paths(builddir_base, 'api-impl.jar'), hax_jar.full_path()])
 
+# gstub.jar
+subdir('src/gstub')
+
+custom_target('gstub.jar', build_by_default: true, input: [gstub_jar], output: ['gstub.jar'],
+              install: true,
+              install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
+              # not --incremental, for the same reason as api-impl.jar above
+              command: ['dx', '--dex', '--output='+join_paths(builddir_base, 'gstub.jar'), gstub_jar.full_path()])
+
 # test-runner.jar
 subdir('src/test-runner')
 

@@ -5,8 +5,22 @@ import java.io.File;
 public final class ATLPaths {
 	public static final File app_data_dir_base;
 	public static final File installed_apks_dir;
+	public static final File api_impl_jar;
+	public static final File gstub_jar;
 
 	static {
+		/* main.c hands us the path directly: api-impl.jar is on the boot class path
+		 * here, not on java.class.path. The hotspot and native-image launchers do put
+		 * it first on the class path, upstream style, so fall back to that. */
+		String jar = System.getProperty("atl.api.impl.jar");
+		if (jar == null || jar.isEmpty()) {
+			String cp = System.getProperty("java.class.path");
+			int separator = cp.indexOf(':');
+			jar = separator == -1 ? cp : cp.substring(0, separator);
+		}
+		api_impl_jar = new File(jar).getAbsoluteFile();
+		// gstub.jar is always next to api-impl.jar both when installed and when running from builddir
+		gstub_jar = new File(ATLPaths.api_impl_jar.getParentFile(), "gstub.jar");
 		// Mirror how main.c calculates app_data_dir_base
 		String ANDROID_APP_DATA_DIR = System.getenv("ANDROID_APP_DATA_DIR");
 		if (ANDROID_APP_DATA_DIR != null && !ANDROID_APP_DATA_DIR.isEmpty()) {

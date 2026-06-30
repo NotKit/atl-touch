@@ -130,13 +130,13 @@ static void set_up_boot_class_path(const char *art_jar_dir, const char *api_impl
 #define JDWP_ARG    "-XjdwpOptions:transport=dt_socket,server=y,suspend=y,address="
 #define SDK_INT_ARG "-DBuild.VERSION.SDK_INT="
 
-JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options)
+JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options)
 {
 	JavaVM *jvm;
 	JNIEnv *env;
 	JavaVMInitArgs args = {
 		.version = JNI_VERSION_1_6,
-		.nOptions = 4,
+		.nOptions = 5,
 	};
 	JavaVMOption *options;
 
@@ -157,7 +157,7 @@ JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runne
 		args.nOptions += g_strv_length(extra_jvm_options);
 	options = malloc(sizeof(JavaVMOption) * args.nOptions);
 
-	int option_counter = 4; // slots 0 to 3 are always filled below
+	int option_counter = 5; // slots 0 to 4 are always filled below
 
 	/* Absolute, because BaseDexClassLoader.findLibrary() hands the path it
 	 * finds straight to the app, and a caller that takes dirname() of it gets
@@ -178,6 +178,9 @@ JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runne
 	 * ATLLoadedApp relies on the first element in atl.app.class.path being the main apk */
 	options[2].optionString = construct_classpath("-Datl.app.class.path=", (char *[]){apk_classpath, test_runner_jar}, 2);
 	options[3].optionString = construct_classpath("-Datl.app.library.path=", (char *[]){natives_dir, app_lib_dir}, 2);
+	/* upstream reads this off java.class.path; here api-impl.jar is on the boot class
+	 * path instead, so ATLPaths gets the path it uses to find gstub.jar from us */
+	options[4].optionString = construct_classpath("-Datl.api.impl.jar=", (char *[]){api_impl_jar}, 1);
 	g_free(builddir);
 	if (getenv("ATL_CHECK_JNI"))
 		options[option_counter++].optionString = "-Xcheck:jni";
@@ -434,7 +437,7 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	dl_parse_library_path(ld_path, ":");
 	g_free(ld_path);
 
-	JNIEnv *env = create_vm(apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options);
+	JNIEnv *env = create_vm(api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options);
 
 	free(app_lib_dir);
 
