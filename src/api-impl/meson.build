@@ -111,6 +111,7 @@ srcs = [
 	'android/atl/ATLPaths.java',
 	'android/atl/ATLProvider.java',
 	'android/atl/ATLRuntime.java',
+	'android/atl/ATLSigHelper.java',
 	'android/atl/ATLTimeZone.java',
 	'android/atl/ATLZoneInfoDb.java',
 	'android/atl/EarlyPackageParser.java',
