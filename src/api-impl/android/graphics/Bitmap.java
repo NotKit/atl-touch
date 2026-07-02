@@ -39,6 +39,13 @@ public final class Bitmap {
 		WEBP_LOSSLESS,
 	}
 
+	public static final int DENSITY_NONE = 0;
+	public int mDensity = DENSITY_NONE;
+
+	static int getDefaultDensity() {
+		return DENSITY_NONE;
+	}
+
 	private int width;
 	private int height;
 	private int stride;
@@ -142,10 +149,18 @@ public final class Bitmap {
 		return snapshot;
 	}
 
+	/** AOSP-compatible accessor: the native SkBitmap* backing this bitmap */
+	public long getNativeInstance() {
+		return getTexture();
+	}
+
 	public synchronized long getGdkTexture() {
-		if (gdk_texture == 0) {
-			gdk_texture = native_create_gdk_texture(getTexture());
+		/* always take a fresh copy: a Canvas may have drawn into the pixels
+		 * since the last call (the AOSP Canvas does not notify us) */
+		if (gdk_texture != 0) {
+			native_unref_gdk_texture(gdk_texture);
 		}
+		gdk_texture = native_create_gdk_texture(getTexture());
 		return gdk_texture;
 	}
 
@@ -186,6 +201,10 @@ public final class Bitmap {
 
 	public boolean isRecycled() {
 		return recycled;
+	}
+
+	public boolean isPremultiplied() {
+		return true;
 	}
 
 	public void setHasAlpha(boolean hasAlpha) {

@@ -55,6 +55,11 @@ public class Path {
 		return path;
 	}
 
+	/** AOSP-compatible accessor: the native SkPath* for read-only use */
+	public long readOnlyNI() {
+		return getGskPath();
+	}
+
 	public void reset() {
 		native_reset(path, builder);
 		path = 0;

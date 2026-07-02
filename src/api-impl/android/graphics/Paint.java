@@ -18,10 +18,16 @@ public class Paint {
 	public static final int VERTICAL_TEXT_FLAG = (1 << 12);
 
 	public long paint; // native paint
+	public int mBidiFlags = 2; // Paint.BIDI_DEFAULT_LTR
 	private Xfermode xfermode;
 	private Shader shader;
 	private Align align = Align.CENTER;
 	private ColorFilter color_filter;
+
+	/** AOSP-compatible accessor: the native AndroidPaint* behind this paint */
+	public long getNativeInstance() {
+		return paint;
+	}
 
 	public Paint() {
 		paint = native_create();
