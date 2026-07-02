@@ -191,7 +191,7 @@ executable('android-translation-layer', [
                                         ],
                                         install: true,
                                         dependencies: [
-                                        	dependency('gtk4'), dependency('jni'), dependency('glfw3'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'),
+                                        	dependency('gio-2.0'), dependency('jni'), dependency('glfw3'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('fontconfig'),
                                         ],
                                         link_args: [
                                         	'-rdynamic'

@@ -1,11 +1,8 @@
 // for dladdr
 #define _GNU_SOURCE
 
-#include <cairo-svg.h>
-#include <gdk/wayland/gdkwayland.h>
+#include <gio/gio.h>
 #include <GLFW/glfw3.h>
-#include <gtk/gtk.h>
-#include <libportal/portal.h>
 
 #include "../api-impl-jni/defines.h"
 #include "../api-impl-jni/util.h"
@@ -39,11 +36,11 @@
 	#error unknown native architecture
 #endif
 
-GtkWidget *window = NULL; /* legacy: still referenced by libandroid's egl.c */
+void *window = NULL; /* legacy: still referenced by libandroid's egl.c */
 ATLWindow *atl_window = NULL;
 char *apk_path;
 
-// standard Gtk Application stuff, more or less
+// standard GApplication stuff, more or less
 
 
 
@@ -155,43 +152,26 @@ gboolean hacky_on_window_focus_changed_callback(JNIEnv *env)
 	return G_SOURCE_CONTINUE;
 }
 
-struct dynamic_launcher_callback_data {
-	char *desktop_file_id;
-	char *desktop_entry;
-};
-static void dynamic_launcher_ready_callback(GObject *portal, GAsyncResult *res, gpointer user_data)
+static void install_desktop_entry(const char *desktop_file_id, const char *desktop_entry)
 {
-	struct dynamic_launcher_callback_data *data = user_data;
-	GVariant *result = xdp_portal_dynamic_launcher_prepare_install_finish(XDP_PORTAL(portal), res, NULL);
-	if (!result) {
-		fprintf(stderr, "cancelled\n");
-		exit(0);
-	}
-	const char *token;
-	g_variant_lookup(result, "token", "s", &token);
+	char *applications_dir = g_strdup_printf("%s/applications", g_get_user_data_dir());
+	g_mkdir_with_parents(applications_dir, 0755);
+	char *desktop_file_path = g_strdup_printf("%s/%s", applications_dir, desktop_file_id);
 	GError *err = NULL;
-	xdp_portal_dynamic_launcher_install(XDP_PORTAL(portal), token, data->desktop_file_id, data->desktop_entry, &err);
-	g_free(data->desktop_file_id);
-	g_free(data->desktop_entry);
-	g_free(data);
+	g_file_set_contents(desktop_file_path, desktop_entry, -1, &err);
 	if (err) {
-		fprintf(stderr, "failed to install dynamic launcher: %s\n", err->message);
+		fprintf(stderr, "failed to install desktop entry %s: %s\n", desktop_file_path, err->message);
 		exit(1);
 	}
+	g_free(desktop_file_path);
 	// run update-desktop-database to add the new x-scheme-handler entries to ~/.local/share/applications/mimeinfo.cache
-	char *update_desktop_database = g_strdup_printf("update-desktop-database %s/applications", g_get_user_data_dir());
+	char *update_desktop_database = g_strdup_printf("update-desktop-database %s", applications_dir);
 	printf("running: `%s`\n", update_desktop_database);
 	system(update_desktop_database);
 	g_free(update_desktop_database);
+	g_free(applications_dir);
 
 	exit(0);
-}
-
-static cairo_status_t cairo_write_func_gstring(void *closure, const unsigned char *data, unsigned int length)
-{
-	GString *str = closure;
-	g_string_append_len(str, (gchar *)data, length);
-	return CAIRO_STATUS_SUCCESS;
 }
 
 // this is exported by the shim bionic linker
@@ -265,7 +245,7 @@ char *find_jar_or_die(char *builddir_path, char *installed_path, char *install_p
 	return path;
 }
 
-static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
+static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
 {
 	// TODO: pass all files to classpath
 	/*
@@ -418,12 +398,12 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	                            d->window_height ? d->window_height : 960,
 	                            true, decorated);
 
-	/* Our windows are GLFW windows, not GtkWindows, so the GtkApplication has
-	 * no windows of its own and would auto-quit as soon as `activate`/`open`
-	 * returns, making g_application_run() return and the app exit immediately.
-	 * Hold the application open for our lifetime; we exit explicitly when the
-	 * last activity/window goes away. */
-	g_application_hold(G_APPLICATION(app));
+	/* Our windows are GLFW windows, so the GApplication has no windows of its
+	 * own and would auto-quit as soon as `activate`/`open` returns, making
+	 * g_application_run() return and the app exit immediately. Hold the
+	 * application open for our lifetime; we exit explicitly when the last
+	 * activity/window goes away. */
+	g_application_hold(app);
 
 	prepare_main_looper(env);
 
@@ -506,47 +486,20 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			exit(1);
 		}
 
-		XdpPortal *portal = xdp_portal_new();
-
 		const char *app_label = _CSTRING((*env)->CallObjectMethod(env, application_object, _METHOD(handle_cache.application.class, "get_app_label", "()Ljava/lang/String;")));
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 
-		GVariant *icon_serialized = NULL;
+		char *icon_path_installed = NULL;
 		if (!d->install_internal) {
 			if (app_icon_path) {
-				/* we can import the icon as-is */
+			/* we can reference the extracted icon file directly */
 				extract_from_apk(app_icon_path, app_icon_path);
-				char *app_icon_path_full = g_strdup_printf("%s/%s", app_data_dir, app_icon_path);
-				GMappedFile *icon_file = g_mapped_file_new(app_icon_path_full, FALSE, NULL);
-				GBytes *icon_bytes = g_mapped_file_get_bytes(icon_file);
-				GIcon *icon = g_bytes_icon_new(icon_bytes);
-				icon_serialized = g_icon_serialize(icon);
-				g_object_unref(icon);
-				g_bytes_unref(icon_bytes);
-				g_mapped_file_unref(icon_file);
-				g_free(app_icon_path_full);
-			} else {
-				/* the icon is a generalized Drawable, let's render it into an SVG */
-				_SET_STATIC_BOOL_FIELD((*env)->FindClass(env, "android/graphics/drawable/VectorDrawable"), "direct_draw_override", true);
-				GdkPaintable *icon_paintable = _PTR((*env)->CallLongMethod(env, application_object, handle_cache.application.get_app_icon_paintable));
-				GString *svg_string = g_string_new("");
-				cairo_surface_t *svg_surface = cairo_svg_surface_create_for_stream(cairo_write_func_gstring, svg_string, 108, 108);
-				cairo_t *cr = cairo_create(svg_surface);
-				GdkSnapshot *snapshot = gtk_snapshot_new();
-				gdk_paintable_snapshot(icon_paintable, snapshot, 108, 108);
-				GskRenderNode *node = gtk_snapshot_to_node(snapshot);
-				gsk_render_node_draw(node, cr);
-				gsk_render_node_unref(node);
-				g_object_unref(snapshot);
-				cairo_destroy(cr);
-				cairo_surface_destroy(svg_surface);
-				GBytes *icon_bytes = g_string_free_to_bytes(svg_string);
-				GIcon *icon = g_bytes_icon_new(icon_bytes);
-				icon_serialized = g_icon_serialize(icon);
-				g_object_unref(icon);
-				g_bytes_unref(icon_bytes);
+				icon_path_installed = g_strdup_printf("%s%s", app_data_dir, app_icon_path);
 			}
+			/* TODO: icons that only exist as a generalized Drawable (e.g. VectorDrawable)
+			 * used to be rendered to SVG through GTK/GSK; that path was dropped together
+			 * with libportal. Render through Skia instead. */
 		}
 
 		gchar *dest_name = g_strdup_printf("%s.apk", package_name);
@@ -570,8 +523,13 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 		GString *desktop_entry = g_string_new("[Desktop Entry]\n"
 		                                      "Type=Application\n"
-		                                      "DBusActivatable=true\n"
-		                                      "Exec=env ");
+		                                      "DBusActivatable=true\n");
+		g_string_append_printf(desktop_entry, "Name=%s\n", app_label);
+		if (icon_path_installed) {
+			g_string_append_printf(desktop_entry, "Icon=%s\n", icon_path_installed);
+			g_free(icon_path_installed);
+		}
+		g_string_append(desktop_entry, "Exec=env ");
 		if (getenv("RUN_FROM_BUILDDIR")) {
 			printf("WARNING: RUN_FROM_BUILDDIR set and --install given: using current directory in desktop entry\n");
 			g_string_append_printf(desktop_entry, "-C %s ", g_get_current_dir());
@@ -593,11 +551,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		g_string_append_printf(desktop_entry, "%s --uri %%u\n", g_file_get_path(dest));
 		if (supported_mime_types)
 			g_string_append_printf(desktop_entry, "MimeType=%s\n", supported_mime_types);
-		struct dynamic_launcher_callback_data *cb_data = g_new(struct dynamic_launcher_callback_data, 1);
-		cb_data->desktop_file_id = g_strdup_printf("%s.desktop", package_name);
-		cb_data->desktop_entry = g_string_free(desktop_entry, FALSE);
-		printf("installing %s\n\n%s\n", cb_data->desktop_file_id, cb_data->desktop_entry);
-		xdp_portal_dynamic_launcher_prepare_install(portal, NULL, app_label, icon_serialized, XDP_LAUNCHER_APPLICATION, NULL, TRUE, TRUE, NULL, dynamic_launcher_ready_callback, cb_data);
+		char *desktop_file_id = g_strdup_printf("%s.desktop", package_name);
+		char *desktop_entry_str = g_string_free(desktop_entry, FALSE);
+		printf("installing %s\n\n%s\n", desktop_file_id, desktop_entry_str);
+		install_desktop_entry(desktop_file_id, desktop_entry_str); // exits
 		return;
 	}
 
@@ -621,7 +578,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	}
 
 
-	const char *app_id = g_application_get_application_id(G_APPLICATION(app));
+	const char *app_id = g_application_get_application_id(app);
 	if (strcmp(app_id, "com.example.demo_application")) {
 		// This would normally happen automatically, if the GApplication is not contructed with G_APPLICATION_NON_UNIQUE
 		g_dbus_connection_call(g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL),
@@ -635,7 +592,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	}
 }
 
-static void activate(GtkApplication *app, struct jni_callback_data *d)
+static void activate(GApplication *app, struct jni_callback_data *d)
 {
 	if (atl_window) { // this is not the first launch, but a DBus activate request to the running app
 		atl_window_focus(atl_window);
@@ -711,7 +668,7 @@ static void pregrow_stack()
 
 int main(int argc, char **argv)
 {
-	GtkApplication *app;
+	GApplication *app;
 	int status;
 
 	pregrow_stack();
@@ -737,7 +694,7 @@ int main(int argc, char **argv)
 	callback_data->extra_string_keys = NULL;
 	callback_data->sdk_int = NULL;
 
-	app = gtk_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
+	app = g_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
 
 	// cmdline related setup
 	init_cmd_parameters(G_APPLICATION(app), callback_data);
