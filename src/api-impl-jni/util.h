@@ -1,7 +1,7 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
-#include <gtk/gtk.h>
+#include <glib.h>
 
 #include <jni.h>
 
@@ -51,11 +51,7 @@ void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **arr
 void release_nio_buffer(JNIEnv *env, jarray array_ref, jbyte *array);
 int get_nio_buffer_size(JNIEnv *env, jobject buffer);
 
-void atl_ensure_widget_snapshotability(GtkWidget *widget);
-void atl_safe_gtk_label_set_text(GtkLabel *label, const char *str);
-void atl_safe_gtk_widget_set_visible(GtkWidget *widget, gboolean visible);
-void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
-void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
+/* GTK widget helpers moved to util_gtk.h */
 
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);

@@ -6,6 +6,7 @@
 
 #include "src/api-impl-jni/defines.h"
 #include "util.h"
+#include "util_gtk.h"
 
 const char *attribute_set_get_string(JNIEnv *env, jobject attrs, char *attribute, char *schema)
 {
