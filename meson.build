@@ -169,7 +169,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
-                                                                  	dependency('glfw3'), dependency('pangocairo'),
+                                                                  	dependency('glfw3'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),
                                                                   	dependency('wpe-webkit-2.0'), dependency('wpebackend-fdo-1.0'), dependency('wpe-1.0'),

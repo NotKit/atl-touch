@@ -77,22 +77,17 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Paint_nInit(JNIEnv *env, jclass)
 	AndroidPaint *paint = new AndroidPaint();
 	paint->paint.setColor(SK_ColorBLACK);
 	paint->font.setTypeface(atl_default_typeface());
-	paint->pango_font = pango_font_description_new();
 	return _INTPTR(paint);
 }
 
 JNIEXPORT jlong JNICALL Java_android_graphics_Paint_nInitWithPaint(JNIEnv *env, jclass, jlong src_ptr)
 {
-	AndroidPaint *clone = new AndroidPaint(*PAINT(src_ptr));
-	clone->pango_font = pango_font_description_copy(PAINT(src_ptr)->pango_font);
-	return _INTPTR(clone);
+	return _INTPTR(new AndroidPaint(*PAINT(src_ptr)));
 }
 
 static void paint_finalizer(void *ptr)
 {
-	AndroidPaint *paint = (AndroidPaint *)ptr;
-	pango_font_description_free(paint->pango_font);
-	delete paint;
+	delete (AndroidPaint *)ptr;
 }
 
 JNIEXPORT jlong JNICALL Java_android_graphics_Paint_nGetNativeFinalizer(JNIEnv *env, jclass)
@@ -103,21 +98,14 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Paint_nGetNativeFinalizer(JNIEnv *
 JNIEXPORT void JNICALL Java_android_graphics_Paint_nReset(JNIEnv *env, jclass, jlong paint_ptr)
 {
 	AndroidPaint *paint = PAINT(paint_ptr);
-	PangoFontDescription *pango_font = paint->pango_font;
 	*paint = AndroidPaint();
 	paint->paint.setColor(SK_ColorBLACK);
 	paint->font.setTypeface(atl_default_typeface());
-	pango_font_description_free(pango_font);
-	paint->pango_font = pango_font_description_new();
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_nSet(JNIEnv *env, jclass, jlong dst_ptr, jlong src_ptr)
 {
-	AndroidPaint *dst = PAINT(dst_ptr);
-	PangoFontDescription *pango_font = dst->pango_font;
-	*dst = *PAINT(src_ptr);
-	pango_font_description_free(pango_font);
-	dst->pango_font = pango_font_description_copy(PAINT(src_ptr)->pango_font);
+	*PAINT(dst_ptr) = *PAINT(src_ptr);
 }
 
 /* --- flags --- */
@@ -375,9 +363,7 @@ JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_nGetTextSize(JNIEnv *env, j
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_nSetTextSize(JNIEnv *env, jclass, jlong paint_ptr, jfloat size)
 {
-	AndroidPaint *paint = PAINT(paint_ptr);
-	paint->font.setSize(size);
-	pango_font_description_set_absolute_size(paint->pango_font, roundf(size * PANGO_SCALE));
+	PAINT(paint_ptr)->font.setSize(size);
 }
 
 JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_nGetTextScaleX(JNIEnv *env, jclass, jlong paint_ptr)

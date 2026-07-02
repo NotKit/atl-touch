@@ -1,240 +1,345 @@
-#include <pango/pango.h>
-#include <pango/pangocairo.h>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 #include "../defines.h"
-#include "../jni_cpp.h"
 #include "../graphics/ATLCanvas.h"
 #include "../graphics/AndroidPaint.h"
+#include "../hwui/MinikinGlue.h"
+#include "../jni_cpp.h"
+
+#include "include/core/SkFontMetrics.h"
+
+#include <minikin/LineBreaker.h>
+#include <minikin/MeasuredText.h>
 
 extern "C" {
 #include "../generated_headers/android_text_Layout.h"
 }
 
-static PangoContext *atl_pango_context(void)
+/*
+ * android.text.Layout backend over minikin's line breaker (the same greedy
+ * breaker Android's StaticLayout uses), replacing the previous Pango one.
+ * All offsets are UTF-16 code units, matching the Java side directly.
+ */
+
+namespace {
+
+class ConstantLineWidth : public minikin::LineWidth {
+public:
+	explicit ConstantLineWidth(float width) : width_(width) {}
+	float getAt(size_t line_no) const override { return width_; }
+	float getMin() const override { return width_; }
+
+private:
+	float width_;
+};
+
+struct ATLTextLayout {
+	std::vector<uint16_t> text;
+	AndroidPaint *paint; // owned by the Java Paint the Java Layout references
+	float width = -1;    // wrap width; -1 = unlimited
+	int ellipsize_mode = 0;
+	float ellipsize_width = 0;
+	bool ellipsized = false;
+
+	struct Line {
+		int start, end;
+		float advance;
+		bool ellipsis = false; // draw "…" after this (truncated) line
+	};
+	std::vector<Line> lines;
+	float ascent = 0, descent = 0, line_height = 1;
+
+	void relayout();
+	float measure(int start, int end, float *advances) const;
+	int line_for_offset(int offset) const;
+};
+
+float ATLTextLayout::measure(int start, int end, float *advances) const
 {
-	static PangoContext *context = pango_font_map_create_context(pango_cairo_font_map_get_default());
-	return context;
+	if (end <= start)
+		return 0;
+	return android::minikin_measure_text(paint, text.data() + start, end - start,
+	                                     minikin::Bidi::DEFAULT_LTR, advances);
 }
 
-JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env, jclass clazz, jstring text, jlong paint, jint width)
+void ATLTextLayout::relayout()
 {
-	AndroidPaint *android_paint = (AndroidPaint *)_PTR(paint);
-	PangoLayout *layout = pango_layout_new(atl_pango_context());
-	pango_layout_set_font_description(layout, android_paint->pango_font);
-	const char *str = env->GetStringUTFChars(text, NULL);
-	pango_layout_set_text(layout, str, -1);
-	env->ReleaseStringUTFChars(text, str);
-	pango_layout_set_width(layout, width == -1 ? -1 : width * PANGO_SCALE);
+	SkFontMetrics metrics;
+	paint->font.getMetrics(&metrics);
+	ascent = metrics.fAscent;
+	descent = metrics.fDescent;
+	line_height = descent - ascent + metrics.fLeading;
+	if (line_height <= 0)
+		line_height = 1;
+
+	lines.clear();
+	ellipsized = false;
+
+	int len = text.size();
+	int para_start = 0;
+	while (para_start <= len) {
+		int para_end = para_start;
+		while (para_end < len && text[para_end] != '\n')
+			para_end++;
+
+		int para_len = para_end - para_start;
+		if (para_len == 0) {
+			lines.push_back({para_start, para_start, 0, false});
+		} else if (width < 0) {
+			lines.push_back({para_start, para_end, measure(para_start, para_end, nullptr), false});
+		} else {
+			minikin::U16StringPiece para(text.data() + para_start, para_len);
+			minikin::MeasuredTextBuilder builder;
+			builder.addStyleRun(0, para_len, android::minikin_paint_for(paint),
+			                    0 /* LINE_BREAK_STYLE_NONE */, 0 /* WORD_STYLE_NONE */,
+			                    false /* isRtl */);
+			std::unique_ptr<minikin::MeasuredText> measured = builder.build(
+			    para, false /* hyphenation */, false /* computeLayout */,
+			    true /* ignoreHyphenKerning */, nullptr);
+			ConstantLineWidth line_width(width);
+			minikin::TabStops tab_stops(nullptr, 0, paint->font.getSize() * 2);
+			minikin::LineBreakResult result = minikin::breakIntoLines(
+			    para, minikin::BreakStrategy::Greedy, minikin::HyphenationFrequency::None,
+			    false /* justified */, *measured, line_width, tab_stops);
+			int line_start = 0;
+			for (size_t i = 0; i < result.breakPoints.size(); i++) {
+				lines.push_back({para_start + line_start, para_start + result.breakPoints[i],
+				                 result.widths[i], false});
+				line_start = result.breakPoints[i];
+			}
+		}
+		para_start = para_end + 1;
+	}
+
+	/* single-line END ellipsis, the common TextView case */
+	if (ellipsize_mode != 0 && (lines.size() > 1 || (lines.size() == 1 && width > 0 && lines[0].advance > width))) {
+		float max_width = ellipsize_width > 0 ? ellipsize_width : width;
+		if (max_width > 0) {
+			const uint16_t ellipsis_char = 0x2026; // …
+			float ellipsis_advance = android::minikin_measure_text(
+			    paint, &ellipsis_char, 1, minikin::Bidi::DEFAULT_LTR, nullptr);
+			Line line = {0, 0, 0, true};
+			std::vector<float> advances(text.size());
+			measure(0, text.size(), advances.data());
+			float budget = max_width - ellipsis_advance;
+			int end = 0;
+			float advance = 0;
+			while (end < (int)text.size() && text[end] != '\n' &&
+			       (advance + advances[end] <= budget || advances[end] == 0)) {
+				advance += advances[end];
+				end++;
+			}
+			line.end = end;
+			line.advance = advance + ellipsis_advance;
+			lines.assign(1, line);
+			ellipsized = true;
+		}
+	}
+}
+
+int ATLTextLayout::line_for_offset(int offset) const
+{
+	for (size_t i = 0; i < lines.size(); i++)
+		if (offset <= lines[i].end)
+			return i;
+	return lines.size() - 1;
+}
+
+#define LAYOUT(ptr) ((ATLTextLayout *)_PTR(ptr))
+
+} // namespace
+
+JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env, jclass, jstring text, jlong paint_ptr, jint width)
+{
+	ATLTextLayout *layout = new ATLTextLayout();
+	const jchar *chars = env->GetStringChars(text, NULL);
+	layout->text.assign(chars, chars + env->GetStringLength(text));
+	env->ReleaseStringChars(text, chars);
+	layout->paint = (AndroidPaint *)_PTR(paint_ptr);
+	layout->width = width;
+	layout->relayout();
 	return _INTPTR(layout);
 }
 
-JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1width(JNIEnv *env, jobject object, jlong layout, jint width)
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1free(JNIEnv *env, jclass, jlong layout)
 {
-	pango_layout_set_width(PANGO_LAYOUT(_PTR(layout)), width * PANGO_SCALE);
+	delete LAYOUT(layout);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1width(JNIEnv *env, jobject object, jlong layout)
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1width(JNIEnv *env, jobject, jlong layout, jint width)
 {
-	return pango_layout_get_width(PANGO_LAYOUT(_PTR(layout))) / PANGO_SCALE;
+	LAYOUT(layout)->width = width;
+	LAYOUT(layout)->relayout();
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1height(JNIEnv *env, jobject object, jlong layout)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1width(JNIEnv *env, jobject, jlong layout)
 {
-	PangoRectangle ink_rect;
-	PangoRectangle logical_rect;
-	pango_layout_get_extents(PANGO_LAYOUT(_PTR(layout)), &ink_rect, &logical_rect);
-	return logical_rect.height / PANGO_SCALE;
+	return (jint)LAYOUT(layout)->width;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1count(JNIEnv *env, jobject object, jlong layout)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1height(JNIEnv *env, jobject, jlong layout)
 {
-	return pango_layout_get_line_count(PANGO_LAYOUT(_PTR(layout)));
+	return (jint)ceilf(LAYOUT(layout)->lines.size() * LAYOUT(layout)->line_height);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1start(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1count(JNIEnv *env, jobject, jlong layout)
 {
-	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(pango_layout, line);
-	int byte_index = pango_layout_line_get_start_index(pango_line);
-	return g_utf8_strlen(pango_layout_get_text(pango_layout), byte_index);
+	return LAYOUT(layout)->lines.size();
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1end(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1start(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(pango_layout, line);
-	int byte_index = pango_layout_line_get_start_index(pango_line) + pango_layout_line_get_length(pango_line);
-	return g_utf8_strlen(pango_layout_get_text(pango_layout), byte_index);
+	return LAYOUT(layout)->lines[line].start;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1top(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1end(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, NULL);
-	return (logical_rect.y) / PANGO_SCALE;
+	return LAYOUT(layout)->lines[line].end;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1bottom(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1top(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, NULL);
-	return (logical_rect.y + logical_rect.height) / PANGO_SCALE;
+	return (jint)(line * LAYOUT(layout)->line_height);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1left(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1bottom(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, NULL);
-	return logical_rect.x / PANGO_SCALE;
+	return (jint)ceilf((line + 1) * LAYOUT(layout)->line_height);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1right(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1left(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, NULL);
-	return (logical_rect.x + logical_rect.width) / PANGO_SCALE;
+	return 0;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1width(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1right(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, NULL);
-	return logical_rect.width / PANGO_SCALE;
+	return (jint)ceilf(LAYOUT(layout)->lines[line].advance);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1baseline(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1width(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutIter *pango_iter = pango_layout_get_iter(PANGO_LAYOUT(_PTR(layout)));
-	while (line--)
-		pango_layout_iter_next_line(pango_iter);
-
-	return pango_layout_iter_get_baseline(pango_iter) / PANGO_SCALE;
+	return (jint)ceilf(LAYOUT(layout)->lines[line].advance);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1ascent(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1baseline(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect, ink_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, &ink_rect);
-	return -PANGO_ASCENT(ink_rect) / PANGO_SCALE;
+	ATLTextLayout *l = LAYOUT(layout);
+	return (jint)roundf(line * l->line_height - l->ascent);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1descent(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1ascent(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	PangoRectangle logical_rect, ink_rect;
-	pango_layout_line_get_extents(pango_line, &logical_rect, &ink_rect);
-	return PANGO_DESCENT(ink_rect) / PANGO_SCALE;
+	return (jint)LAYOUT(layout)->ascent;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1for_1vertical(JNIEnv *env, jobject object, jlong layout, jint y)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1descent(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
-	int index_, trailing;
-	pango_layout_xy_to_index(pango_layout, 0, y * PANGO_SCALE, &index_, &trailing);
-	int line, x_pos;
-	pango_layout_index_to_line_x(pango_layout, index_, trailing, &line, &x_pos);
-	return line;
+	return (jint)ceilf(LAYOUT(layout)->descent);
 }
 
-JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1ellipsize(JNIEnv *env, jobject object, jlong layout, jint ellipsize_mode, jfloat ellipsize_width)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1for_1vertical(JNIEnv *env, jobject, jlong layout, jint y)
 {
-	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
-	pango_layout_set_ellipsize(pango_layout, (PangoEllipsizeMode)ellipsize_mode);
-	pango_layout_set_width(pango_layout, ellipsize_width * PANGO_SCALE);
+	ATLTextLayout *l = LAYOUT(layout);
+	int line = (int)(y / l->line_height);
+	return std::clamp(line, 0, (int)l->lines.size() - 1);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1ellipsis_1count(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1for_1offset(JNIEnv *env, jobject, jlong layout, jint offset)
 {
-	return pango_layout_is_ellipsized(PANGO_LAYOUT(_PTR(layout)));
+	return LAYOUT(layout)->line_for_offset(offset);
 }
 
-JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw(JNIEnv *env, jobject object, jlong layout, jlong snapshot_ptr, jlong paint_ptr)
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1ellipsize(JNIEnv *env, jobject, jlong layout, jint ellipsize_mode, jfloat ellipsize_width)
 {
-	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
-	ATLCanvas *atl_canvas = (ATLCanvas *)_PTR(snapshot_ptr);
-	AndroidPaint *android_paint = (AndroidPaint *)_PTR(paint_ptr);
-
-	/* line breaking and positioning come from Pango; glyph rendering is Skia */
-	const char *text = pango_layout_get_text(pango_layout);
-	PangoLayoutIter *pango_iter = pango_layout_get_iter(pango_layout);
-	do {
-		PangoLayoutLine *pango_line = pango_layout_iter_get_line_readonly(pango_iter);
-		if (pango_line->length == 0)
-			continue;
-		PangoRectangle line_rect;
-		pango_layout_iter_get_line_extents(pango_iter, NULL, &line_rect);
-		float x = (float)line_rect.x / PANGO_SCALE;
-		float y = (float)pango_layout_iter_get_baseline(pango_iter) / PANGO_SCALE;
-		atl_canvas->canvas->drawSimpleText(text + pango_line->start_index, pango_line->length,
-		                                   SkTextEncoding::kUTF8, x, y,
-		                                   android_paint->font, android_paint->paint);
-	} while (pango_layout_iter_next_line(pango_iter));
-	pango_layout_iter_free(pango_iter);
+	ATLTextLayout *l = LAYOUT(layout);
+	l->ellipsize_mode = ellipsize_mode;
+	l->ellipsize_width = ellipsize_width;
+	l->relayout();
 }
 
-JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw_1custom_1canvas(JNIEnv *env, jobject object, jlong layout, jobject canvas, jobject paint)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1ellipsis_1count(JNIEnv *env, jobject, jlong layout, jint line)
 {
-	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
-
-	const gchar *text = pango_layout_get_text(pango_layout);
-	PangoLayoutIter *pango_iter = pango_layout_get_iter(pango_layout);
-	do {
-		PangoLayoutLine *pango_line = pango_layout_iter_get_line_readonly(pango_iter);
-
-		jstring text_jstr = env->NewStringUTF(text + pango_line->start_index);
-		jint end = env->GetStringLength(text_jstr);
-		if (pango_line->length < end)
-			end = pango_line->length;
-		jfloat y = (float)pango_layout_iter_get_baseline(pango_iter) / PANGO_SCALE;
-		env->CallVoidMethod(canvas, handle_cache.canvas.drawText, text_jstr, (jint)0, end, (jfloat)0, y, paint);
-		env->DeleteLocalRef(text_jstr);
-	} while (pango_layout_iter_next_line(pango_iter));
-	pango_layout_iter_free(pango_iter);
+	return LAYOUT(layout)->ellipsized;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1for_1offset(JNIEnv *env, jobject object, jlong layout, jint offset)
+JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1primary_1horizontal(JNIEnv *env, jobject, jlong layout, jint offset)
 {
-	int line;
-	pango_layout_index_to_line_x(PANGO_LAYOUT(_PTR(layout)), offset, FALSE, &line, NULL);
-	return line;
-}
-
-JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1primary_1horizontal(JNIEnv *env, jobject object, jlong layout, jint offset)
-{
-	PangoRectangle cursor_rect;
-	pango_layout_get_cursor_pos(PANGO_LAYOUT(_PTR(layout)), offset, &cursor_rect, NULL);
-	return (jfloat)cursor_rect.x / PANGO_SCALE;
+	ATLTextLayout *l = LAYOUT(layout);
+	if (l->lines.empty())
+		return 0;
+	const auto &line = l->lines[l->line_for_offset(offset)];
+	return l->measure(line.start, std::min(offset, line.end), nullptr);
 }
 
 JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1secondary_1horizontal(JNIEnv *env, jobject object, jlong layout, jint offset)
 {
-	PangoRectangle cursor_rect;
-	pango_layout_get_cursor_pos(PANGO_LAYOUT(_PTR(layout)), offset, NULL, &cursor_rect);
-	return (jfloat)cursor_rect.x / PANGO_SCALE;
+	return Java_android_text_Layout_native_1get_1primary_1horizontal(env, object, layout, offset);
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1offset_1for_1horizontal(JNIEnv *env, jobject object, jlong layout, jint line, jfloat x)
+JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1offset_1for_1horizontal(JNIEnv *env, jobject, jlong layout, jint line_no, jfloat x)
 {
-	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
-	int index;
-	pango_layout_line_x_to_index(pango_line, x * PANGO_SCALE, &index, NULL);
-	return index;
+	ATLTextLayout *l = LAYOUT(layout);
+	if (l->lines.empty())
+		return 0;
+	const auto &line = l->lines[line_no];
+	int count = line.end - line.start;
+	if (count <= 0)
+		return line.start;
+	std::vector<float> advances(count);
+	l->measure(line.start, line.end, advances.data());
+	float pos = 0;
+	for (int i = 0; i < count; i++) {
+		if (pos + advances[i] / 2 > x)
+			return line.start + i;
+		pos += advances[i];
+	}
+	return line.end;
 }
 
-JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1desired_1width(JNIEnv *env, jclass clazz, jlong layout)
+JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1desired_1width(JNIEnv *env, jclass, jlong layout)
 {
-	int width;
-	pango_layout_get_size(PANGO_LAYOUT(_PTR(layout)), &width, NULL);
-	return (jfloat)width / PANGO_SCALE;
+	float max_advance = 0;
+	for (const auto &line : LAYOUT(layout)->lines)
+		max_advance = std::max(max_advance, line.advance);
+	return max_advance;
 }
 
-JNIEXPORT void JNICALL Java_android_text_Layout_native_1free(JNIEnv *env, jclass clazz, jlong layout)
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw(JNIEnv *env, jobject, jlong layout_ptr, jlong canvas_ptr, jlong paint_ptr)
 {
-	g_object_unref(PANGO_LAYOUT(_PTR(layout)));
+	ATLTextLayout *layout = LAYOUT(layout_ptr);
+	ATLCanvas *atl_canvas = (ATLCanvas *)_PTR(canvas_ptr);
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	const uint16_t ellipsis_char = 0x2026;
+
+	for (size_t i = 0; i < layout->lines.size(); i++) {
+		const auto &line = layout->lines[i];
+		float baseline = i * layout->line_height - layout->ascent;
+		if (line.end > line.start)
+			android::minikin_draw_text(atl_canvas->canvas, paint,
+			                           layout->text.data() + line.start, line.end - line.start,
+			                           minikin::Bidi::DEFAULT_LTR, 0, baseline);
+		if (line.ellipsis) {
+			float x = layout->measure(line.start, line.end, nullptr);
+			android::minikin_draw_text(atl_canvas->canvas, paint, &ellipsis_char, 1,
+			                           minikin::Bidi::DEFAULT_LTR, x, baseline);
+		}
+	}
+}
+
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw_1custom_1canvas(JNIEnv *env, jobject, jlong layout_ptr, jobject canvas, jobject paint)
+{
+	ATLTextLayout *layout = LAYOUT(layout_ptr);
+	for (size_t i = 0; i < layout->lines.size(); i++) {
+		const auto &line = layout->lines[i];
+		if (line.end <= line.start)
+			continue;
+		float baseline = i * layout->line_height - layout->ascent;
+		jstring text_jstr = env->NewString(layout->text.data() + line.start, line.end - line.start);
+		env->CallVoidMethod(canvas, handle_cache.canvas.drawText, text_jstr, (jint)0,
+		                    (jint)(line.end - line.start), (jfloat)0, (jfloat)baseline, paint);
+		env->DeleteLocalRef(text_jstr);
+	}
 }
