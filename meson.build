@@ -48,6 +48,9 @@ extra_jni_srcs = []
 # Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap
 skia_dep = dependency('skia')
 
+# minikin (text shaping/measurement/line breaking), vendored from AOSP-13
+subdir('third_party/minikin')
+
 layer_shell_dep = dependency('gtk4-layer-shell-0', required : false)
 if layer_shell_dep.found()
   extra_deps = [ layer_shell_dep ]
