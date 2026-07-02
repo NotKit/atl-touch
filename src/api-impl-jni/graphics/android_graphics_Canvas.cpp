@@ -4,6 +4,7 @@
 #include "../defines.h"
 #include "ATLCanvas.h"
 #include "AndroidPaint.h"
+#include "../hwui/MinikinGlue.h"
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkBlendMode.h"
@@ -481,8 +482,8 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmapMesh(JNIEnv *
 
 static void draw_text_utf16(SkCanvas *canvas, const jchar *chars, int count, float x, float y, AndroidPaint *paint)
 {
-	SkTextUtils::Draw(canvas, chars, count * sizeof(jchar), SkTextEncoding::kUTF16,
-	                  x, y, paint->font, paint->paint, (SkTextUtils::Align)paint->text_align);
+	/* shaping + font fallback via minikin (alignment handled inside) */
+	android::minikin_draw_text(canvas, paint, chars, count, minikin::Bidi::LTR, x, y);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawText__J_3CIIFFIJ(JNIEnv *env, jclass, jlong canvas_ptr, jcharArray text_arr, jint index, jint count, jfloat x, jfloat y, jint bidi_flags, jlong paint_ptr)

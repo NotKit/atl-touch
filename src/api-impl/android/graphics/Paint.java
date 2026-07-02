@@ -76,7 +76,11 @@ public class Paint {
 		native_set_text_size(paint, size);
 	}
 
+	private Typeface typeface;
+
 	public Typeface setTypeface(Typeface typeface) {
+		this.typeface = typeface;
+		native_set_typeface(paint, typeface != null ? typeface.native_instance : 0);
 		return typeface;
 	}
 	public void getTextBounds(String text, int start, int end, Rect bounds) {
@@ -287,7 +291,10 @@ public class Paint {
 		return null;
 	}
 
-	public void setLetterSpacing(float spacing) {}
+	public void setLetterSpacing(float spacing) {
+		// Android's unit is EMs; native side multiplies by text size
+		native_set_letter_spacing(paint, spacing);
+	}
 
 	public enum Cap {
 		/**
@@ -340,7 +347,7 @@ public class Paint {
 	}
 
 	public Typeface getTypeface() {
-		return new Typeface();
+		return typeface;
 	}
 
 	public void setTextAlign(Align align) {
@@ -455,6 +462,8 @@ public class Paint {
 	private static native void native_set_color_filter(long paint, int mode, int color);
 	private static native void native_get_text_bounds(long paint, String text, Rect bounds);
 	private static native void native_set_text_align(long paint, int align);
+	private static native void native_set_typeface(long paint, long typeface);
+	private static native void native_set_letter_spacing(long paint, float spacing);
 	private static native float native_measure_text(long paint, String text);
 	private static native int native_get_text_widths(long paint, String text, float[] widths);
 	private static native float native_ascent(long paint);

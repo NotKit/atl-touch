@@ -124,6 +124,11 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchSkia.cpp',
 	'src/api-impl-jni/graphics/android_graphics_Canvas.cpp',
+                                                                  	'src/api-impl-jni/hwui/android_graphics_Typeface.cpp',
+                                                                  	'src/api-impl-jni/hwui/MinikinGlue.cpp',
+                                                                  	'src/api-impl-jni/hwui/MinikinSkia.cpp',
+                                                                  	'src/api-impl-jni/hwui/Typeface.cpp',
+                                                                  	'src/api-impl-jni/hwui/TypefaceCollection.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Bitmap.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_BitmapFactory.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Matrix.cpp',
@@ -168,7 +173,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),
                                                                   	dependency('wpe-webkit-2.0'), dependency('wpebackend-fdo-1.0'), dependency('wpe-1.0'),
-                                                                        libart_dep, wayland_protos_dep, skia_dep
+                                                                        libart_dep, wayland_protos_dep, skia_dep, minikin_dep
                                                                   ],
                                                                   link_with: [ libandroid_so ],
                                                                   link_args: [

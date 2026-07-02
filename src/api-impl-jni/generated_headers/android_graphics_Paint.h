@@ -195,6 +195,22 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1align
 
 /*
  * Class:     android_graphics_Paint
+ * Method:    native_set_typeface
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1typeface
+  (JNIEnv *, jclass, jlong, jlong);
+
+/*
+ * Class:     android_graphics_Paint
+ * Method:    native_set_letter_spacing
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1letter_1spacing
+  (JNIEnv *, jclass, jlong, jfloat);
+
+/*
+ * Class:     android_graphics_Paint
  * Method:    native_measure_text
  * Signature: (JLjava/lang/String;)F
  */

@@ -4,6 +4,9 @@
 #include "ATLCanvas.h"
 #include "ATLShader.h"
 #include "AndroidPaint.h"
+#include "../hwui/MinikinGlue.h"
+
+#include <vector>
 
 #include "include/core/SkBlendMode.h"
 #include "include/core/SkFontMetrics.h"
@@ -202,7 +205,8 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1align(JNIE
 
 static float measure_utf16(AndroidPaint *paint, const jchar *chars, int len)
 {
-	return paint->font.measureText(chars, len * sizeof(jchar), SkTextEncoding::kUTF16);
+	/* shaped measurement with font fallback via minikin */
+	return android::minikin_measure_text(paint, chars, len, minikin::Bidi::LTR, nullptr);
 }
 
 JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1measure_1text(JNIEnv *env, jclass, jlong paint_ptr, jstring text)
@@ -220,15 +224,7 @@ JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1get_1text_1widths(JNI
 	const jchar *chars = env->GetStringChars(text, NULL);
 	int len = env->GetStringLength(text);
 	jfloat *widths = env->GetFloatArrayElements(widths_arr, NULL);
-	/* per-UTF16-unit advances; low surrogates get 0, matching AOSP */
-	for (int i = 0; i < len; i++) {
-		if ((chars[i] & 0xFC00) == 0xDC00) {
-			widths[i] = 0;
-		} else {
-			int glyph_len = ((chars[i] & 0xFC00) == 0xD800 && i + 1 < len) ? 2 : 1;
-			widths[i] = measure_utf16(paint, chars + i, glyph_len);
-		}
-	}
+	android::minikin_measure_text(paint, chars, len, minikin::Bidi::LTR, widths);
 	env->ReleaseFloatArrayElements(widths_arr, widths, 0);
 	env->ReleaseStringChars(text, chars);
 	return len;
@@ -261,16 +257,16 @@ JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1break_1text(JNIEnv *e
 	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
 	const jchar *chars = env->GetStringChars(text, NULL);
 	int len = env->GetStringLength(text);
-	/* this Skia has no SkFont::breakText; accumulate per-cluster advances */
+	/* accumulate minikin cluster advances until the width budget runs out */
+	std::vector<float> advances(len);
+	android::minikin_measure_text(paint, chars, len, minikin::Bidi::LTR, advances.data());
 	SkScalar measured = 0;
 	int fitted = 0;
 	while (fitted < len) {
-		int glyph_len = ((chars[fitted] & 0xFC00) == 0xD800 && fitted + 1 < len) ? 2 : 1;
-		SkScalar advance = measure_utf16(paint, chars + fitted, glyph_len);
-		if (measured + advance > max_width)
+		if (measured + advances[fitted] > max_width && advances[fitted] > 0)
 			break;
-		measured += advance;
-		fitted += glyph_len;
+		measured += advances[fitted];
+		fitted++;
 	}
 	env->ReleaseStringChars(text, chars);
 	if (measured_arr) {
@@ -278,4 +274,26 @@ JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1break_1text(JNIEnv *e
 		env->SetFloatArrayRegion(measured_arr, 0, 1, &measured_f);
 	}
 	return fitted;
+}
+
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1typeface(JNIEnv *env, jclass, jlong paint_ptr, jlong typeface_ptr)
+{
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	paint->typeface = (android::Typeface *)_PTR(typeface_ptr);
+	/* keep the SkFont in sync for legacy draw paths */
+	if (paint->typeface) {
+		const auto &families = paint->typeface->fFontCollection->getFamilies();
+		if (!families.empty()) {
+			auto closest = families[0]->getClosestMatch(paint->typeface->fStyle);
+			paint->font.setTypeface(
+			    static_cast<const android::MinikinFontSkia *>(closest.font->typeface().get())
+			        ->RefSkTypeface());
+		}
+	}
+}
+
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1letter_1spacing(JNIEnv *env, jclass, jlong paint_ptr, jfloat spacing)
+{
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	paint->letter_spacing = spacing * paint->font.getSize();
 }

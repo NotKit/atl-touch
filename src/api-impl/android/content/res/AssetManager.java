@@ -294,6 +294,27 @@ public final class AssetManager {
 	 * @see #open(String, int)
 	 * @see #list
 	 */
+	/**
+	 * atl-touch: copy an asset to a file so native consumers (e.g. font loading)
+	 * can use a path; returns null if the asset does not exist.
+	 */
+	public final String extractAsset(String fileName) {
+		java.io.File out = new java.io.File(
+		    android.os.Environment.getDataDirectory(), "extracted_assets/" + fileName);
+		try (InputStream in = open(fileName)) {
+			out.getParentFile().mkdirs();
+			try (java.io.FileOutputStream os = new java.io.FileOutputStream(out)) {
+				byte[] buf = new byte[65536];
+				int n;
+				while ((n = in.read(buf)) > 0)
+					os.write(buf, 0, n);
+			}
+			return out.getAbsolutePath();
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
 	public final InputStream open(String fileName) throws IOException {
 		return open(fileName, ACCESS_STREAMING);
 	}

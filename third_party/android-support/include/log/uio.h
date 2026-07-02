@@ -18,6 +18,7 @@
 // implementation of sys/uio.h for platforms that don't have it (Win32)
 //
 #ifndef _LIBS_CUTILS_UIO_H
+#define HAVE_SYS_UIO_H 1
 #define _LIBS_CUTILS_UIO_H
 
 #ifdef HAVE_SYS_UIO_H
