@@ -24,6 +24,10 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 public class TextUtils {
+	public static String nullIfEmpty(String str) {
+		return isEmpty(str) ? null : str;
+	}
+
 	public static int getLayoutDirectionFromLocale(Locale locale) {
 		return 0 /*LTR*/; // FIXME
 	}

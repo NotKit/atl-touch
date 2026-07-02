@@ -21,6 +21,13 @@ package android.graphics;
  * color and a specific {@link PorterDuff Porter-Duff composite mode}.
  */
 public class PorterDuffColorFilter extends ColorFilter {
+	@Override
+	public long getNativeInstance() {
+		return native_CreateBlendModeFilter(getColor(), getMode().nativeInt);
+	}
+
+	private static native long native_CreateBlendModeFilter(int color, int porterDuffMode);
+
 	private int mColor;
 	private PorterDuff.Mode mMode;
 

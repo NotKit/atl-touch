@@ -26,4 +26,17 @@ struct AndroidPaint {
 	float letter_spacing = 0;
 	float word_spacing = 0;
 	std::string font_feature_settings;
+	uint32_t locale_list_id = 0;
+
+	/* android.graphics.Paint state not representable in SkPaint/SkFont */
+	int flags = 0;
+	bool underline = false;
+	bool strike_thru = false;
+	bool elegant_text_height = false;
+	int start_hyphen_edit = 0;
+	int end_hyphen_edit = 0;
+	float shadow_radius = 0;
+	float shadow_dx = 0;
+	float shadow_dy = 0;
+	SkColor shadow_color = 0;
 };

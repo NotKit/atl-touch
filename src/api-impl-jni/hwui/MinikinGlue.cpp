@@ -1,7 +1,10 @@
 #include "MinikinGlue.h"
 
+#include <include/core/SkBlurTypes.h>
 #include <include/core/SkCanvas.h>
 #include <include/core/SkFont.h>
+#include <include/core/SkFontMetrics.h>
+#include <include/core/SkMaskFilter.h>
 #include <include/core/SkTextBlob.h>
 #include <minikin/FontCollection.h>
 
@@ -17,7 +20,7 @@ minikin::MinikinPaint minikin_paint_for(const AndroidPaint *paint)
 	mp.letterSpacing = paint->letter_spacing;
 	mp.wordSpacing = paint->word_spacing;
 	mp.fontFlags = MinikinFontSkia::packFontFlags(paint->font);
-	mp.localeListId = 0;
+	mp.localeListId = paint->locale_list_id;
 	mp.fontStyle = typeface->fStyle;
 	mp.fontFeatureSettings = paint->font_feature_settings;
 	return mp;
@@ -47,6 +50,18 @@ void minikin_draw_text(SkCanvas *canvas, const AndroidPaint *paint, const uint16
 	else if (paint->text_align == 2)
 		x -= layout.getAdvance();
 
+	/* shadow layer: draw the same runs blurred, offset, in the shadow color */
+	if (paint->shadow_radius > 0) {
+		AndroidPaint shadow = *paint;
+		shadow.shadow_radius = 0;
+		shadow.text_align = 0; // x is already alignment-adjusted
+		shadow.paint.setColor(paint->shadow_color);
+		shadow.paint.setMaskFilter(SkMaskFilter::MakeBlur(
+		    kNormal_SkBlurStyle, paint->shadow_radius * 0.5f));
+		minikin_draw_text(canvas, &shadow, text, count, bidi,
+		                  x + paint->shadow_dx, y + paint->shadow_dy);
+	}
+
 	/* emit one glyph run per contiguous (font, fakery) stretch */
 	size_t glyph_count = layout.nGlyphs();
 	size_t run_start = 0;
@@ -71,6 +86,29 @@ void minikin_draw_text(SkCanvas *canvas, const AndroidPaint *paint, const uint16
 		}
 		canvas->drawTextBlob(builder.make(), 0, 0, paint->paint);
 		run_start = run_end;
+	}
+
+	/* text decorations */
+	if (paint->underline || paint->strike_thru) {
+		SkFontMetrics metrics;
+		paint->font.getMetrics(&metrics);
+		float thickness;
+		if (!metrics.hasUnderlineThickness(&thickness))
+			thickness = paint->font.getSize() / 18.0f;
+		SkPaint line_paint = paint->paint;
+		line_paint.setStyle(SkPaint::kFill_Style);
+		if (paint->underline) {
+			float position;
+			if (!metrics.hasUnderlinePosition(&position))
+				position = paint->font.getSize() / 9.0f;
+			canvas->drawRect(SkRect::MakeXYWH(x, y + position, layout.getAdvance(), thickness),
+			                 line_paint);
+		}
+		if (paint->strike_thru) {
+			float position = -paint->font.getSize() * (6.0f / 21.0f);
+			canvas->drawRect(SkRect::MakeXYWH(x, y + position, layout.getAdvance(), thickness),
+			                 line_paint);
+		}
 	}
 }
 

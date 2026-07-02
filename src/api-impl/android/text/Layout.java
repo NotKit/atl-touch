@@ -29,7 +29,7 @@ public class Layout {
 		this.spacing_mult = spacingMult;
 		this.spacing_add = spacingAdd;
 		this.align = align;
-		layout = native_constructor(text != null ? text.toString() : "", paint.paint, width);
+		layout = native_constructor(text != null ? text.toString() : "", paint.getNativeInstance(), width);
 	}
 
 	public int getLineCount() {
@@ -63,7 +63,7 @@ public class Layout {
 	}
 
 	public void draw(Canvas canvas) {
-		native_draw(layout, canvas.getNativeCanvasWrapper(), paint.paint);
+		native_draw(layout, canvas.getNativeCanvasWrapper(), paint.getNativeInstance());
 	}
 
 	public void draw(Canvas canvas, Path selectionHighlight, Paint paint, int selectionOffset) {
@@ -81,7 +81,7 @@ public class Layout {
 	}
 
 	public static float getDesiredWidth(CharSequence source, TextPaint paint) {
-		long layout = native_constructor(source != null ? source.toString() : "", paint.paint, -1);
+		long layout = native_constructor(source != null ? source.toString() : "", paint.getNativeInstance(), -1);
 		float width = native_get_desired_width(layout);
 		native_free(layout);
 		return width;

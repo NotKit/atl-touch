@@ -20,6 +20,50 @@ import java.util.HashMap;
 import java.util.Locale;
 
 public class Color {
+
+	/*
+	 * ColorLong support, sRGB-only subset: the packed representation is the
+	 * ARGB int in the upper 32 bits with color space id 0 (sRGB), matching
+	 * AOSP's encoding for sRGB colors.
+	 */
+
+	public static long pack(int color) {
+		return (long)color << 32;
+	}
+
+	public static long pack(float red, float green, float blue, float alpha) {
+		return pack(argb((int)(alpha * 255.0f + 0.5f), (int)(red * 255.0f + 0.5f),
+		                 (int)(green * 255.0f + 0.5f), (int)(blue * 255.0f + 0.5f)));
+	}
+
+	public static long pack(float red, float green, float blue, float alpha, ColorSpace colorSpace) {
+		return pack(red, green, blue, alpha); // sRGB only
+	}
+
+	public static int toArgb(long color) {
+		return (int)(color >> 32);
+	}
+
+	public static ColorSpace colorSpace(long color) {
+		return ColorSpace.get(ColorSpace.Named.SRGB);
+	}
+
+	public static float alpha(long color) {
+		return ((toArgb(color) >>> 24) & 0xff) / 255.0f;
+	}
+
+	public static float red(long color) {
+		return ((toArgb(color) >> 16) & 0xff) / 255.0f;
+	}
+
+	public static float green(long color) {
+		return ((toArgb(color) >> 8) & 0xff) / 255.0f;
+	}
+
+	public static float blue(long color) {
+		return (toArgb(color) & 0xff) / 255.0f;
+	}
+
 	public static final int BLACK = 0xFF000000;
 	public static final int DKGRAY = 0xFF444444;
 	public static final int GRAY = 0xFF888888;

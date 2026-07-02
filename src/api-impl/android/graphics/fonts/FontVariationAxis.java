@@ -13,6 +13,11 @@ public class FontVariationAxis {
 		return arr;
 	}
 
+	public int getOpenTypeTagValue() {
+		return (tag_string.charAt(0) << 24) | (tag_string.charAt(1) << 16) |
+		       (tag_string.charAt(2) << 8) | tag_string.charAt(3);
+	}
+
 	public float getStyleValue() {
 		return style_value;
 	}

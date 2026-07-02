@@ -64,6 +64,10 @@ public class Typeface {
 		return extractedPath != null ? createFromFile(extractedPath) : DEFAULT;
 	}
 
+	public boolean isSupportedAxes(int axis) {
+		return false; // variation axes not wired up yet
+	}
+
 	public int getStyle() {
 		return style;
 	}
@@ -82,6 +86,11 @@ public class Typeface {
 			case NORMAL: return DEFAULT;
 			default: return create((String)null, style);
 		}
+	}
+
+	public static Typeface createFromTypefaceWithVariation(Typeface family, java.util.List<android.graphics.fonts.FontVariationAxis> axes) {
+		// TODO: apply the variation axes through minikin
+		return family != null ? family : DEFAULT;
 	}
 
 	public static Typeface createFromFamiliesWithDefault(FontFamily[] families) {

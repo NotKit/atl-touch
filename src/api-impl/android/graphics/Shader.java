@@ -11,6 +11,14 @@ public class Shader {
 	/* native ATLShader* (0 for shader types not yet backed natively) */
 	public long native_instance = 0;
 
+	public long getNativeInstance() {
+		return native_instance;
+	}
+
+	public long getNativeInstance(boolean filterFromPaint) {
+		return native_instance;
+	}
+
 	protected void init(long ni) {
 		native_instance = ni;
 	}

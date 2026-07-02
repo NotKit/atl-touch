@@ -9,6 +9,14 @@ extern "C" {
 #endif
 /*
  * Class:     android_graphics_PorterDuffColorFilter
+ * Method:    native_CreateBlendModeFilter
+ * Signature: (II)J
+ */
+JNIEXPORT jlong JNICALL Java_android_graphics_PorterDuffColorFilter_native_1CreateBlendModeFilter
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_graphics_PorterDuffColorFilter
  * Method:    native_CreatePorterDuffFilter
  * Signature: (II)J
  */
