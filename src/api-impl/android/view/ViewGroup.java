@@ -3,7 +3,6 @@ package android.view;
 import android.R;
 import android.animation.LayoutTransition;
 import android.annotation.UnsupportedAppUsage;
-import android.atl.GskCanvas;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;

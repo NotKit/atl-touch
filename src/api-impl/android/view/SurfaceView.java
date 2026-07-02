@@ -1,6 +1,5 @@
 package android.view;
 
-import android.atl.GskCanvas;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -234,7 +233,7 @@ public class SurfaceView extends View {
 			if (getWidth() == 0 || getHeight() == 0)
 				return null;
 
-			return new GskCanvas(native_createSnapshot(getWidth(), getHeight()));
+			return new DisplayListCanvas(native_createSnapshot(getWidth(), getHeight()));
 		}
 
 		/**
@@ -245,8 +244,7 @@ public class SurfaceView extends View {
 		 */
 		@Override
 		public void unlockCanvasAndPost(Canvas canvas) {
-			long bitmap = native_canvas_to_bitmap(((GskCanvas)canvas).snapshot);
-			((GskCanvas)canvas).snapshot = 0;
+			long bitmap = native_canvas_to_bitmap(canvas.getNativeCanvasWrapper());
 			postFrame(android.graphics.Bitmap.fromNative(bitmap));
 			//		mSurface.unlockCanvasAndPost(canvas);
 			//		mSurfaceLock.unlock();

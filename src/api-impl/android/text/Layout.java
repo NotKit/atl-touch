@@ -1,6 +1,5 @@
 package android.text;
 
-import android.atl.GskCanvas;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -64,10 +63,7 @@ public class Layout {
 	}
 
 	public void draw(Canvas canvas) {
-		if (canvas instanceof GskCanvas)
-			native_draw(layout, ((GskCanvas)canvas).snapshot, paint.paint);
-		else
-			native_draw_custom_canvas(layout, canvas, paint);
+		native_draw(layout, canvas.getNativeCanvasWrapper(), paint.paint);
 	}
 
 	public void draw(Canvas canvas, Path selectionHighlight, Paint paint, int selectionOffset) {

@@ -5,7 +5,6 @@ import android.animation.AnimatorInflater;
 import android.animation.StateListAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.atl.GskCanvas;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.ColorStateList;

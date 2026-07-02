@@ -1,6 +1,5 @@
 package android.view;
 
-import android.atl.GskCanvas;
 import android.graphics.Canvas;
 
 /**
@@ -65,7 +64,7 @@ public class ViewRootImpl implements ViewParent {
 			return;
 		if (view.isLayoutRequested() || width != this.width || height != this.height)
 			performLayout(width, height);
-		Canvas canvas = new GskCanvas(canvas_ptr);
+		Canvas canvas = new DisplayListCanvas(canvas_ptr);
 		view.draw(canvas);
 	}
 

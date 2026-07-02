@@ -120,7 +120,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/ATLCanvas.cpp',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchSkia.cpp',
-                                                                  	'src/api-impl-jni/graphics/android_atl_GskCanvas.cpp',
+	'src/api-impl-jni/graphics/android_graphics_Canvas.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Bitmap.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_BitmapFactory.cpp',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Matrix.cpp',

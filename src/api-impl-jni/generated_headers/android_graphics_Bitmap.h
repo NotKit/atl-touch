@@ -7,6 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_graphics_Bitmap_DENSITY_NONE
+#define android_graphics_Bitmap_DENSITY_NONE 0L
 /*
  * Class:     android_graphics_Bitmap
  * Method:    native_create_bitmap

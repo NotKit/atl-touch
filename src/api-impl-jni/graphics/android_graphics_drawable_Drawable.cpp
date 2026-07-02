@@ -35,7 +35,7 @@ static void java_paintable_snapshot(GdkPaintable *gdk_paintable, GdkSnapshot *sn
 	if (width < 1 || height < 1)
 		return;
 	void *atl_canvas = atl_canvas_new_raster((int)width, (int)height);
-	jclass canvas_class = env->FindClass("android/atl/GskCanvas");
+	jclass canvas_class = env->FindClass("android/view/DisplayListCanvas");
 	jmethodID canvas_constructor = env->GetMethodID(canvas_class, "<init>", "(J)V");
 	jobject canvas = env->NewObject(canvas_class, canvas_constructor, _INTPTR(atl_canvas));
 	env->CallVoidMethod(paintable->drawable, handle_cache.drawable.setBounds, 0, 0, (int)width, (int)height);

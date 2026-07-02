@@ -11,7 +11,6 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.Gravity;
-import android.atl.GskCanvas;
 import com.android.internal.R;
 import java.io.IOException;
 import org.xmlpull.v1.XmlPullParser;
@@ -106,10 +105,8 @@ public class BitmapDrawable extends Drawable {
 		// its intrinsic size within the bounds (e.g. android:gravity="center").
 		Gravity.apply(gravity, bitmap.getWidth(), bitmap.getHeight(), bounds, dstRect);
 
-		if (canvas instanceof GskCanvas) {
-			canvas.translate(dstRect.left, dstRect.top);
-			native_draw(paintable, ((GskCanvas)canvas).snapshot, dstRect.width(), dstRect.height());
-			canvas.translate(-dstRect.left, -dstRect.top);
-		}
+		canvas.translate(dstRect.left, dstRect.top);
+		native_draw(paintable, canvas.getNativeCanvasWrapper(), dstRect.width(), dstRect.height());
+		canvas.translate(-dstRect.left, -dstRect.top);
 	}
 }

@@ -1,6 +1,5 @@
 package android.graphics.drawable;
 
-import android.atl.GskCanvas;
 import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
@@ -116,13 +115,11 @@ public class Drawable {
 	}
 
 	public void draw(Canvas canvas) {
-		if (canvas instanceof GskCanvas) {
-			if (mBounds.left != 0 || mBounds.top != 0)
-				canvas.translate(mBounds.left, mBounds.top);
-			native_draw(paintable, ((GskCanvas)canvas).snapshot, mBounds.width(), mBounds.height());
-			if (mBounds.left != 0 || mBounds.top != 0)
-				canvas.translate(-mBounds.left, -mBounds.top);
-		}
+		if (mBounds.left != 0 || mBounds.top != 0)
+			canvas.translate(mBounds.left, mBounds.top);
+		native_draw(paintable, canvas.getNativeCanvasWrapper(), mBounds.width(), mBounds.height());
+		if (mBounds.left != 0 || mBounds.top != 0)
+			canvas.translate(-mBounds.left, -mBounds.top);
 	}
 
 	public boolean setState(int[] stateSet) {
