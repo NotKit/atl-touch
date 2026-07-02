@@ -204,6 +204,18 @@ public class Matrix {
 	public boolean isIdentity() {
 		return native_isIdentity(native_instance);
 	}
+
+	/**
+	 * Gets whether this matrix is affine. An affine matrix preserves
+	 * straight lines and has no perspective.
+	 *
+	 * @return Whether the matrix is affine.
+	 */
+	public boolean isAffine() {
+		float[] values = new float[9];
+		getValues(values);
+		return values[MPERSP_0] == 0 && values[MPERSP_1] == 0 && values[MPERSP_2] == 1;
+	}
 	/**
 	 * Returns true if will map a rectangle to another rectangle. This can be
 	 * true if the matrix is identity, scale-only, or rotates a multiple of 90

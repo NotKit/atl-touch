@@ -6,6 +6,7 @@
 #include "AndroidPaint.h"
 
 #include "include/core/SkBlendMode.h"
+#include "include/core/SkFontMetrics.h"
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkRect.h"
 
@@ -195,4 +196,86 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1align(JNIE
 {
 	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
 	paint->text_align = align;
+}
+
+/* --- text measurement over SkFont (real metrics, replacing old estimates) --- */
+
+static float measure_utf16(AndroidPaint *paint, const jchar *chars, int len)
+{
+	return paint->font.measureText(chars, len * sizeof(jchar), SkTextEncoding::kUTF16);
+}
+
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1measure_1text(JNIEnv *env, jclass, jlong paint_ptr, jstring text)
+{
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	const jchar *chars = env->GetStringChars(text, NULL);
+	float width = measure_utf16(paint, chars, env->GetStringLength(text));
+	env->ReleaseStringChars(text, chars);
+	return width;
+}
+
+JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1get_1text_1widths(JNIEnv *env, jclass, jlong paint_ptr, jstring text, jfloatArray widths_arr)
+{
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	const jchar *chars = env->GetStringChars(text, NULL);
+	int len = env->GetStringLength(text);
+	jfloat *widths = env->GetFloatArrayElements(widths_arr, NULL);
+	/* per-UTF16-unit advances; low surrogates get 0, matching AOSP */
+	for (int i = 0; i < len; i++) {
+		if ((chars[i] & 0xFC00) == 0xDC00) {
+			widths[i] = 0;
+		} else {
+			int glyph_len = ((chars[i] & 0xFC00) == 0xD800 && i + 1 < len) ? 2 : 1;
+			widths[i] = measure_utf16(paint, chars + i, glyph_len);
+		}
+	}
+	env->ReleaseFloatArrayElements(widths_arr, widths, 0);
+	env->ReleaseStringChars(text, chars);
+	return len;
+}
+
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1ascent(JNIEnv *env, jclass, jlong paint_ptr)
+{
+	SkFontMetrics metrics;
+	((AndroidPaint *)_PTR(paint_ptr))->font.getMetrics(&metrics);
+	return metrics.fAscent;
+}
+
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1descent(JNIEnv *env, jclass, jlong paint_ptr)
+{
+	SkFontMetrics metrics;
+	((AndroidPaint *)_PTR(paint_ptr))->font.getMetrics(&metrics);
+	return metrics.fDescent;
+}
+
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1font_1metrics(JNIEnv *env, jclass, jlong paint_ptr, jfloatArray out_arr)
+{
+	SkFontMetrics metrics;
+	((AndroidPaint *)_PTR(paint_ptr))->font.getMetrics(&metrics);
+	jfloat out[5] = {metrics.fTop, metrics.fAscent, metrics.fDescent, metrics.fBottom, metrics.fLeading};
+	env->SetFloatArrayRegion(out_arr, 0, 5, out);
+}
+
+JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1break_1text(JNIEnv *env, jclass, jlong paint_ptr, jstring text, jfloat max_width, jfloatArray measured_arr)
+{
+	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
+	const jchar *chars = env->GetStringChars(text, NULL);
+	int len = env->GetStringLength(text);
+	/* this Skia has no SkFont::breakText; accumulate per-cluster advances */
+	SkScalar measured = 0;
+	int fitted = 0;
+	while (fitted < len) {
+		int glyph_len = ((chars[fitted] & 0xFC00) == 0xD800 && fitted + 1 < len) ? 2 : 1;
+		SkScalar advance = measure_utf16(paint, chars + fitted, glyph_len);
+		if (measured + advance > max_width)
+			break;
+		measured += advance;
+		fitted += glyph_len;
+	}
+	env->ReleaseStringChars(text, chars);
+	if (measured_arr) {
+		jfloat measured_f = measured;
+		env->SetFloatArrayRegion(measured_arr, 0, 1, &measured_f);
+	}
+	return fitted;
 }

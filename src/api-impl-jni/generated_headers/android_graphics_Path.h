@@ -9,163 +9,307 @@ extern "C" {
 #endif
 /*
  * Class:     android_graphics_Path
- * Method:    native_create_builder
- * Signature: (JJ)J
+ * Method:    nInit
+ * Signature: ()J
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1create_1builder
-  (JNIEnv *, jclass, jlong, jlong);
+JNIEXPORT jlong JNICALL Java_android_graphics_Path_nInit__
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_graphics_Path
- * Method:    native_create_path
+ * Method:    nInit
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1create_1path
+JNIEXPORT jlong JNICALL Java_android_graphics_Path_nInit__J
   (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     android_graphics_Path
- * Method:    native_ref_path
- * Signature: (J)J
+ * Method:    nGetFinalizer
+ * Signature: ()J
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1ref_1path
-  (JNIEnv *, jclass, jlong);
+JNIEXPORT jlong JNICALL Java_android_graphics_Path_nGetFinalizer
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_graphics_Path
- * Method:    native_reset
+ * Method:    nSet
  * Signature: (JJ)V
  */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1reset
+JNIEXPORT void JNICALL Java_android_graphics_Path_nSet
   (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     android_graphics_Path
- * Method:    native_close
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1close
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_move_to
- * Signature: (JFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1move_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_line_to
- * Signature: (JFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1line_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_cubic_to
- * Signature: (JFFFFFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1cubic_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_quad_to
- * Signature: (JFFFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1quad_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_arc_to
- * Signature: (JFFFFFFZ)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1arc_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jboolean);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_rel_move_to
- * Signature: (JFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1rel_1move_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_rel_line_to
- * Signature: (JFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1rel_1line_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_rel_cubic_to
- * Signature: (JFFFFFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1rel_1cubic_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_rel_quad_to
- * Signature: (JFFFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1rel_1quad_1to
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_add_arc
- * Signature: (JFFFFFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1arc
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_add_path
- * Signature: (JJJ)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1path
-  (JNIEnv *, jclass, jlong, jlong, jlong);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_add_rect
- * Signature: (JFFFF)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1rect
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_add_round_rect
- * Signature: (JFFFF[F)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1round_1rect
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloatArray);
-
-/*
- * Class:     android_graphics_Path
- * Method:    native_get_bounds
+ * Method:    nComputeBounds
  * Signature: (JLandroid/graphics/RectF;)V
  */
-JNIEXPORT void JNICALL Java_android_graphics_Path_native_1get_1bounds
+JNIEXPORT void JNICALL Java_android_graphics_Path_nComputeBounds
   (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     android_graphics_Path
- * Method:    native_transform
- * Signature: (JJ)J
+ * Method:    nIncReserve
+ * Signature: (JI)V
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1transform
+JNIEXPORT void JNICALL Java_android_graphics_Path_nIncReserve
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nMoveTo
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nMoveTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nRMoveTo
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nRMoveTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nLineTo
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nLineTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nRLineTo
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nRLineTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nQuadTo
+ * Signature: (JFFFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nQuadTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nRQuadTo
+ * Signature: (JFFFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nRQuadTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nCubicTo
+ * Signature: (JFFFFFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nCubicTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nRCubicTo
+ * Signature: (JFFFFFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nRCubicTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nArcTo
+ * Signature: (JFFFFFFZ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nArcTo
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jboolean);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nClose
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nClose
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddRect
+ * Signature: (JFFFFI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddRect
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jint);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddOval
+ * Signature: (JFFFFI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddOval
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jint);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddCircle
+ * Signature: (JFFFI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddCircle
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jint);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddArc
+ * Signature: (JFFFFFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddArc
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddRoundRect
+ * Signature: (JFFFFFFI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddRoundRect__JFFFFFFI
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jint);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddRoundRect
+ * Signature: (JFFFF[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddRoundRect__JFFFF_3FI
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloatArray, jint);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddPath
+ * Signature: (JJFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddPath__JJFF
+  (JNIEnv *, jclass, jlong, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddPath
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddPath__JJ
   (JNIEnv *, jclass, jlong, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nAddPath
+ * Signature: (JJJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nAddPath__JJJ
+  (JNIEnv *, jclass, jlong, jlong, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nOffset
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nOffset
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nSetLastPoint
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nSetLastPoint
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nTransform
+ * Signature: (JJJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nTransform__JJJ
+  (JNIEnv *, jclass, jlong, jlong, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nTransform
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nTransform__JJ
+  (JNIEnv *, jclass, jlong, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nOp
+ * Signature: (JJIJ)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Path_nOp
+  (JNIEnv *, jclass, jlong, jlong, jint, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nApproximate
+ * Signature: (JF)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_android_graphics_Path_nApproximate
+  (JNIEnv *, jclass, jlong, jfloat);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nIsRect
+ * Signature: (JLandroid/graphics/RectF;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Path_nIsRect
+  (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nReset
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nReset
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nRewind
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nRewind
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nIsEmpty
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Path_nIsEmpty
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nIsConvex
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Path_nIsConvex
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nGetFillType
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_graphics_Path_nGetFillType
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    nSetFillType
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Path_nSetFillType
+  (JNIEnv *, jclass, jlong, jint);
 
 #ifdef __cplusplus
 }
