@@ -11,6 +11,14 @@ extern "C" {
 #define android_graphics_Region_MAX_POOL_SIZE 10L
 /*
  * Class:     android_graphics_Region
+ * Method:    isEmpty
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Region_isEmpty
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     android_graphics_Region
  * Method:    isRect
  * Signature: ()Z
  */
@@ -76,90 +84,98 @@ JNIEXPORT void JNICALL Java_android_graphics_Region_scale
 /*
  * Class:     android_graphics_Region
  * Method:    nativeEquals
- * Signature: (II)Z
+ * Signature: (JJ)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeEquals
-  (JNIEnv *, jclass, jint, jint);
+  (JNIEnv *, jclass, jlong, jlong);
+
+/*
+ * Class:     android_graphics_Region
+ * Method:    nativeConstructor
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_android_graphics_Region_nativeConstructor
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeDestructor
- * Signature: (I)V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_android_graphics_Region_nativeDestructor
-  (JNIEnv *, jclass, jint);
+  (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeSetRegion
- * Signature: (II)V
+ * Signature: (JJ)V
  */
 JNIEXPORT void JNICALL Java_android_graphics_Region_nativeSetRegion
-  (JNIEnv *, jclass, jint, jint);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeSetRect
- * Signature: (IIIII)Z
+ * Signature: (JIIII)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeSetRect
-  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeSetPath
- * Signature: (IJI)Z
+ * Signature: (JJJ)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeSetPath
-  (JNIEnv *, jclass, jint, jlong, jint);
+  (JNIEnv *, jclass, jlong, jlong, jlong);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeGetBounds
- * Signature: (ILandroid/graphics/Rect;)Z
+ * Signature: (JLandroid/graphics/Rect;)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeGetBounds
-  (JNIEnv *, jclass, jint, jobject);
+  (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeGetBoundaryPath
- * Signature: (IJ)Z
+ * Signature: (JJ)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeGetBoundaryPath
-  (JNIEnv *, jclass, jint, jlong);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeOp
- * Signature: (IIIIII)Z
+ * Signature: (JIIIII)Z
  */
-JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeOp__IIIIII
-  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint);
+JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeOp__JIIIII
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jint);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeOp
- * Signature: (ILandroid/graphics/Rect;II)Z
+ * Signature: (JLandroid/graphics/Rect;JI)Z
  */
-JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeOp__ILandroid_graphics_Rect_2II
-  (JNIEnv *, jclass, jint, jobject, jint, jint);
+JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeOp__JLandroid_graphics_Rect_2JI
+  (JNIEnv *, jclass, jlong, jobject, jlong, jint);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeOp
- * Signature: (IIII)Z
+ * Signature: (JJJI)Z
  */
-JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeOp__IIII
-  (JNIEnv *, jclass, jint, jint, jint, jint);
+JNIEXPORT jboolean JNICALL Java_android_graphics_Region_nativeOp__JJJI
+  (JNIEnv *, jclass, jlong, jlong, jlong, jint);
 
 /*
  * Class:     android_graphics_Region
  * Method:    nativeToString
- * Signature: (I)Ljava/lang/String;
+ * Signature: (J)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_android_graphics_Region_nativeToString
-  (JNIEnv *, jclass, jint);
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

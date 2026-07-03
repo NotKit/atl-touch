@@ -267,6 +267,7 @@ srcs = [
 	'android/graphics/Rect.java',
 	'android/graphics/RectF.java',
 	'android/graphics/Region.java',
+	'android/graphics/RegionIterator.java',
 	'android/graphics/Shader.java',
 	'android/graphics/SweepGradient.java',
 	'android/graphics/Typeface.java',
