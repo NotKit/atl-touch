@@ -4,6 +4,10 @@ import android.content.res.AssetManager;
 
 public class Typeface {
 
+	/** @hide */
+	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+	public @interface Style {}
+
 	// Style
 	public static final int NORMAL = 0;
 	public static final int BOLD = 1;
@@ -52,6 +56,17 @@ public class Typeface {
 	public static Typeface create(Typeface family, int style) {
 		long base = family != null ? family.native_instance : 0;
 		return new Typeface(nativeCreateRelative(base, style), style);
+	}
+
+	public static Typeface create(Typeface family, int weight, boolean italic) {
+		// map the exact weight onto the nearest legacy style until exact-weight
+		// derivation is wired through minikin
+		int style = (weight >= 600 ? BOLD : NORMAL) | (italic ? ITALIC : NORMAL);
+		return create(family, style);
+	}
+
+	public int getWeight() {
+		return isBold() ? 700 : 400;
 	}
 
 	public static Typeface createFromFile(String path) {

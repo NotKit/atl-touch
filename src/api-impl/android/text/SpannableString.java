@@ -28,6 +28,11 @@ public class SpannableString
 		super(source, 0, source.length());
 	}
 
+	/** @hide */
+	public SpannableString(CharSequence source, boolean ignoreNoCopySpan) {
+		this(source); // NoCopySpan handling not implemented in SpannableStringInternal
+	}
+
 	private SpannableString(CharSequence source, int start, int end) {
 		super(source, start, end);
 	}

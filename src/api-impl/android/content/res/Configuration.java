@@ -1517,4 +1517,9 @@ public final class Configuration implements Comparable<Configuration> {
 	}
 
 	public int fontWeightAdjustment;
+
+	/**
+	 * A fontWeightAdjustment value indicating that it is undefined.
+	 */
+	public static final int FONT_WEIGHT_ADJUSTMENT_UNDEFINED = Integer.MAX_VALUE;
 }

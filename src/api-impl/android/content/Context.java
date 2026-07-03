@@ -676,6 +676,9 @@ public abstract class Context {
 
 	public boolean isRestricted() { return false; }
 
+	/** @hide */
+	public boolean canLoadUnsafeResources() { return true; }
+
 	public File getDatabasePath(String dbName) {
 		File databaseDir = new File(getDataDirFile(), "databases");
 		if (!databaseDir.exists())

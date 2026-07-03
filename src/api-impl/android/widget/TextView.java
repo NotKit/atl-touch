@@ -14,6 +14,7 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
+import android.text.StaticLayout;
 import android.text.TextDirectionHeuristic;
 import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
@@ -104,8 +105,22 @@ public class TextView extends View {
 
 	private Layout text_layout;
 
+	private float spacing_mult = 1.0f;
+	private float spacing_add = 0.0f;
+
 	private Layout makeLayout(int width) {
-		return new BoringLayout(text, paint, width, getLayoutAlignment(), 1, 0, new BoringLayout.Metrics(), false);
+		BoringLayout.Metrics boring = BoringLayout.isBoring(text, paint);
+		if (boring != null && boring.width <= width) {
+			return BoringLayout.make(text, paint, width, getLayoutAlignment(),
+			                         spacing_mult, spacing_add, boring, include_padding);
+		}
+		return StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
+		    .setAlignment(getLayoutAlignment())
+		    .setLineSpacing(spacing_add, spacing_mult)
+		    .setIncludePad(include_padding)
+		    .setBreakStrategy(break_strategy)
+		    .setHyphenationFrequency(hyphenation_frequency)
+		    .build();
 	}
 
 	@Override
@@ -201,26 +216,42 @@ public class TextView extends View {
 		}
 	}
 	public void setTypeface(Typeface tf, int style) {
-		String[] classesToRemove = {"ATL-font-bold", "ATL-font-italic"};
-		native_removeClasses(widget, classesToRemove);
+		if (style > 0) {
+			if (tf == null) {
+				tf = Typeface.defaultFromStyle(style);
+			} else {
+				tf = Typeface.create(tf, style);
+			}
 
-		switch (style) {
-			case Typeface.BOLD:
-				native_addClass(widget, "ATL-font-bold");
-				break;
-			case Typeface.ITALIC:
-				native_addClass(widget, "ATL-font-italic");
-				break;
-			case Typeface.BOLD_ITALIC:
-				native_addClass(widget, "ATL-font-bold");
-				native_addClass(widget, "ATL-font-italic");
-				break;
-			default:
-				break;
+			setTypeface(tf);
+			// now compute what (if any) algorithmic styling is needed
+			int typefaceStyle = tf != null ? tf.getStyle() : 0;
+			int need = style & ~typefaceStyle;
+			paint.setFakeBoldText((need & Typeface.BOLD) != 0);
+			paint.setTextSkewX((need & Typeface.ITALIC) != 0 ? -0.25f : 0);
+		} else {
+			paint.setFakeBoldText(false);
+			paint.setTextSkewX(0);
+			setTypeface(tf);
 		}
 	}
-	public void setTypeface(Typeface tf) {}
-	public void setLineSpacing(float add, float mult) {}
+	public void setTypeface(Typeface tf) {
+		if (paint.getTypeface() != tf) {
+			paint.setTypeface(tf);
+			text_layout = null;
+			requestLayout();
+			invalidate();
+		}
+	}
+	public void setLineSpacing(float add, float mult) {
+		if (spacing_add != add || spacing_mult != mult) {
+			spacing_add = add;
+			spacing_mult = mult;
+			text_layout = null;
+			requestLayout();
+			invalidate();
+		}
+	}
 	public final void setLinksClickable(boolean whether) {}
 
 	public void setInputType(int type) {}
@@ -292,7 +323,9 @@ public class TextView extends View {
 	public void setMinWidth(int minWidth) {}
 	public void setMaxWidth(int maxWidth) {}
 
-	public Typeface getTypeface() { return null; }
+	public Typeface getTypeface() {
+		return paint.getTypeface();
+	}
 
 	public float getTextSize() {
 		return paint.getTextSize();

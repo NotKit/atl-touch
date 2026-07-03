@@ -900,6 +900,16 @@ public class TypedArray {
 	}
 
 	/**
+	 * Retrieve the Typeface for the attribute at <var>index</var>.
+	 *
+	 * Font resources are not implemented; callers fall back to reading the
+	 * attribute as a family-name string.
+	 */
+	public android.graphics.Typeface getFont(/*@StyleableRes*/ int index) {
+		return null;
+	}
+
+	/**
 	 * Retrieve the CharSequence[] for the attribute at <var>index</var>.
 	 * This gets the resource ID of the selected attribute, and uses
 	 * {@link Resources#getTextArray Resources.getTextArray} of the owning
