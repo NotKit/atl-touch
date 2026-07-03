@@ -6,9 +6,12 @@ import dalvik.system.VMDebug;
 
 public final class Debug {
 	public static class MemoryInfo {
-	
-	public java.lang.String getMemoryStat(java.lang.String a0) { return null; }
-}
+		public int getTotalPss() {
+			return 0;
+		}
+
+		public java.lang.String getMemoryStat(java.lang.String a0) { return null; }
+	}
 
 	public static void waitForDebugger() {
 	}
