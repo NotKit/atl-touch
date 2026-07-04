@@ -2,8 +2,9 @@ package android.graphics.drawable;
 
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 
-public class DrawableContainer extends Drawable {
+public class DrawableContainer extends Drawable implements Drawable.Callback {
 
 	private DrawableContainerState state;
 	private int curIndex = -1;
@@ -18,11 +19,51 @@ public class DrawableContainer extends Drawable {
 	public boolean selectDrawable(int idx) {
 		if (idx >= 0 && idx < state.childCount && idx != curIndex && state.drawables[idx] != null) {
 			curIndex = idx;
-			native_selectChild(paintable, state.drawables[idx].paintable);
+			final Drawable child = state.drawables[idx];
+			// The newly selected child may never have seen the container's
+			// bounds (they are only forwarded to the current child).
+			final Rect bounds = getBounds();
+			child.setBounds(bounds.left, bounds.top, bounds.right, bounds.bottom);
+			native_selectChild(paintable, child.paintable);
 			invalidateSelf();
 			return true;
 		}
 		return false;
+	}
+
+	/* --- Drawable.Callback: forward child invalidates (e.g. an animating
+	 * transition of an AnimatedStateListDrawable) up to the view --- */
+
+	@Override
+	public void invalidateDrawable(Drawable who) {
+		if (who == getCurrent())
+			invalidateSelf();
+	}
+
+	@Override
+	public void scheduleDrawable(Drawable who, Runnable what, long when) {
+		if (who == getCurrent()) {
+			final Callback callback = getCallback();
+			if (callback != null)
+				callback.scheduleDrawable(this, what, when);
+		}
+	}
+
+	@Override
+	public void unscheduleDrawable(Drawable who, Runnable what) {
+		final Callback callback = getCallback();
+		if (callback != null)
+			callback.unscheduleDrawable(this, what);
+	}
+
+	/** index of the currently selected child, or -1 */
+	public int getCurrentIndex() {
+		return curIndex;
+	}
+
+	@Override
+	public Drawable getCurrent() {
+		return curIndex != -1 ? state.drawables[curIndex] : null;
 	}
 
 	protected void setConstantState(DrawableContainerState state) {
@@ -64,6 +105,8 @@ public class DrawableContainer extends Drawable {
 			if (childCount >= drawables.length) {
 				growArray(drawables.length, drawables.length * 2);
 			}
+			if (dr != null)
+				dr.setCallback(owner);
 			drawables[childCount] = dr;
 			return childCount++;
 		}
@@ -108,6 +151,7 @@ public class DrawableContainer extends Drawable {
 
 	@Override
 	public void setBounds(int left, int top, int right, int bottom) {
+		super.setBounds(left, top, right, bottom); // remember for later-selected children
 		if (curIndex != -1)
 			state.drawables[curIndex].setBounds(left, top, right, bottom);
 	}

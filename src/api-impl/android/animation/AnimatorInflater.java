@@ -30,7 +30,7 @@ import android.content.res.XmlResourceParser;
 import android.graphics.Path;
 import android.util.AttributeSet;
 import android.util.Log;
-//import android.util.PathParser;
+import android.util.PathParser;
 import android.util.StateSet;
 import android.util.TypedValue;
 import android.util.Xml;
@@ -254,7 +254,7 @@ public class AnimatorInflater {
 	 * represented in the same format but different control points' values.
 	 * The path is represented as verbs and points for each of the verbs.
 	 */
-	/*private static class PathDataEvaluator implements TypeEvaluator<PathParser.PathData> {
+	private static class PathDataEvaluator implements TypeEvaluator<PathParser.PathData> {
 		private final PathParser.PathData mPathData = new PathParser.PathData();
 
 		@Override
@@ -266,7 +266,7 @@ public class AnimatorInflater {
 			}
 			return mPathData;
 		}
-	}*/
+	}
 
 	private static PropertyValuesHolder getPVH(TypedArray styledAttributes, int valueType, int valueFromId, int valueToId, String propertyName) {
 
@@ -291,7 +291,6 @@ public class AnimatorInflater {
 		PropertyValuesHolder returnValue = null;
 
 		if (valueType == VALUE_TYPE_PATH) {
-			/*
 			String fromString = styledAttributes.getString(valueFromId);
 			String toString = styledAttributes.getString(valueToId);
 			PathParser.PathData nodesFrom = fromString == null
@@ -321,7 +320,6 @@ public class AnimatorInflater {
 										    (Object)nodesTo);
 				}
 			}
-			*/
 		} else {
 			TypeEvaluator evaluator = null;
 			// Integer and float value types are handled here.

@@ -277,6 +277,16 @@ public class Drawable {
 				drawable.inflate(resources, parser, attrs, theme);
 				return drawable;
 			}
+			case "animated-selector": {
+				AnimatedStateListDrawable drawable = new AnimatedStateListDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
+			case "animated-vector": {
+				AnimatedVectorDrawable drawable = new AnimatedVectorDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
 			case "shape": {
 				GradientDrawable drawable = new GradientDrawable();
 				drawable.inflate(resources, parser, attrs, theme);
@@ -323,6 +333,11 @@ public class Drawable {
 			}
 		}
 
+		/* AOSP throws XmlPullParserException("invalid drawable tag") here; we
+		 * return null to limp along, but callers (e.g. Material widgets) may
+		 * well NPE on it, so be loud about the actual cause. */
+		android.util.Log.e("Drawable", "createFromXmlInner: unsupported drawable tag <"
+		                               + parser.getName() + ">, returning null");
 		return null;
 	}
 

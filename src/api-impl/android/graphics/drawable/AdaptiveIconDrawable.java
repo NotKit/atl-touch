@@ -43,7 +43,7 @@ import android.graphics.Shader;
 import android.graphics.Shader.TileMode;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-//import android.util.PathParser;
+import android.util.PathParser;
 import com.android.internal.R;
 import java.io.IOException;
 import org.xmlpull.v1.XmlPullParser;
