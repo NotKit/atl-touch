@@ -21,6 +21,12 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		}
 
 		@Override
+		public void requestLayout() {
+			// TODO Auto-generated method stub
+			throw new UnsupportedOperationException("Unimplemented method 'requestLayout'");
+		}
+
+		@Override
 		public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
 			// TODO Auto-generated method stub
 			throw new UnsupportedOperationException("Unimplemented method 'requestDisallowInterceptTouchEvent'");

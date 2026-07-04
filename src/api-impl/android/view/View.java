@@ -1794,14 +1794,14 @@ public class View implements Drawable.Callback {
 	}
 
 	public void requestLayout() {
-		View view = this;
-		view.layoutRequested = true;
-		while (view.parent instanceof View) {
-			view = (View)view.parent;
-			view.layoutRequested = true;
-		}
-		if (view.viewRootImpl != null)
-			view.viewRootImpl.requestLayout();
+		layoutRequested = true;
+		/* propagate through the parent's requestLayout() (not just up to the
+		 * ViewRootImpl) so container overrides run: e.g. RecyclerView eats
+		 * requestLayout from item views while it is laying them out — going
+		 * straight to the ViewRootImpl instead turns every RecyclerView
+		 * layout pass into another scheduled layout pass, forever. */
+		if (parent != null && !parent.isLayoutRequested())
+			parent.requestLayout();
 	};
 
 	public void setOverScrollMode(int mode) {}
