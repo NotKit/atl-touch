@@ -81,17 +81,19 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	JNIEnv *env;
 	JavaVMInitArgs args = {
 		.version = JNI_VERSION_1_6,
-		.nOptions = 3,
+		.nOptions = 2,
 	};
 	JavaVMOption *options;
-
-	int option_counter = args.nOptions;
 
 	char jdwp_option_string[sizeof(JDWP_ARG) + 5] = JDWP_ARG;          // 5 chars for port number, NULL byte is counted by sizeof
 	char sdk_int_option_string[sizeof(SDK_INT_ARG) + 2] = SDK_INT_ARG; // 2 chars for SDK_INT, NULL byte is counted by sizeof
 
 	const char *jdwp_port = getenv("JDWP_LISTEN");
 
+	/* CheckJNI validates every JNI transition; with the AOSP graphics stack a
+	 * single frame makes tens of thousands of them, so keep it opt-in */
+	if (getenv("ATL_CHECK_JNI"))
+		args.nOptions += 1;
 	if (jdwp_port)
 		args.nOptions += 2;
 	if (sdk_int)
@@ -100,6 +102,8 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 		args.nOptions += g_strv_length(extra_jvm_options);
 	options = malloc(sizeof(JavaVMOption) * args.nOptions);
 
+	int option_counter = 2; // slots 0 and 1 are always filled below
+
 	if (getenv("RUN_FROM_BUILDDIR")) {
 		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){"./", app_lib_dir}, 2);
 	} else {
@@ -107,7 +111,8 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	}
 
 	options[1].optionString = construct_classpath("-Djava.class.path=", (char *[]){api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar}, 4);
-	options[2].optionString = "-Xcheck:jni";
+	if (getenv("ATL_CHECK_JNI"))
+		options[option_counter++].optionString = "-Xcheck:jni";
 	if (jdwp_port) {
 		strncat(jdwp_option_string, jdwp_port, 5); // 5 chars is enough for a port number, and won't overflow our array
 		options[option_counter++].optionString = "-XjdwpProvider:internal";
