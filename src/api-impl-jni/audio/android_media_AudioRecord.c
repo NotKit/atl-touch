@@ -89,7 +89,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioRecord_getMinBufferSize(JNIEnv *e
 	return frames * num_channels * 2; // 2 bytes = 16 bits (s16)
 }
 
-JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1record(JNIEnv *env, jobject this, long pcm_handle_ptr)
+JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1record(JNIEnv *env, jobject this, jlong pcm_handle_ptr)
 {
 	if (!getenv("ATL_UGLY_ENABLE_MICROPHONE") || !pcm_handle_ptr)
 		return;
@@ -99,7 +99,7 @@ JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1record(JNIEnv *env
 	snd_pcm_start(pcm_handle);
 }
 
-JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1stop(JNIEnv *env, jobject this, long pcm_handle_ptr)
+JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1stop(JNIEnv *env, jobject this, jlong pcm_handle_ptr)
 {
 	if (!getenv("ATL_UGLY_ENABLE_MICROPHONE") || !pcm_handle_ptr)
 		return;
@@ -109,7 +109,7 @@ JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1stop(JNIEnv *env, 
 	snd_pcm_drain(pcm_handle);
 }
 
-JNIEXPORT jint JNICALL Java_android_media_AudioRecord_native_1read(JNIEnv *env, jobject this, long pcm_handle_ptr, jshortArray audio_data, jint offset_in_shorts, jint frames_to_read)
+JNIEXPORT jint JNICALL Java_android_media_AudioRecord_native_1read(JNIEnv *env, jobject this, jlong pcm_handle_ptr, jshortArray audio_data, jint offset_in_shorts, jint frames_to_read)
 {
 	if (!getenv("ATL_UGLY_ENABLE_MICROPHONE") || !pcm_handle_ptr)
 		return 0;
@@ -135,7 +135,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioRecord_native_1read(JNIEnv *env, 
 	return frames_read;
 }
 
-JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1release(JNIEnv *env, jobject this, long pcm_handle_ptr)
+JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1release(JNIEnv *env, jobject this, jlong pcm_handle_ptr)
 {
 	if (!getenv("ATL_UGLY_ENABLE_MICROPHONE") || !pcm_handle_ptr)
 		return;
