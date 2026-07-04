@@ -555,13 +555,19 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
 		child.computeScroll();
-		canvas.save();
+		/* Restore to the saved count rather than a single restore(): a child's
+		 * draw() may leave the canvas save stack unbalanced (e.g. Material's
+		 * CollapsingToolbarLayout saves for its scrim/title and relies on the
+		 * parent to unwind it), and a lone restore() would then leave the extra
+		 * save in place, corrupting the clip for the next sibling. This matches
+		 * AOSP View.draw(Canvas, ViewGroup, long). */
+		final int restoreTo = canvas.save();
 		canvas.translate(child.getLeft() - getScrollX() + child.getTranslationX(),
 		                 child.getTop() - getScrollY() + child.getTranslationY());
 		canvas.clipRect(0, 0, child.getWidth(), child.getHeight());
 		canvas.translate(-child.getScrollX(), -child.getScrollY());
 		child.draw(canvas);
-		canvas.restore();
+		canvas.restoreToCount(restoreTo);
 		return false;
 	}
 
