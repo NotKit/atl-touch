@@ -257,6 +257,18 @@ static void on_window_close(GLFWwindow *glfw_window)
 
 /* --- rendering: raster Skia scene blitted through GL --- */
 
+/* Per-phase frame timing, gated behind ATL_DEBUG_RENDER. Layout and draw are
+ * reported separately: they are very different costs (the first layout of a
+ * text-heavy tree is ~1s cold, while the actual raster draw is a couple of ms),
+ * and lumping them together as "draw" is misleading. */
+static bool debug_render(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = getenv("ATL_DEBUG_RENDER") != NULL;
+	return cached;
+}
+
 static void atl_window_render(ATLWindow *window)
 {
 	if (!window->view_root || !glfwGetWindowAttrib(window->glfw_window, GLFW_VISIBLE))
@@ -266,18 +278,24 @@ static void atl_window_render(ATLWindow *window)
 	if (width < 1 || height < 1)
 		return;
 	JNIEnv *env = get_jni_env();
+	jlong layout_ms = 0;
 	if (width != window->layout_width || height != window->layout_height) {
 		window->layout_width = width;
 		window->layout_height = height;
+		jlong t = debug_render() ? atl_uptime_millis() : 0;
 		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, height);
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
+		if (debug_render())
+			layout_ms = atl_uptime_millis() - t;
 	}
 
+	jlong t_draw = debug_render() ? atl_uptime_millis() : 0;
 	void *canvas = atl_canvas_new_raster(width, height);
 	(*env)->CallVoidMethod(env, window->view_root, window->perform_draw, _INTPTR(canvas), width, height);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	jlong draw_ms = debug_render() ? atl_uptime_millis() - t_draw : 0;
 
 	int pixel_width, pixel_height, stride;
 	const void *pixels = atl_canvas_get_pixels(canvas, &pixel_width, &pixel_height, &stride);
@@ -317,6 +335,13 @@ static void atl_window_render(ATLWindow *window)
 
 	atl_canvas_free(canvas);
 	window->needs_redraw = false;
+
+	/* Only a handful of frames should ever be slow (the first layout, genuine
+	 * resizes); a steady stream of these means something is scheduling
+	 * needless relayouts/redraws. */
+	if (debug_render() && (layout_ms > 50 || draw_ms > 50))
+		fprintf(stderr, "ATLWindow: slow frame: layout %lldms, draw %lldms (%dx%d)\n",
+		        (long long)layout_ms, (long long)draw_ms, width, height);
 }
 
 /* --- event pump on the GLib main loop --- */
