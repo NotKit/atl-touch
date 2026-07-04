@@ -31,6 +31,7 @@ public class Dialog implements Window.Callback, DialogInterface {
 	private Window window;
 	private OnDismissListener onDismissListener;
 	private OnShowListener onShowListener;
+	private boolean mCreated = false;
 
 	public Dialog(Context context, int themeResId) {
 		this.context = context;
@@ -87,7 +88,15 @@ public class Dialog implements Window.Callback, DialogInterface {
 		Runnable action = new Runnable() {
 			@Override
 			public void run() {
-				onCreate(null);
+				// AOSP dispatchOnCreate: onCreate must run exactly once per
+				// Dialog instance. androidx's ComponentDialog restores its
+				// SavedStateRegistry in onCreate and throws if that happens
+				// twice, which is what a DialogFragment shown across two
+				// onStart()s would otherwise trigger.
+				if (!mCreated) {
+					onCreate(null);
+					mCreated = true;
+				}
 				// Read the size of the main window. Floating dialogs should be smaller as specified in the windowMinWidth* attributes.
 				// Non-floating are typically constructed with MATCH_PARENT layout params and thus get the exact size of the main window.
 				// Most non-floating dialogs are technically dialogs, but are expected to behave more like full size activities.
