@@ -331,6 +331,38 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		childDrawable.mInsetB = b;
 	}
 
+	/** Explicit size for a layer, or -1 to use the drawable's intrinsic size. */
+	public void setLayerSize(int index, int w, int h) {
+		final ChildDrawable childDrawable = mLayerState.mChildren[index];
+		childDrawable.mWidth = w;
+		childDrawable.mHeight = h;
+	}
+
+	public void setLayerWidth(int index, int w) {
+		mLayerState.mChildren[index].mWidth = w;
+	}
+
+	public int getLayerWidth(int index) {
+		return mLayerState.mChildren[index].mWidth;
+	}
+
+	public void setLayerHeight(int index, int h) {
+		mLayerState.mChildren[index].mHeight = h;
+	}
+
+	public int getLayerHeight(int index) {
+		return mLayerState.mChildren[index].mHeight;
+	}
+
+	/** Gravity used to place/stretch a layer within its container. */
+	public void setLayerGravity(int index, int gravity) {
+		mLayerState.mChildren[index].mGravity = gravity;
+	}
+
+	public int getLayerGravity(int index) {
+		return mLayerState.mChildren[index].mGravity;
+	}
+
 	// overrides from Drawable.Callback
 
 	public void invalidateDrawable(Drawable who) {
@@ -533,16 +565,44 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		int padL = 0, padT = 0, padR = 0, padB = 0;
 		for (int i = 0; i < N; i++) {
 			final ChildDrawable r = array[i];
-			r.mDrawable.setBounds(bounds.left + r.mInsetL + padL,
-			                      bounds.top + r.mInsetT + padT,
-			                      bounds.right - r.mInsetR - padR,
-			                      bounds.bottom - r.mInsetB - padB);
+			final Drawable d = r.mDrawable;
+
+			// Available container after insets and accumulated padding.
+			final int containerL = bounds.left + r.mInsetL + padL;
+			final int containerT = bounds.top + r.mInsetT + padT;
+			final int containerR = bounds.right - r.mInsetR - padR;
+			final int containerB = bounds.bottom - r.mInsetB - padB;
+
+			if (r.mWidth < 0 && r.mHeight < 0 && r.mGravity == android.view.Gravity.NO_GRAVITY) {
+				// No explicit size or gravity: fill the container (legacy behavior).
+				d.setBounds(containerL, containerT, containerR, containerB);
+			} else {
+				// AOSP updateLayerBounds: an unset dimension defaults to FILL in
+				// that axis, an explicit one is placed by gravity at its size.
+				final int w = r.mWidth < 0 ? d.getIntrinsicWidth() : r.mWidth;
+				final int h = r.mHeight < 0 ? d.getIntrinsicHeight() : r.mHeight;
+				int gravity = r.mGravity;
+				if (gravity == android.view.Gravity.NO_GRAVITY) {
+					gravity = 0;
+					gravity |= (r.mWidth < 0) ? android.view.Gravity.FILL_HORIZONTAL
+					                          : android.view.Gravity.LEFT;
+					gravity |= (r.mHeight < 0) ? android.view.Gravity.FILL_VERTICAL
+					                           : android.view.Gravity.TOP;
+				}
+				mTmpContainer.set(containerL, containerT, containerR, containerB);
+				android.view.Gravity.apply(gravity, w, h, mTmpContainer, mTmpOutRect);
+				d.setBounds(mTmpOutRect);
+			}
+
 			padL += mPaddingL[i];
 			padR += mPaddingR[i];
 			padT += mPaddingT[i];
 			padB += mPaddingB[i];
 		}
 	}
+
+	private final Rect mTmpContainer = new Rect();
+	private final Rect mTmpOutRect = new Rect();
 
 	@Override
 	public int getIntrinsicWidth() {
@@ -644,6 +704,9 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 	static class ChildDrawable {
 		public Drawable mDrawable;
 		public int mInsetL, mInsetT, mInsetR, mInsetB;
+		public int mWidth = -1;  // -1 = use intrinsic width
+		public int mHeight = -1; // -1 = use intrinsic height
+		public int mGravity = android.view.Gravity.NO_GRAVITY;
 		public int mId;
 	}
 
@@ -690,6 +753,9 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 					r.mInsetT = or.mInsetT;
 					r.mInsetR = or.mInsetR;
 					r.mInsetB = or.mInsetB;
+					r.mWidth = or.mWidth;
+					r.mHeight = or.mHeight;
+					r.mGravity = or.mGravity;
 					r.mId = or.mId;
 				}
 
