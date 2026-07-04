@@ -90,13 +90,15 @@ public class Window {
 		return viewRootImpl;
 	}
 
-	/** create the native scene widget rendering this window's view hierarchy */
+	/** point the (process-wide, shared) native window at this window's view
+	 *  hierarchy. Called from Activity.onStart, so on every resume too: all
+	 *  activities share one native window, and whichever one is starting must
+	 *  (re)claim it — otherwise after a child activity finishes, the resumed
+	 *  activity's view tree is never re-attached and the window stays blank. */
 	public void attachViewRoot() {
 		ViewRootImpl root = getViewRootImpl();
-		boolean needs_scene = root.scene == 0;
 		root.setView(decorView);
-		if (needs_scene)
-			native_set_view_root(native_window, root);
+		native_set_view_root(native_window, root);
 	}
 
 	public View getDecorView() {
