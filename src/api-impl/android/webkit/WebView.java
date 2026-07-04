@@ -3,7 +3,6 @@ package android.webkit;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Canvas;
-import android.atl.GskCanvas;
 import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.ViewGroup;
@@ -47,8 +46,8 @@ public class WebView extends ViewGroup {
 	@Override
 	public void onDraw(Canvas canvas) {
 		long p = ensurePeer();
-		if (p != 0 && canvas instanceof GskCanvas)
-			native_draw(p, ((GskCanvas)canvas).snapshot, getWidth(), getHeight());
+		if (p != 0)
+			native_draw(p, canvas.getNativeCanvasWrapper(), getWidth(), getHeight());
 	}
 
 	public WebSettings getSettings() {
