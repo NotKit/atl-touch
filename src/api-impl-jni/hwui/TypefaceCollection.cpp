@@ -14,6 +14,7 @@
 #include <minikin/FontFamily.h>
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -52,6 +53,17 @@ static std::shared_ptr<minikin::MinikinFont> make_minikin_font(sk_sp<SkTypeface>
 	                                         std::vector<minikin::FontVariation>());
 }
 
+/* Each matchFamilyStyle() is a fontconfig query against the whole font
+ * database. build_collection() asks for ~22 families x 4 styles, and both the
+ * per-name families and the (identical) fallback chain would otherwise be
+ * re-queried on every Typeface.create() — thousands of fontconfig lookups
+ * during a single layout of a text-heavy screen, which was taking >10s. Cache
+ * families by name (negatives included) and whole collections by primary name.
+ * Guarded by a mutex since text can be measured off the main thread. */
+static std::mutex g_font_cache_mutex;
+static std::map<std::string, std::shared_ptr<minikin::FontFamily>> g_family_cache;
+static std::map<std::string, std::shared_ptr<minikin::FontCollection>> g_collection_cache;
+
 static std::shared_ptr<minikin::FontFamily> make_family(const char *name)
 {
 	sk_sp<SkFontMgr> mgr = atl_fontmgr();
@@ -84,10 +96,22 @@ static std::shared_ptr<minikin::FontFamily> make_family(const char *name)
 	return std::make_shared<minikin::FontFamily>(std::move(fonts));
 }
 
+/* memoized make_family(); caller must hold g_font_cache_mutex */
+static std::shared_ptr<minikin::FontFamily> family_cached(const char *name)
+{
+	std::string key = name ? name : "";
+	auto it = g_family_cache.find(key);
+	if (it != g_family_cache.end())
+		return it->second;
+	auto family = make_family(name); // may be nullptr; cache that too
+	g_family_cache.emplace(std::move(key), family);
+	return family;
+}
+
 static std::shared_ptr<minikin::FontCollection> build_collection(const char *primary)
 {
 	std::vector<std::shared_ptr<minikin::FontFamily>> families;
-	if (auto family = make_family(primary))
+	if (auto family = family_cached(primary))
 		families.push_back(family);
 	/* script/emoji fallback; each family is skipped silently if absent */
 	static const char *fallbacks[] = {
@@ -101,22 +125,35 @@ static std::shared_ptr<minikin::FontCollection> build_collection(const char *pri
 	for (const char *name : fallbacks) {
 		if (primary && !strcmp(name, primary))
 			continue;
-		if (auto family = make_family(name))
+		if (auto family = family_cached(name))
 			families.push_back(family);
 	}
 	if (families.empty()) {
 		/* last resort: whatever fontconfig calls the default */
-		if (auto family = make_family(nullptr))
+		if (auto family = family_cached(nullptr))
 			families.push_back(family);
 	}
 	LOG_ALWAYS_FATAL_IF(families.empty(), "no usable fonts found via fontconfig");
 	return std::make_shared<minikin::FontCollection>(families);
 }
 
+/* memoized build_collection(); caller must hold g_font_cache_mutex */
+static std::shared_ptr<minikin::FontCollection> collection_cached(const char *primary)
+{
+	std::string key = primary ? primary : "";
+	auto it = g_collection_cache.find(key);
+	if (it != g_collection_cache.end())
+		return it->second;
+	auto collection = build_collection(primary);
+	g_collection_cache.emplace(std::move(key), collection);
+	return collection;
+}
+
 static Typeface *make_typeface(const char *primary)
 {
+	std::lock_guard<std::mutex> lock(g_font_cache_mutex);
 	Typeface *typeface = new Typeface();
-	typeface->fFontCollection = build_collection(primary);
+	typeface->fFontCollection = collection_cached(primary);
 	typeface->fAPIStyle = Typeface::kNormal;
 	typeface->fBaseWeight = SkFontStyle::kNormal_Weight;
 	typeface->fStyle = minikin::FontStyle();
