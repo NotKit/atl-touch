@@ -7,6 +7,7 @@ incdir_dep = declare_dependency(include_directories: '.')
 add_project_dependencies(incdir_dep, language: 'c')
 
 cc = meson.get_compiler('c')
+python3_prog = import('python').find_installation('python3')
 dir_base = meson.current_source_dir()
 builddir_base = meson.current_build_dir()
 libart_dep = dependency('art-standalone')
@@ -215,11 +216,24 @@ executable('android-translation-layer', [
 # hax.jar
 subdir('src/api-impl')
 
+# Stubs that exist only so framework sources compile against SDK31+ types.
+# Apps using these APIs bundle their own copies (androidx); if api-impl.jar
+# also defines them, ART's duplicate-class check rejects the app's oat file
+# and the whole app runs interpreted. See strip_compile_only_stubs.py.
+compile_only_stubs = [
+    'android/view/OnReceiveContentListener.class',
+    'android/view/WindowInsetsAnimation$Callback.class',
+    'android/window/OnBackInvokedCallback.class',
+]
+hax_stripped_jar = custom_target('hax-stripped', input: [hax_jar], output: ['hax-stripped.jar'],
+              command: [python3_prog, files('src/api-impl/strip_compile_only_stubs.py'),
+                        hax_jar.full_path(), '@OUTPUT@'] + compile_only_stubs)
+
 # api-impl.jar
-custom_target('api-impl.jar', build_by_default: true, input: [hax_jar], output: ['api-impl.jar'],
+custom_target('api-impl.jar', build_by_default: true, input: [hax_stripped_jar], output: ['api-impl.jar'],
               install: true,
               install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
-              command: ['dx', '--dex', '--incremental', '--output='+join_paths(builddir_base, 'api-impl.jar'), hax_jar.full_path()])
+              command: ['dx', '--dex', '--incremental', '--output='+join_paths(builddir_base, 'api-impl.jar'), hax_stripped_jar.full_path()])
 
 # test-runner.jar
 subdir('src/test-runner')
