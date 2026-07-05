@@ -12121,6 +12121,7 @@ public final class R {
 		 */
 		public static final int addToDictionary = 0x0102002a;
 		public static final int background = 0x01020000;
+		public static final int mask = 0x0102002e;
 		public static final int button1 = 0x01020019;
 		public static final int button2 = 0x0102001a;
 		public static final int button3 = 0x0102001b;

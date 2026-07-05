@@ -16,7 +16,7 @@ public abstract class AbsSeekBar extends ProgressBar {
 	}
 
 	public Drawable getThumb() {
-		return new Drawable();
+		return new android.graphics.drawable.ColorDrawable(0);
 	}
 
 	public void setKeyProgressIncrement(int keyProgressIncrement) {}

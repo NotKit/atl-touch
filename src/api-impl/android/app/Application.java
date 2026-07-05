@@ -25,10 +25,6 @@ public class Application extends ContextWrapper {
 		return icon_path;
 	}
 
-	private long get_app_icon_paintable() {
-		return getPackageManager().getApplicationIcon(pkg.applicationInfo).paintable;
-	}
-
 	String get_app_label() {
 		return getString(pkg.applicationInfo.labelRes);
 	}

@@ -46,6 +46,15 @@ public final class Bitmap {
 		return DENSITY_NONE;
 	}
 
+	/* AOSP helper used by drawables for density scaling */
+	static public int scaleFromDensity(int size, int sdensity, int tdensity) {
+		if (sdensity == DENSITY_NONE || tdensity == DENSITY_NONE || sdensity == tdensity) {
+			return size;
+		}
+		// Scale by tdensity / sdensity, rounding up.
+		return ((size * tdensity) + (sdensity >> 1)) / sdensity;
+	}
+
 	private int width;
 	private int height;
 	private int stride;
@@ -53,6 +62,7 @@ public final class Bitmap {
 	private long snapshot;    // ATLCanvas*
 	private long gdk_texture; // cached GdkTexture* copy for GTK consumers
 	private Config config = Config.ARGB_8888;
+	private boolean hasMipMap = false;
 	private boolean hasAlpha = true;
 	long bytes = 0; // used by native function AndroidBitmap_lockPixels()
 	private boolean recycled = false;
@@ -189,7 +199,21 @@ public final class Bitmap {
 		getTexture();
 	}
 
-	public void setDensity(int density) {}
+	public void setDensity(int density) {
+		this.mDensity = density;
+	}
+
+	public int getDensity() {
+		return mDensity;
+	}
+
+	public void setHasMipMap(boolean hasMipMap) {
+		this.hasMipMap = hasMipMap;
+	}
+
+	public boolean hasMipMap() {
+		return hasMipMap;
+	}
 
 	public int getScaledWidth(int density) {
 		return width;

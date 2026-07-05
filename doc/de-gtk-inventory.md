@@ -14,11 +14,7 @@ GApplication launcher; this list tracks them.
 
 | File | Refs | Role / replacement |
 |---|---|---|
-| `src/api-impl-jni/graphics/ATLCanvas.cpp/.h` | 27+7 | GSK render-node canvas; replace with the Skia canvas path everywhere, then delete |
-| `src/api-impl-jni/graphics/android_graphics_drawable_Drawable.cpp` | 15 | GdkPaintable-based drawable rasterization → Skia |
-| `src/api-impl-jni/graphics/NinePatchPaintable.c/.h` | 14+2 | GdkPaintable ninepatch → Skia ninepatch |
-| `src/api-impl-jni/graphics/android_graphics_drawable_DrawableContainer.c` | 12 | GdkPaintable container → Skia |
-| `src/api-impl-jni/graphics/android_graphics_drawable_NinePatchDrawable.cpp` | 5 | ditto |
+| `src/api-impl-jni/graphics/ATLCanvas.cpp/.h` | 27+7 | GSK render-node canvas; ~~replace with the Skia canvas path everywhere~~ mostly done — remaining GTK use is the GdkTexture bridge (`atl_skbitmap_to/from_gdk_texture`) for MediaCodec/SurfaceView/WallpaperManager |
 | `src/libandroid/egl.c` | 21 | NDK EGL over GdkSurface; extern `window` global from launcher → Wayland EGL (wl_egl_window) |
 | `src/libandroid/native_window.c/.h` | 18+1 | ANativeWindow over GTK → Wayland surface/subsurface |
 | `src/libandroid/input.c` | 7 | GDK event translation for NativeActivity → GLFW/Wayland input |
@@ -53,3 +49,8 @@ GApplication launcher; this list tracks them.
   replaced by direct `.desktop` install; GTK/GSK VectorDrawable→SVG icon rendering
   dropped (TODO: re-add via Skia).
 - `src/api-impl-jni/util.h` — GTK-free; GTK helper declarations moved to `util_gtk.h`.
+- `src/api-impl-jni/graphics/android_graphics_drawable_Drawable.cpp`,
+  `NinePatchPaintable.c/.h`, `android_graphics_drawable_DrawableContainer.c`,
+  `android_graphics_drawable_NinePatchDrawable.cpp` — DELETED. The whole
+  drawable stack is now AOSP-13 Java over the Skia Canvas; ninepatch drawing
+  lives in `android_graphics_NinePatch.cpp` (no GTK).

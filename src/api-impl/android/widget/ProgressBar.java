@@ -15,7 +15,7 @@ public class ProgressBar extends View {
 	protected int progress = 0;
 	private boolean indeterminate = false;
 	private Drawable indeterminateDrawable;
-	private Drawable progressDrawable = new Drawable();
+	private Drawable progressDrawable = new android.graphics.drawable.ColorDrawable(0);
 
 	public ProgressBar(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
@@ -30,13 +30,7 @@ public class ProgressBar extends View {
 		native_setIndeterminate(indeterminate);
 		/* FIXME hack: NewPipe expects this to not be null, but for some reason it is */
 		if (indeterminateDrawable == null)
-			indeterminateDrawable = new Drawable() {
-				@Override
-				public void draw(Canvas canvas) {
-					// TODO Auto-generated method stub
-					throw new UnsupportedOperationException("Unimplemented method 'draw'");
-				}
-			};
+			indeterminateDrawable = new android.graphics.drawable.ColorDrawable(0);
 		a.recycle();
 	}
 

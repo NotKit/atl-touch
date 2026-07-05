@@ -92,11 +92,6 @@ GdkTexture *atl_skbitmap_to_gdk_texture(void *skbitmap);
 /* download a GdkTexture into an SkBitmap; the result is cached on the
  * texture and freed together with it */
 void *atl_skbitmap_from_gdk_texture(GdkTexture *texture);
-/* snapshot a GTK child widget, render it offscreen and draw the result onto
- * the canvas at the child's allocated position */
-void atl_canvas_draw_gtk_child(void *atl_canvas, void *parent_widget, void *child_widget);
-/* render any GdkPaintable offscreen and draw it onto the canvas */
-void atl_canvas_draw_gdk_paintable(void *atl_canvas, GdkPaintable *paintable, double width, double height);
 
 #ifdef __cplusplus
 }

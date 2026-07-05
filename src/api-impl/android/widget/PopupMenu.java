@@ -473,7 +473,7 @@ public class PopupMenu {
 
 		@Override
 		public Drawable getIcon() {
-			return new Drawable();
+			return new android.graphics.drawable.ColorDrawable(0);
 		}
 
 		@Override

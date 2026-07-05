@@ -12,7 +12,7 @@ public class ResolveInfo {
 	public Drawable loadIcon(PackageManager pm) {
 		Drawable icon = activityInfo.loadIcon(pm);
 		if (icon == null) {
-			icon = new Drawable();
+			icon = new android.graphics.drawable.ColorDrawable(0);
 		}
 		return icon;
 	}

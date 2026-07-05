@@ -108,7 +108,6 @@ struct handle_cache {
 	struct {
 		jclass class;
 		jmethodID get_app_icon_path;
-		jmethodID get_app_icon_paintable;
 	} application;
 	struct {
 		jclass class;
@@ -119,11 +118,6 @@ struct handle_cache {
 		jclass class;
 		jmethodID constructor;
 	} key_event;
-	struct {
-		jclass class;
-		jmethodID draw;
-		jmethodID setBounds;
-	} drawable;
 	struct {
 		jclass class;
 		jmethodID constructor;

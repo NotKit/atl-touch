@@ -109,7 +109,6 @@ void set_up_handle_cache(JNIEnv *env)
 
 	handle_cache.application.class = _REF((*env)->FindClass(env, "android/app/Application"));
 	handle_cache.application.get_app_icon_path = _METHOD(handle_cache.application.class, "get_app_icon_path", "()Ljava/lang/String;");
-	handle_cache.application.get_app_icon_paintable = _METHOD(handle_cache.application.class, "get_app_icon_paintable", "()J");
 
 	handle_cache.looper.class = _REF((*env)->FindClass(env, "android/os/Looper"));
 	handle_cache.looper.loop = _STATIC_METHOD(handle_cache.looper.class, "loop", "()V");
@@ -117,10 +116,6 @@ void set_up_handle_cache(JNIEnv *env)
 
 	handle_cache.key_event.class = _REF((*env)->FindClass(env, "android/view/KeyEvent"));
 	handle_cache.key_event.constructor = _METHOD(handle_cache.key_event.class, "<init>", "(JJIIII)V");
-
-	handle_cache.drawable.class = _REF((*env)->FindClass(env, "android/graphics/drawable/Drawable"));
-	handle_cache.drawable.draw = _METHOD(handle_cache.drawable.class, "draw", "(Landroid/graphics/Canvas;)V");
-	handle_cache.drawable.setBounds = _METHOD(handle_cache.drawable.class, "setBounds", "(IIII)V");
 
 	handle_cache.intent.class = _REF((*env)->FindClass(env, "android/content/Intent"));
 	handle_cache.intent.constructor = _METHOD(handle_cache.intent.class, "<init>", "()V");

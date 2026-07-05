@@ -23,6 +23,14 @@ extern "C" {
 #define android_graphics_Canvas_ALL_SAVE_FLAG 31L
 /*
  * Class:     android_graphics_Canvas
+ * Method:    nDrawNinePatch
+ * Signature: (JJJFFFFJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawNinePatch
+  (JNIEnv *, jclass, jlong, jlong, jlong, jfloat, jfloat, jfloat, jfloat, jlong);
+
+/*
+ * Class:     android_graphics_Canvas
  * Method:    nFreeCaches
  * Signature: ()V
  */

@@ -212,6 +212,21 @@ public class Resources {
 		//        assets.ensureStringBlocks();
 	}
 
+	/**
+	 * Returns the drawable inflater used by this resources object.
+	 *
+	 * ATL: the app APK and api-impl.jar share one classpath, so this class'
+	 * classloader can load app-defined custom drawable classes too.
+	 */
+	public android.graphics.drawable.DrawableInflater getDrawableInflater() {
+		if (mDrawableInflater == null) {
+			mDrawableInflater = new android.graphics.drawable.DrawableInflater(this, Resources.class.getClassLoader());
+		}
+		return mDrawableInflater;
+	}
+
+	private android.graphics.drawable.DrawableInflater mDrawableInflater;
+
 	public void applyPackageQuirks(int minSdkVersion) {
 		// Apps that target >= 23 expect mDrawableCache to be a ThemedResourceCache while other apps expect a Map
 		if (Build.VERSION.SDK_INT >= 23 || minSdkVersion >= 23) {
