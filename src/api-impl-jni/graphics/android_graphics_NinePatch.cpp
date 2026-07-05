@@ -65,12 +65,22 @@ struct Res_png_9patch *atl_ninepatch_chunk_parse(const uint8_t *data, uint32_t s
 	int32_t *colors = (int32_t *)((char *)chunk + chunk->colorsOffset);
 
 	if (!chunk->wasDeserialized) {
+		/* A raw npTc chunk straight from the PNG file stores its multi-byte
+		 * fields — the div/color arrays AND the padding — in network order.
+		 * (The offsets are recomputed above, so they don't need swapping.)
+		 * Padding is usually 0, where the swap is a no-op, which is why a
+		 * non-zero padding like a Material box's 4px bottom is the first place
+		 * a missing swap shows up: 0x04000000 instead of 4. */
 		for (int i = 0; i < chunk->numXDivs; i++)
 			xDivs[i] = ntohl(xDivs[i]);
 		for (int i = 0; i < chunk->numYDivs; i++)
 			yDivs[i] = ntohl(yDivs[i]);
 		for (int i = 0; i < chunk->numColors; i++)
 			colors[i] = ntohl(colors[i]);
+		chunk->paddingLeft = ntohl(chunk->paddingLeft);
+		chunk->paddingRight = ntohl(chunk->paddingRight);
+		chunk->paddingTop = ntohl(chunk->paddingTop);
+		chunk->paddingBottom = ntohl(chunk->paddingBottom);
 		chunk->wasDeserialized = 1;
 	}
 

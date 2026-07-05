@@ -694,7 +694,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public interface OnGenericMotionListener {
-		// TODO
+		boolean onGenericMotion(View v, MotionEvent event);
 	}
 
 	public interface OnSystemUiVisibilityChangeListener {
@@ -714,11 +714,11 @@ public class View implements Drawable.Callback {
 	}
 
 	public interface OnHoverListener {
-		// TODO
+		boolean onHover(View v, MotionEvent event);
 	}
 
 	public interface OnApplyWindowInsetsListener {
-		// TODO
+		WindowInsets onApplyWindowInsets(View v, WindowInsets insets);
 	}
 
 	public interface OnLayoutChangeListener {
@@ -1350,11 +1350,30 @@ public class View implements Drawable.Callback {
 		this.id = id;
 	}
 
-	public void setOnKeyListener(OnKeyListener l) {}
+	private OnKeyListener onKeyListener;
+	public void setOnKeyListener(OnKeyListener l) {
+		onKeyListener = l;
+	}
 
-	public void setFocusable(boolean focusable) {}
-	public void setFocusable(int focusable) {}
-	public void setFocusableInTouchMode(boolean focusableInTouchMode) {}
+	private int focusableAttr = FOCUSABLE;
+	private boolean focusableInTouchMode = false;
+	public void setFocusable(boolean focusable) {
+		focusableAttr = focusable ? FOCUSABLE : NOT_FOCUSABLE;
+	}
+	public void setFocusable(int focusable) {
+		focusableAttr = focusable;
+	}
+	public void setFocusableInTouchMode(boolean focusableInTouchMode) {
+		this.focusableInTouchMode = focusableInTouchMode;
+		if (focusableInTouchMode)
+			focusableAttr = FOCUSABLE;
+	}
+	public int getFocusable() {
+		return focusableAttr;
+	}
+	public final boolean isFocusableInTouchMode() {
+		return focusableInTouchMode;
+	}
 	public final boolean requestFocus() {
 		return requestFocus(View.FOCUS_DOWN);
 	}
@@ -1373,6 +1392,8 @@ public class View implements Drawable.Callback {
 		if (focused == gainFocus)
 			return;
 		focused = gainFocus;
+		if (!gainFocus)
+			onFocusLost();
 		onFocusChanged(gainFocus, FOCUS_DOWN, null);
 		if (onFocusChangeListener != null)
 			onFocusChangeListener.onFocusChange(this, gainFocus);
@@ -1398,9 +1419,9 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setPressed(boolean pressed) {
-		Slog.w(TAG, "calling setPressed on " + this + " with value: " + pressed);
 		if (this.pressed != pressed) {
 			this.pressed = pressed;
+			dispatchSetPressed(pressed);
 			drawableStateChanged();
 		}
 	}
@@ -1414,7 +1435,15 @@ public class View implements Drawable.Callback {
 			invalidate();
 	}
 
-	public void setSelected(boolean selected) {}
+	private boolean selected = false;
+	public void setSelected(boolean selected) {
+		if (this.selected != selected) {
+			this.selected = selected;
+			dispatchSetSelected(selected);
+			drawableStateChanged();
+			invalidate();
+		}
+	}
 
 	public Window native_get_window(long widget) {
 		ViewRootImpl root = getViewRootImpl();
@@ -1623,7 +1652,13 @@ public class View implements Drawable.Callback {
 		this.clickable = clickable;
 	}
 
-	public void setEnabled(boolean enabled) {}
+	public void setEnabled(boolean enabled) {
+		if (this.enabled != enabled) {
+			this.enabled = enabled;
+			drawableStateChanged();
+			invalidate();
+		}
+	}
 
 	public CharSequence getContentDescription() {
 		return null;
@@ -1650,7 +1685,10 @@ public class View implements Drawable.Callback {
 		on_context_click_listener = listener;
 	}
 
-	public void setOnHoverListener(OnHoverListener listener) {}
+	private OnHoverListener onHoverListener;
+	public void setOnHoverListener(OnHoverListener listener) {
+		onHoverListener = listener;
+	}
 
 	public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
 		if (layoutRequested || widthMeasureSpec != oldWidthMeasureSpec || heightMeasureSpec != oldHeightMeasureSpec) {
@@ -1787,13 +1825,29 @@ public class View implements Drawable.Callback {
 		invalidate();
 	}
 
-	public int getOverScrollMode() { return 0; }
+	private int overScrollMode = OVER_SCROLL_IF_CONTENT_SCROLLS;
+	public int getOverScrollMode() { return overScrollMode; }
 
-	public void setFitsSystemWindows(boolean fitsSystemWindows) {}
+	private boolean fitsSystemWindows = false;
+	public void setFitsSystemWindows(boolean fitsSystemWindows) {
+		this.fitsSystemWindows = fitsSystemWindows;
+	}
+	public boolean getFitsSystemWindows() {
+		return fitsSystemWindows;
+	}
+	public boolean fitsSystemWindows() {
+		return fitsSystemWindows;
+	}
 
 	public void setWillNotDraw(boolean value) {}
 
-	public void setScrollContainer(boolean isScrollContainer) {}
+	private boolean scrollContainer = false;
+	public void setScrollContainer(boolean isScrollContainer) {
+		scrollContainer = isScrollContainer;
+	}
+	public boolean isScrollContainer() {
+		return scrollContainer;
+	}
 
 	public boolean removeCallbacks(Runnable action) { return false; }
 
@@ -1813,7 +1867,9 @@ public class View implements Drawable.Callback {
 			parent.requestLayout();
 	};
 
-	public void setOverScrollMode(int mode) {}
+	public void setOverScrollMode(int mode) {
+		overScrollMode = mode;
+	}
 
 	public int getId() { return id; }
 	public String getIdName() {
@@ -1869,7 +1925,7 @@ public class View implements Drawable.Callback {
 	public void addOnLayoutChangeListener(OnLayoutChangeListener listener) {}
 	public void removeOnLayoutChangeListener(OnLayoutChangeListener listener) {}
 
-	public boolean isSelected() { return false; }
+	public boolean isSelected() { return selected; }
 
 	public void sendAccessibilityEvent(int eventType) {}
 
@@ -1880,9 +1936,17 @@ public class View implements Drawable.Callback {
 		this.minWidth = minWidth;
 	}
 
-	public void setActivated(boolean activated) {}
+	private boolean activated = false;
+	public void setActivated(boolean activated) {
+		if (this.activated != activated) {
+			this.activated = activated;
+			dispatchSetActivated(activated);
+			drawableStateChanged();
+			invalidate();
+		}
+	}
 
-	public boolean isActivated() { return false; }
+	public boolean isActivated() { return activated; }
 
 	public int getVisibility() { return visibility; }
 
@@ -1902,7 +1966,8 @@ public class View implements Drawable.Callback {
 
 	public void bringToFront() {}
 
-	public boolean isEnabled() { return true; }
+	private boolean enabled = true;
+	public boolean isEnabled() { return enabled; }
 	public boolean hasFocus() { return focused; }
 	public boolean isLayoutRequested() { return layoutRequested; }
 	public int getBaseline() { return -1; }
@@ -2066,12 +2131,21 @@ public class View implements Drawable.Callback {
 		return importantForAccessibility;
 	}
 
-	public boolean getFitsSystemWindows() { return true; }
 
-	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {}
+	private OnApplyWindowInsetsListener onApplyWindowInsetsListener;
+	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {
+		onApplyWindowInsetsListener = l;
+	}
+	public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
+		if (onApplyWindowInsetsListener != null)
+			return onApplyWindowInsetsListener.onApplyWindowInsets(this, insets);
+		return onApplyWindowInsets(insets);
+	}
+	public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+		return insets;
+	}
 
 	public final boolean isFocusable() { return true; }
-	public final boolean isFocusableInTouchMode() { return true; }
 	public boolean isClickable() { return true; }
 	public boolean isLongClickable() { return true; }
 
@@ -2101,15 +2175,45 @@ public class View implements Drawable.Callback {
 		postDelayed(action, delayMillis);
 	}
 
-	public void setHorizontalScrollBarEnabled(boolean enabled) {}
+	/* scrollbars are not rendered, but the state must round-trip: apps and
+	 * libraries save/restore these (e.g. across a programmatic style switch) */
+	private boolean horizontalScrollBarEnabled = false;
+	private boolean verticalScrollBarEnabled = false;
+	private boolean scrollbarFadingEnabled = true;
+	private int scrollBarStyle = SCROLLBARS_INSIDE_OVERLAY;
 
-	public void setVerticalScrollBarEnabled(boolean enabled) {}
+	public void setHorizontalScrollBarEnabled(boolean enabled) {
+		horizontalScrollBarEnabled = enabled;
+	}
+
+	public boolean isHorizontalScrollBarEnabled() {
+		return horizontalScrollBarEnabled;
+	}
+
+	public void setVerticalScrollBarEnabled(boolean enabled) {
+		verticalScrollBarEnabled = enabled;
+	}
+
+	public boolean isVerticalScrollBarEnabled() {
+		return verticalScrollBarEnabled;
+	}
+
+	public boolean isScrollbarFadingEnabled() {
+		return scrollbarFadingEnabled;
+	}
+
+	public int getScrollBarStyle() {
+		return scrollBarStyle;
+	}
 
 	public void postInvalidateOnAnimation() {
 		postInvalidate();
 	}
 
-	public void setPaddingRelative(int start, int top, int end, int bottom) {}
+	public void setPaddingRelative(int start, int top, int end, int bottom) {
+		// ATL is LTR-only: relative padding maps directly to absolute
+		setPadding(start, top, end, bottom);
+	}
 
 	public boolean isAttachedToWindow() {
 		return getViewRootImpl() != null;
@@ -2178,7 +2282,11 @@ public class View implements Drawable.Callback {
 
 	public boolean isPaddingRelative() { return false; }
 
-	public void setForeground(Drawable foreground) {}
+	private Drawable foreground;
+	public void setForeground(Drawable foreground) {
+		this.foreground = foreground;
+		invalidate();
+	}
 
 	public boolean canScrollVertically(int value) { return false; }
 
@@ -2312,7 +2420,13 @@ public class View implements Drawable.Callback {
 		}
 	}
 
-	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {}
+	private boolean hapticFeedbackEnabled = true;
+	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {
+		this.hapticFeedbackEnabled = hapticFeedbackEnabled;
+	}
+	public boolean isHapticFeedbackEnabled() {
+		return hapticFeedbackEnabled;
+	}
 
 	public StateListAnimator getStateListAnimator() { return null; }
 
@@ -2379,17 +2493,33 @@ public class View implements Drawable.Callback {
 
 	public int getTextDirection() { return textDirection; }
 
-	public Drawable getForeground() { return null; }
+	public Drawable getForeground() { return foreground; }
 
-	public void setScrollbarFadingEnabled(boolean fadeEnabled) {}
+	public void setScrollbarFadingEnabled(boolean fadeEnabled) {
+		scrollbarFadingEnabled = fadeEnabled;
+	}
 
-	public void setScrollBarStyle(int style) {}
+	public void setScrollBarStyle(int style) {
+		scrollBarStyle = style;
+	}
 
-	public void setVerticalScrollbarPosition(int position) {}
+	private int verticalScrollbarPosition = 0;
+	public void setVerticalScrollbarPosition(int position) {
+		verticalScrollbarPosition = position;
+	}
+	public int getVerticalScrollbarPosition() {
+		return verticalScrollbarPosition;
+	}
 
 	public void setNestedScrollingEnabled(boolean enabled) {}
 
-	public void setTouchDelegate(TouchDelegate touchDelegate) {}
+	private TouchDelegate touchDelegate;
+	public void setTouchDelegate(TouchDelegate touchDelegate) {
+		this.touchDelegate = touchDelegate;
+	}
+	public TouchDelegate getTouchDelegate() {
+		return touchDelegate;
+	}
 
 	public void setOnDragListener(OnDragListener onDragListener) {}
 
@@ -2412,7 +2542,13 @@ public class View implements Drawable.Callback {
 			return null;
 	}
 
-	public void setTooltipText(CharSequence tooltip) {}
+	private CharSequence tooltipText;
+	public void setTooltipText(CharSequence tooltip) {
+		tooltipText = tooltip;
+	}
+	public CharSequence getTooltipText() {
+		return tooltipText;
+	}
 
 	public int getImportantForAutofill() { return 0; }
 
@@ -2430,7 +2566,19 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
-	public void setClipBounds(Rect clipBounds) {}
+	private Rect clipBounds;
+	public void setClipBounds(Rect clipBounds) {
+		this.clipBounds = clipBounds != null ? new Rect(clipBounds) : null;
+	}
+	public Rect getClipBounds() {
+		return clipBounds != null ? new Rect(clipBounds) : null;
+	}
+	public boolean getClipBounds(Rect outRect) {
+		if (clipBounds == null)
+			return false;
+		outRect.set(clipBounds);
+		return true;
+	}
 
 	public boolean getClipToOutline() { return false; }
 
@@ -2450,7 +2598,10 @@ public class View implements Drawable.Callback {
 		layout(left, top, right, bottom);
 	}
 
-	public void setCameraDistance(float distance) {}
+	private float cameraDistance = 0;
+	public void setCameraDistance(float distance) {
+		cameraDistance = distance;
+	}
 
 	public boolean requestRectangleOnScreen(Rect rectangle, boolean immediate) { return false; }
 
@@ -2466,10 +2617,17 @@ public class View implements Drawable.Callback {
 	}
 
 	public boolean dispatchKeyEvent(KeyEvent event) {
-		if (event.getAction() == KeyEvent.ACTION_DOWN)
-			return onKeyDown(event.getKeyCode(), event);
-		else
-			return false;
+		if (onKeyListener != null && onKeyListener.onKey(this, event.getKeyCode(), event))
+			return true;
+		switch (event.getAction()) {
+			case KeyEvent.ACTION_DOWN:
+				return onKeyDown(event.getKeyCode(), event);
+			case KeyEvent.ACTION_UP:
+				return onKeyUp(event.getKeyCode(), event);
+			case KeyEvent.ACTION_MULTIPLE:
+				return onKeyMultiple(event.getKeyCode(), event.getRepeatCount(), event);
+		}
+		return false;
 	}
 
 	public WindowInsets getRootWindowInsets() { return null; }
@@ -2534,15 +2692,25 @@ public class View implements Drawable.Callback {
 
 	public void setBackgroundTintMode(PorterDuff.Mode tintMode) {}
 
-	public void setNextFocusLeftId(int id) {}
+	private int nextFocusLeftId = NO_ID;
+	public void setNextFocusLeftId(int id) { nextFocusLeftId = id; }
+	public int getNextFocusLeftId() { return nextFocusLeftId; }
 
-	public void setNextFocusRightId(int id) {}
+	private int nextFocusRightId = NO_ID;
+	public void setNextFocusRightId(int id) { nextFocusRightId = id; }
+	public int getNextFocusRightId() { return nextFocusRightId; }
 
-	public void setNextFocusDownId(int id) {}
+	private int nextFocusDownId = NO_ID;
+	public void setNextFocusDownId(int id) { nextFocusDownId = id; }
+	public int getNextFocusDownId() { return nextFocusDownId; }
 
-	public void setNextFocusUpId(int id) {}
+	private int nextFocusUpId = NO_ID;
+	public void setNextFocusUpId(int id) { nextFocusUpId = id; }
+	public int getNextFocusUpId() { return nextFocusUpId; }
 
-	public void setNextFocusForwardId(int id) {}
+	private int nextFocusForwardId = NO_ID;
+	public void setNextFocusForwardId(int id) { nextFocusForwardId = id; }
+	public int getNextFocusForwardId() { return nextFocusForwardId; }
 
 	public void setHasTransientState(boolean hasTransientState) {}
 
@@ -2577,7 +2745,11 @@ public class View implements Drawable.Callback {
 		this.scrollY = value;
 	}
 
-	protected boolean dispatchHoverEvent(MotionEvent event) { return false; }
+	protected boolean dispatchHoverEvent(MotionEvent event) {
+		if (onHoverListener != null && onHoverListener.onHover(this, event))
+			return true;
+		return onHoverEvent(event);
+	}
 
 	public ActionMode startActionMode(ActionMode.Callback callback, int type) { return null; }
 
@@ -2676,4 +2848,789 @@ public class View implements Drawable.Callback {
 	public int getAccessibilityLiveRegion() { return 0; }
 
 	public void setLabelFor(int id) {}
+
+	/* --- AOSP-13 API surface: methods apps call or override-and-chain to super.
+	 * Implementations are simple but semantically faithful; subsystems ATL does
+	 * not have (scrollbar rendering, RTL resolution, pointer capture, IME
+	 * pre-dispatch) report their inert defaults. --- */
+
+	/* key events */
+
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
+		    && isClickable() && isEnabled()) {
+			return performClick();
+		}
+		return false;
+	}
+
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyShortcut(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean dispatchKeyEventPreIme(KeyEvent event) {
+		return onKeyPreIme(event.getKeyCode(), event);
+	}
+
+	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
+		return onKeyShortcut(event.getKeyCode(), event);
+	}
+
+	private KeyEvent.DispatcherState keyDispatcherState;
+
+	public KeyEvent.DispatcherState getKeyDispatcherState() {
+		if (keyDispatcherState == null)
+			keyDispatcherState = new KeyEvent.DispatcherState();
+		return keyDispatcherState;
+	}
+
+	private java.util.ArrayList<OnUnhandledKeyEventListener> unhandledKeyListeners;
+
+	/** listeners are recorded but never invoked: unhandled keys are consumed by the window */
+	public void addOnUnhandledKeyEventListener(OnUnhandledKeyEventListener listener) {
+		if (unhandledKeyListeners == null)
+			unhandledKeyListeners = new java.util.ArrayList<>();
+		unhandledKeyListeners.add(listener);
+	}
+
+	public void removeOnUnhandledKeyEventListener(OnUnhandledKeyEventListener listener) {
+		if (unhandledKeyListeners != null)
+			unhandledKeyListeners.remove(listener);
+	}
+
+	public boolean checkInputConnectionProxy(View view) {
+		return false;
+	}
+
+	public void onCancelPendingInputEvents() {}
+
+	public void requestUnbufferedDispatch(MotionEvent event) {}
+
+	public void requestUnbufferedDispatch(int source) {}
+
+	/* focus */
+
+	protected void onFocusLost() {}
+
+	public void addFocusables(java.util.ArrayList<View> views, int direction) {
+		addFocusables(views, direction, FOCUSABLES_TOUCH_MODE);
+	}
+
+	public void addFocusables(java.util.ArrayList<View> views, int direction, int focusableMode) {
+		if (views != null && getFocusable() != NOT_FOCUSABLE && getVisibility() == VISIBLE)
+			views.add(this);
+	}
+
+	public java.util.ArrayList<View> getFocusables(int direction) {
+		java.util.ArrayList<View> result = new java.util.ArrayList<View>(24);
+		addFocusables(result, direction);
+		return result;
+	}
+
+	public View focusSearch(int direction) {
+		return null;
+	}
+
+	public boolean hasExplicitFocusable() {
+		return getFocusable() != NOT_FOCUSABLE;
+	}
+
+	private boolean focusedByDefault = false;
+
+	public void setFocusedByDefault(boolean isFocusedByDefault) {
+		focusedByDefault = isFocusedByDefault;
+	}
+
+	public final boolean isFocusedByDefault() {
+		return focusedByDefault;
+	}
+
+	public boolean restoreDefaultFocus() {
+		return requestFocus();
+	}
+
+	public void dispatchWindowFocusChanged(boolean hasFocus) {
+		onWindowFocusChanged(hasFocus);
+	}
+
+	public boolean isAccessibilityFocused() {
+		return false;
+	}
+
+	private boolean screenReaderFocusable = false;
+
+	public void setScreenReaderFocusable(boolean screenReaderFocusable) {
+		this.screenReaderFocusable = screenReaderFocusable;
+	}
+
+	public boolean isScreenReaderFocusable() {
+		return screenReaderFocusable;
+	}
+
+	/* scrolling */
+
+	protected int computeHorizontalScrollOffset() {
+		return scrollX;
+	}
+
+	protected boolean overScrollBy(int deltaX, int deltaY, int scrollX, int scrollY,
+	                               int scrollRangeX, int scrollRangeY,
+	                               int maxOverScrollX, int maxOverScrollY, boolean isTouchEvent) {
+		int newScrollX = scrollX + deltaX;
+		int newScrollY = scrollY + deltaY;
+		boolean clampedX = false;
+		boolean clampedY = false;
+		if (newScrollX > scrollRangeX) {
+			newScrollX = scrollRangeX;
+			clampedX = true;
+		} else if (newScrollX < 0) {
+			newScrollX = 0;
+			clampedX = true;
+		}
+		if (newScrollY > scrollRangeY) {
+			newScrollY = scrollRangeY;
+			clampedY = true;
+		} else if (newScrollY < 0) {
+			newScrollY = 0;
+			clampedY = true;
+		}
+		onOverScrolled(newScrollX, newScrollY, clampedX, clampedY);
+		return clampedX || clampedY;
+	}
+
+	protected void onOverScrolled(int scrollX, int scrollY, boolean clampedX, boolean clampedY) {}
+
+	public boolean startNestedScroll(int axes) {
+		return false;
+	}
+
+	public boolean hasNestedScrollingParent() {
+		return false;
+	}
+
+	public boolean dispatchNestedFling(float velocityX, float velocityY, boolean consumed) {
+		return false;
+	}
+
+	public boolean dispatchNestedPreFling(float velocityX, float velocityY) {
+		return false;
+	}
+
+	protected boolean awakenScrollBars(int startDelay) {
+		return false;
+	}
+
+	protected boolean awakenScrollBars(int startDelay, boolean invalidate) {
+		return false;
+	}
+
+	private int scrollBarSize = 0;
+	private int scrollBarFadeDuration = 250;
+	private int scrollBarDefaultDelayBeforeFade = 300;
+
+	public int getScrollBarSize() {
+		return scrollBarSize != 0 ? scrollBarSize
+		    : (int)(4 * getContext().getResources().getDisplayMetrics().density);
+	}
+
+	public void setScrollBarSize(int scrollBarSize) {
+		this.scrollBarSize = scrollBarSize;
+	}
+
+	public int getScrollBarFadeDuration() {
+		return scrollBarFadeDuration;
+	}
+
+	public void setScrollBarFadeDuration(int scrollBarFadeDuration) {
+		this.scrollBarFadeDuration = scrollBarFadeDuration;
+	}
+
+	public int getScrollBarDefaultDelayBeforeFade() {
+		return scrollBarDefaultDelayBeforeFade;
+	}
+
+	public void setScrollBarDefaultDelayBeforeFade(int scrollBarDefaultDelayBeforeFade) {
+		this.scrollBarDefaultDelayBeforeFade = scrollBarDefaultDelayBeforeFade;
+	}
+
+	public int getHorizontalScrollbarHeight() {
+		return getScrollBarSize();
+	}
+
+	public void setVerticalScrollbarThumbDrawable(Drawable drawable) {}
+
+	public void setVerticalScrollbarTrackDrawable(Drawable drawable) {}
+
+	public void setHorizontalScrollbarThumbDrawable(Drawable drawable) {}
+
+	public void setHorizontalScrollbarTrackDrawable(Drawable drawable) {}
+
+	protected void onDrawScrollBars(Canvas canvas) {}
+
+	protected void initializeScrollbars(TypedArray a) {}
+
+	public boolean isInScrollingContainer() {
+		return false;
+	}
+
+	protected boolean isVerticalScrollBarHidden() {
+		return false;
+	}
+
+	public int getScrollIndicators() {
+		return 0;
+	}
+
+	public void setScrollIndicators(int indicators) {}
+
+	protected float getVerticalScrollFactor() {
+		return 64 * getContext().getResources().getDisplayMetrics().density;
+	}
+
+	protected float getHorizontalScrollFactor() {
+		return getVerticalScrollFactor();
+	}
+
+	/* fading edges: never rendered, state round-trips */
+
+	private boolean horizontalFadingEdgeEnabled = false;
+	private boolean verticalFadingEdgeEnabled = false;
+
+	public boolean isHorizontalFadingEdgeEnabled() {
+		return horizontalFadingEdgeEnabled;
+	}
+
+	public boolean isVerticalFadingEdgeEnabled() {
+		return verticalFadingEdgeEnabled;
+	}
+
+	public int getHorizontalFadingEdgeLength() {
+		return 0;
+	}
+
+	protected float getLeftFadingEdgeStrength() {
+		return 0.0f;
+	}
+
+	protected float getRightFadingEdgeStrength() {
+		return 0.0f;
+	}
+
+	protected float getTopFadingEdgeStrength() {
+		return 0.0f;
+	}
+
+	protected float getBottomFadingEdgeStrength() {
+		return 0.0f;
+	}
+
+	/* hover / pointer */
+
+	public boolean onHoverEvent(MotionEvent event) {
+		return false;
+	}
+
+	public void onHoverChanged(boolean hovered) {}
+
+	protected boolean dispatchGenericPointerEvent(MotionEvent event) {
+		return onGenericMotionEvent(event);
+	}
+
+	protected boolean dispatchGenericFocusedEvent(MotionEvent event) {
+		return onGenericMotionEvent(event);
+	}
+
+	public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
+		return getPointerIcon();
+	}
+
+	public boolean hasPointerCapture() {
+		return false;
+	}
+
+	public void requestPointerCapture() {}
+
+	public void releasePointerCapture() {}
+
+	public void onPointerCaptureChange(boolean hasCapture) {}
+
+	public void dispatchPointerCaptureChanged(boolean hasCapture) {
+		onPointerCaptureChange(hasCapture);
+	}
+
+	public boolean onCapturedPointerEvent(MotionEvent event) {
+		return false;
+	}
+
+	/* window / insets */
+
+	public boolean fitSystemWindows(Rect insets) {
+		return false;
+	}
+
+	public void dispatchWindowVisibilityChanged(int visibility) {
+		onWindowVisibilityChanged(visibility);
+	}
+
+	protected void onWindowVisibilityChanged(int visibility) {}
+
+	private int windowAttachCount = 0;
+
+	public int getWindowAttachCount() {
+		return windowAttachCount;
+	}
+
+	/* temporary detach */
+
+	private boolean temporarilyDetached = false;
+
+	public void onStartTemporaryDetach() {
+		temporarilyDetached = true;
+	}
+
+	public void onFinishTemporaryDetach() {
+		temporarilyDetached = false;
+	}
+
+	public void dispatchStartTemporaryDetach() {
+		onStartTemporaryDetach();
+	}
+
+	public void dispatchFinishTemporaryDetach() {
+		onFinishTemporaryDetach();
+	}
+
+	public final boolean isTemporarilyDetached() {
+		return temporarilyDetached;
+	}
+
+	/* protected hooks subclasses override and chain to super */
+
+	protected boolean verifyDrawable(Drawable who) {
+		return who == background || who == foreground;
+	}
+
+	public void onDrawForeground(Canvas canvas) {
+		Drawable fg = getForeground();
+		if (fg != null) {
+			fg.setBounds(0, 0, getWidth(), getHeight());
+			fg.draw(canvas);
+		}
+	}
+
+	protected boolean onSetAlpha(int alpha) {
+		return false;
+	}
+
+	protected void dispatchSetPressed(boolean pressed) {}
+
+	protected void dispatchSetActivated(boolean activated) {}
+
+	protected void dispatchSetSelected(boolean selected) {}
+
+	public void onVisibilityAggregated(boolean isVisible) {}
+
+	public void onRtlPropertiesChanged(int layoutDirection) {}
+
+	public boolean isLayoutRtl() {
+		return false;
+	}
+
+	public void onScreenStateChanged(int screenState) {}
+
+	protected void onDisplayHint(int hint) {}
+
+	public void dispatchDisplayHint(int hint) {
+		onDisplayHint(hint);
+	}
+
+	public boolean onTrackballEvent(MotionEvent event) {
+		return false;
+	}
+
+	public boolean dispatchTrackballEvent(MotionEvent event) {
+		return onTrackballEvent(event);
+	}
+
+	public boolean onFilterTouchEventForSecurity(MotionEvent event) {
+		return true;
+	}
+
+	protected void drawableHotspotChanged(float x, float y) {}
+
+	public void dispatchDrawableHotspotChanged(float x, float y) {
+		drawableHotspotChanged(x, y);
+	}
+
+	/* context menu / context click */
+
+	public void createContextMenu(ContextMenu menu) {
+		onCreateContextMenu(menu);
+	}
+
+	protected void onCreateContextMenu(ContextMenu menu) {}
+
+	protected ContextMenu.ContextMenuInfo getContextMenuInfo() {
+		return null;
+	}
+
+	public boolean showContextMenu() {
+		return false;
+	}
+
+	public boolean showContextMenu(float x, float y) {
+		return false;
+	}
+
+	public boolean performContextClick() {
+		return performContextClick(0, 0);
+	}
+
+	public boolean performContextClick(float x, float y) {
+		return on_context_click_listener != null && on_context_click_listener.onContextClick(this);
+	}
+
+	private boolean contextClickable = false;
+
+	public void setContextClickable(boolean contextClickable) {
+		this.contextClickable = contextClickable;
+	}
+
+	public boolean isContextClickable() {
+		return contextClickable;
+	}
+
+	/* misc state round-trips */
+
+	public boolean getKeepScreenOn() {
+		return keepScreenOn;
+	}
+
+	private boolean soundEffectsEnabled = true;
+
+	public void setSoundEffectsEnabled(boolean soundEffectsEnabled) {
+		this.soundEffectsEnabled = soundEffectsEnabled;
+	}
+
+	public boolean isSoundEffectsEnabled() {
+		return soundEffectsEnabled;
+	}
+
+	private boolean filterTouchesWhenObscured = false;
+
+	public void setFilterTouchesWhenObscured(boolean enabled) {
+		filterTouchesWhenObscured = enabled;
+	}
+
+	public boolean getFilterTouchesWhenObscured() {
+		return filterTouchesWhenObscured;
+	}
+
+	public OnLongClickListener getOnLongClickListener() {
+		return on_long_click_listener;
+	}
+
+	public boolean hasOnLongClickListeners() {
+		return on_long_click_listener != null;
+	}
+
+	public boolean performLongClick() {
+		return performLongClick(0, 0);
+	}
+
+	public void setAllowClickWhenDisabled(boolean clickableWhenDisabled) {}
+
+	public void setStateDescription(CharSequence stateDescription) {}
+
+	private java.util.List<Rect> systemGestureExclusionRects = java.util.Collections.emptyList();
+
+	public void setSystemGestureExclusionRects(java.util.List<Rect> rects) {
+		systemGestureExclusionRects = rects;
+	}
+
+	public java.util.List<Rect> getSystemGestureExclusionRects() {
+		return systemGestureExclusionRects;
+	}
+
+	private boolean preferKeepClear = false;
+	private java.util.List<Rect> preferKeepClearRects = java.util.Collections.emptyList();
+
+	public void setPreferKeepClear(boolean preferKeepClear) {
+		this.preferKeepClear = preferKeepClear;
+	}
+
+	public boolean isPreferKeepClear() {
+		return preferKeepClear;
+	}
+
+	public void setPreferKeepClearRects(java.util.List<Rect> rects) {
+		preferKeepClearRects = rects;
+	}
+
+	public java.util.List<Rect> getPreferKeepClearRects() {
+		return preferKeepClearRects;
+	}
+
+	private boolean willNotCacheDrawing = false;
+
+	public void setWillNotCacheDrawing(boolean willNotCacheDrawing) {
+		this.willNotCacheDrawing = willNotCacheDrawing;
+	}
+
+	public boolean willNotCacheDrawing() {
+		return willNotCacheDrawing;
+	}
+
+	public void buildLayer() {}
+
+	/* rendering properties */
+
+	public boolean isOpaque() {
+		return false;
+	}
+
+	private boolean forcedHasOverlappingRendering = false;
+	private boolean forcedOverlappingRenderingValue = true;
+
+	public boolean hasOverlappingRendering() {
+		return true;
+	}
+
+	public final boolean getHasOverlappingRendering() {
+		return forcedHasOverlappingRendering ? forcedOverlappingRenderingValue : hasOverlappingRendering();
+	}
+
+	public void forceHasOverlappingRendering(boolean hasOverlappingRendering) {
+		forcedHasOverlappingRendering = true;
+		forcedOverlappingRenderingValue = hasOverlappingRendering;
+	}
+
+	public int getSolidColor() {
+		return 0;
+	}
+
+	public void setOutlineAmbientShadowColor(int color) {}
+
+	public void setOutlineSpotShadowColor(int color) {}
+
+	public void setZ(float z) {
+		setTranslationZ(z - getElevation());
+	}
+
+	public float getCameraDistance() {
+		return cameraDistance;
+	}
+
+	public void setTransitionAlpha(float alpha) {}
+
+	public void setTransitionVisibility(int visibility) {
+		setVisibility(visibility);
+	}
+
+	private android.graphics.Matrix animationMatrix;
+
+	public void setAnimationMatrix(android.graphics.Matrix matrix) {
+		animationMatrix = matrix;
+	}
+
+	public android.graphics.Matrix getAnimationMatrix() {
+		return animationMatrix;
+	}
+
+	public boolean isPivotSet() {
+		return false;
+	}
+
+	public void resetPivot() {}
+
+	/* geometry helpers */
+
+	public int getMeasuredHeightAndState() {
+		return measuredHeight;
+	}
+
+	public int[] getLocationOnScreen() {
+		int[] location = new int[2];
+		getLocationOnScreen(location);
+		return location;
+	}
+
+	public void getBoundsOnScreen(Rect outRect) {
+		getBoundsOnScreen(outRect, false);
+	}
+
+	public void getBoundsOnScreen(Rect outRect, boolean clipToParent) {
+		int[] location = new int[2];
+		getLocationOnScreen(location);
+		outRect.set(location[0], location[1], location[0] + getWidth(), location[1] + getHeight());
+	}
+
+	final boolean pointInView(float localX, float localY, float slop) {
+		return localX >= -slop && localY >= -slop && localX < (getWidth() + slop)
+		    && localY < (getHeight() + slop);
+	}
+
+	protected boolean setFrame(int left, int top, int right, int bottom) {
+		boolean changed = this.left != left || this.top != top
+		    || this.right != right || this.bottom != bottom;
+		this.left = left;
+		this.top = top;
+		this.right = right;
+		this.bottom = bottom;
+		if (changed)
+			invalidate();
+		return changed;
+	}
+
+	public void setLeftTopRightBottom(int left, int top, int right, int bottom) {
+		setFrame(left, top, right, bottom);
+	}
+
+	public boolean isVisibleToUser() {
+		return isAttachedToWindow() && getVisibility() == VISIBLE;
+	}
+
+	public void getWindowDisplayFrame(Rect outRect) {
+		getWindowVisibleDisplayFrame(outRect);
+	}
+
+	public long getUniqueDrawingId() {
+		return System.identityHashCode(this);
+	}
+
+	public int getSourceLayoutResId() {
+		return 0;
+	}
+
+	public int getExplicitStyle() {
+		return 0;
+	}
+
+	/* touchables */
+
+	public java.util.ArrayList<View> getTouchables() {
+		java.util.ArrayList<View> result = new java.util.ArrayList<View>();
+		addTouchables(result);
+		return result;
+	}
+
+	public void addTouchables(java.util.ArrayList<View> views) {
+		if (isClickable() && getVisibility() == VISIBLE)
+			views.add(this);
+	}
+
+	/* invalidation */
+
+	public void invalidate(boolean invalidateCache) {
+		invalidate();
+	}
+
+	public void postInvalidateDelayed(long delayMilliseconds) {
+		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				invalidate();
+			}
+		}, delayMilliseconds);
+	}
+
+	public void postInvalidateDelayed(long delayMilliseconds, int left, int top, int right, int bottom) {
+		postInvalidateDelayed(delayMilliseconds);
+	}
+
+	/* content receiving */
+
+	public String[] getReceiveContentMimeTypes() {
+		return null;
+	}
+
+	public ContentInfo performReceiveContent(ContentInfo payload) {
+		return onReceiveContent(payload);
+	}
+
+	/* RTL / text direction resolution: ATL is LTR-only for now */
+
+	public int getRawLayoutDirection() {
+		return LAYOUT_DIRECTION_LTR;
+	}
+
+	public boolean canResolveLayoutDirection() {
+		return true;
+	}
+
+	public boolean isLayoutDirectionInherited() {
+		return false;
+	}
+
+	public boolean canResolveTextDirection() {
+		return true;
+	}
+
+	public boolean isTextDirectionInherited() {
+		return false;
+	}
+
+	public boolean isTextDirectionResolved() {
+		return true;
+	}
+
+	public boolean canResolveTextAlignment() {
+		return true;
+	}
+
+	public boolean isTextAlignmentInherited() {
+		return false;
+	}
+
+	public boolean isTextAlignmentResolved() {
+		return true;
+	}
+
+	public boolean resolveLayoutDirection() {
+		return true;
+	}
+
+	public void resolveLayoutParams() {}
+
+	public boolean resolveTextDirection() {
+		return true;
+	}
+
+	public boolean resolveTextAlignment() {
+		return true;
+	}
+
+	public void resolvePadding() {}
+
+	public boolean resolveRtlPropertiesIfNeeded() {
+		return false;
+	}
+
+	protected void resetResolvedLayoutDirection() {}
+
+	protected void resetResolvedTextDirection() {}
+
+	protected void resetResolvedTextAlignment() {}
+
+	protected void resetResolvedPadding() {}
+
+	protected void resetResolvedDrawables() {}
+
+	protected void resolveDrawables() {}
+
+	protected void onResolveDrawables(int layoutDirection) {}
+
+	public void resetRtlProperties() {}
 }
