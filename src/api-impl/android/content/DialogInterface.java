@@ -22,8 +22,10 @@ public interface DialogInterface {
 		void onShow(DialogInterface dialog);
 	}
 	public interface OnCancelListener {
+		void onCancel(DialogInterface dialog);
 	}
 	public interface OnMultiChoiceClickListener {
+		void onClick(DialogInterface dialog, int which, boolean isChecked);
 	}
 	public interface OnKeyListener {
 	}

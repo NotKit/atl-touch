@@ -4,41 +4,62 @@ import android.R;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.TypedArray;
-import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.util.Slog;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewRootImpl;
 import android.view.Window;
 import android.view.WindowManager.LayoutParams;
+import android.view.WindowManagerGlobal;
 
+/**
+ * Dialogs render in-scene: the dialog's decor view is attached as a panel on
+ * the view root currently driving the (shared) native window, floating above
+ * the activity content with a dimmed scrim — like Android composites dialog
+ * windows over the activity on one surface, and unlike a separate OS window.
+ */
 public class Dialog implements Window.Callback, DialogInterface {
-	protected long nativePtr;
-
-	protected native long nativeInit();
-	private native void nativeSetTitle(long ptr, String title);
-	private native void nativeSetContentView(long ptr, long widget);
-	private native void nativeShow(long ptr);
-	private native void nativeClose(long ptr);
-	private native boolean nativeIsShowing(long ptr);
+	private static final String TAG = "Dialog";
 
 	private Context context;
 	private Window window;
+	private OnCancelListener onCancelListener;
 	private OnDismissListener onDismissListener;
 	private OnShowListener onShowListener;
 	private boolean mCreated = false;
+	private boolean showing = false;
+	private boolean cancelable = true;
+	private Boolean canceledOnTouchOutside; // null: default by windowIsFloating at show() time
+	private ViewRootImpl hostRoot;          // the view root the decor is attached to while showing
+
+	private final ViewRootImpl.PanelCallbacks panelCallbacks = new ViewRootImpl.PanelCallbacks() {
+		@Override
+		public boolean onPanelBack() {
+			onBackPressed();
+			return true;
+		}
+
+		@Override
+		public boolean onPanelOutsideTouch() {
+			if (cancelable && !Boolean.FALSE.equals(canceledOnTouchOutside)) {
+				cancel();
+				return true;
+			}
+			return false;
+		}
+	};
 
 	public Dialog(Context context, int themeResId) {
 		this.context = context;
 		window = new Window(context, this);
-		nativePtr = nativeInit();
-
-		window.set_native_window(nativePtr);
 	}
 
 	public Dialog(Context context) {
@@ -62,18 +83,28 @@ public class Dialog implements Window.Callback, DialogInterface {
 	}
 
 	public void setTitle(CharSequence title) {
-		nativeSetTitle(nativePtr, String.valueOf(title));
+		getWindow().getAttributes().setTitle(title);
 	}
 
 	public void setTitle(int titleId) {
-		nativeSetTitle(nativePtr, context.getString(titleId));
+		setTitle(context.getString(titleId));
 	}
 
 	public void setOwnerActivity(Activity activity) {}
 
-	public void setCancelable(boolean cancelable) {}
+	public void setCancelable(boolean cancelable) {
+		this.cancelable = cancelable;
+	}
 
-	public void setOnCancelListener(OnCancelListener onCancelListener) {}
+	public void setCanceledOnTouchOutside(boolean cancel) {
+		if (cancel)
+			cancelable = true;
+		canceledOnTouchOutside = cancel;
+	}
+
+	public void setOnCancelListener(OnCancelListener onCancelListener) {
+		this.onCancelListener = onCancelListener;
+	}
 
 	public void setOnDismissListener(OnDismissListener onDismissListener) {
 		this.onDismissListener = onDismissListener;
@@ -84,10 +115,16 @@ public class Dialog implements Window.Callback, DialogInterface {
 	}
 
 	public void show() {
-		System.out.println("showing the Dialog " + this);
 		Runnable action = new Runnable() {
 			@Override
 			public void run() {
+				if (showing) {
+					// was hide()-den, not dismissed: just make the decor visible again
+					View decor = window.getDecorView();
+					decor.setVisibility(View.VISIBLE);
+					decor.invalidate();
+					return;
+				}
 				// AOSP dispatchOnCreate: onCreate must run exactly once per
 				// Dialog instance. androidx's ComponentDialog restores its
 				// SavedStateRegistry in onCreate and throws if that happens
@@ -97,54 +134,41 @@ public class Dialog implements Window.Callback, DialogInterface {
 					onCreate(null);
 					mCreated = true;
 				}
-				// Read the size of the main window. Floating dialogs should be smaller as specified in the windowMinWidth* attributes.
-				// Non-floating are typically constructed with MATCH_PARENT layout params and thus get the exact size of the main window.
-				// Most non-floating dialogs are technically dialogs, but are expected to behave more like full size activities.
-				Rect displayFrame = new Rect();
-				View decor = getWindow().getDecorView();
-				decor.getWindowVisibleDisplayFrame(displayFrame);
+				onStart();
 
+				ViewRootImpl root = WindowManagerGlobal.getActiveViewRoot();
+				if (root == null) {
+					Slog.e(TAG, "show: no active view root to attach the dialog to");
+					return;
+				}
+
+				// Floating dialogs get the windowMinWidth* fraction of the window as a
+				// fixed width (capped at Material's 560dp max); their height wraps the
+				// content. Non-floating dialogs are technically dialogs but behave like
+				// full-size activities: their (typically MATCH_PARENT) params stand.
 				TypedArray a = context.obtainStyledAttributes(R.styleable.Window);
 				boolean floating = a.getBoolean(R.styleable.Window_windowIsFloating, false);
-				float windowWidthFraction = 1;
-				if (floating) {
-					if (displayFrame.width() > displayFrame.height())
-						windowWidthFraction = a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1);
-					else
-						windowWidthFraction = a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
-				}
 				LayoutParams lp = getWindow().getAttributes();
-
-				// Width: a floating dialog uses windowMinWidth* as a fixed fraction of the
-				// display, so measure it EXACTLY at that width. Otherwise honor an explicit
-				// width, wrap (AT_MOST) a WRAP_CONTENT window, or fill the display.
-				int widthSize = lp.width >= 0 ? lp.width : (int)(displayFrame.width() * windowWidthFraction);
-				if (floating && lp.width < 0) {
-					// On a wide (desktop) window, windowMinWidth* (a fraction of the display)
-					// produces an over-wide dialog. Cap at Material's 560dp max dialog width.
-					int maxWidth = (int)(560 * context.getResources().getDisplayMetrics().density);
-					widthSize = Math.min(widthSize, maxWidth);
+				if (floating) {
+					if (lp.width < 0) {
+						float fraction = root.getWidth() > root.getHeight()
+						    ? a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1)
+						    : a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
+						int maxWidth = (int)(560 * context.getResources().getDisplayMetrics().density);
+						lp.width = Math.min((int)(root.getWidth() * fraction), maxWidth);
+					}
+					if (lp.gravity == 0)
+						lp.gravity = Gravity.CENTER;
+					lp.flags |= LayoutParams.FLAG_DIM_BEHIND;
+					lp.dimAmount = 0.6f;
 				}
-				int widthMode = (lp.width == LayoutParams.WRAP_CONTENT && !floating)
-				    ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY;
-				int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(widthSize, widthMode);
+				a.recycle();
 
-				// Height always wraps its content for a WRAP_CONTENT window, capped at the display.
-				int heightSize = lp.height >= 0 ? lp.height : displayFrame.height();
-				int heightMode = lp.height == LayoutParams.WRAP_CONTENT
-				    ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY;
-				int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(heightSize, heightMode);
-
-				// Measure the content and size the native window to it. Without this the
-				// window keeps its native default size and performLayout() stretches the
-				// decor EXACTLY to fill it, leaving the content cramped at the top.
-				decor.measure(widthMeasureSpec, heightMeasureSpec);
-				int measuredWidth = decor.getMeasuredWidth();
-				int measuredHeight = decor.getMeasuredHeight();
-				if (measuredWidth > 0 && measuredHeight > 0)
-					getWindow().setLayout(measuredWidth, measuredHeight);
-
-				nativeShow(nativePtr);
+				View decor = getWindow().getDecorView();
+				decor.setVisibility(View.VISIBLE); // may have been hidden by hide()
+				hostRoot = root;
+				root.addPanel(decor, lp, panelCallbacks);
+				showing = true;
 
 				if (onShowListener != null)
 					onShowListener.onShow(Dialog.this);
@@ -158,11 +182,10 @@ public class Dialog implements Window.Callback, DialogInterface {
 	}
 
 	public boolean isShowing() {
-		return nativeIsShowing(nativePtr);
+		return showing;
 	}
 
 	public void dismiss() {
-		System.out.println("dismissing the Dialog " + Dialog.this);
 		// HACK: dismissing the Dialog takes some time in AOSP, as the request goes back and forth between the application
 		// and the system server. We replicate this behavior by adding 10 ms delay.
 		// This Hack is required for NewPipe RouterActivity which has a race condition. It subscribes an rxJava observable
@@ -170,7 +193,14 @@ public class Dialog implements Window.Callback, DialogInterface {
 		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
 			@Override
 			public void run() {
-				nativeClose(nativePtr);
+				if (!showing)
+					return;
+				showing = false;
+				if (hostRoot != null) {
+					hostRoot.removePanel(window.getDecorView());
+					hostRoot = null;
+				}
+				onStop();
 				if (onDismissListener != null)
 					onDismissListener.onDismiss(Dialog.this);
 			}
@@ -180,8 +210,6 @@ public class Dialog implements Window.Callback, DialogInterface {
 	public Window getWindow() {
 		return window;
 	}
-
-	public void setCanceledOnTouchOutside(boolean cancel) {}
 
 	public class Builder {
 		public Builder(Context context) {
@@ -225,16 +253,31 @@ public class Dialog implements Window.Callback, DialogInterface {
 	}
 
 	protected void onCreate(Bundle savedInstanceState) {
-		System.out.println("- onCreate - Dialog!");
+	}
+
+	protected void onStart() {
+	}
+
+	protected void onStop() {
+	}
+
+	/** AOSP contract: back cancels a cancelable dialog. androidx's ComponentDialog
+	 *  overrides this to route through its OnBackPressedDispatcher. */
+	public void onBackPressed() {
+		if (cancelable)
+			cancel();
 	}
 
 	public void hide() {
-		System.out.println("hiding the Dialog " + this);
-		nativeClose(nativePtr);
+		// AOSP hide(): the dialog stays showing, its decor just goes invisible
+		if (showing)
+			window.getDecorView().setVisibility(View.GONE);
 	}
 
 	@Override
 	public void cancel() {
+		if (onCancelListener != null)
+			onCancelListener.onCancel(this);
 		dismiss();
 	}
 

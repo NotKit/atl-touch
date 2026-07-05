@@ -7,13 +7,48 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewRootImpl;
+import android.view.WindowManager;
+import android.view.WindowManagerGlobal;
 
+/**
+ * PopupWindow rendered in-scene: the content view is attached as a panel on
+ * the view root of the window it pops up over (anchored below/above its
+ * anchor view), instead of a separate native popup surface.
+ */
 public class PopupWindow {
 
 	int input_method_mode = 0;
 
+	private Context context;
+	private View contentView;
+	private FrameLayout decor; // wraps the content so the popup background doesn't clobber the content's own
+	private Drawable background;
+	private int width = ViewGroup.LayoutParams.WRAP_CONTENT;
+	private int height = ViewGroup.LayoutParams.WRAP_CONTENT;
+	private boolean focusable;
+	private boolean showing;
+	private ViewRootImpl hostRoot;
+	private WindowManager.LayoutParams panelParams;
+	private OnDismissListener onDismissListener;
+
+	private final ViewRootImpl.PanelCallbacks panelCallbacks = new ViewRootImpl.PanelCallbacks() {
+		@Override
+		public boolean onPanelBack() {
+			dismiss();
+			return true;
+		}
+
+		@Override
+		public boolean onPanelOutsideTouch() {
+			dismiss();
+			return true;
+		}
+	};
+
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		popover = native_constructor();
+		this.context = context;
 	}
 
 	public PopupWindow(Context context) {
@@ -21,11 +56,11 @@ public class PopupWindow {
 	}
 
 	public PopupWindow() {
-		popover = native_constructor();
+		this(null, null, 0, 0);
 	}
 
 	public PopupWindow(View contentView, int width, int height, boolean focusable) {
-		popover = native_constructor();
+		this(contentView != null ? contentView.getContext() : null, null, 0, 0);
 		setContentView(contentView);
 		setWidth(width);
 		setHeight(height);
@@ -36,20 +71,14 @@ public class PopupWindow {
 		this(contentView, width, height, true);
 	}
 
-	private View contentView;
-	private Drawable background;
-	private long popover; // native pointer to GtkPopover
-
 	public interface OnDismissListener {
 		public void onDismiss();
 	}
 
 	public void setBackgroundDrawable(Drawable background) {
 		this.background = background;
-		/* FIXME: use a decorview? */
-		if (contentView != null) {
-			contentView.setBackgroundDrawable(background);
-		}
+		if (decor != null)
+			decor.setBackgroundDrawable(background);
 	}
 
 	public void setInputMethodMode(int mode) {
@@ -61,74 +90,193 @@ public class PopupWindow {
 	}
 
 	public boolean isShowing() {
-		return native_isShowing(popover);
+		return showing;
 	}
 
-	public void setFocusable(boolean focusable) {}
+	public void setFocusable(boolean focusable) {
+		this.focusable = focusable;
+	}
+
+	public boolean isFocusable() {
+		return focusable;
+	}
 
 	public Drawable getBackground() {
 		return background;
 	}
 
 	public void setContentView(View view) {
+		if (showing)
+			return;
 		contentView = view;
-		if (contentView != null) {
-			contentView.setBackground(getBackground());
-		}
-		native_setContentView(popover, view == null ? 0 : view.widget);
-	}
-
-	public int getMaxAvailableHeight(View anchor, int yOffset) { return 500; }
-
-	public int getMaxAvailableHeight(View anchor, int yOffset, boolean ignoreKeyboard) { return 500; }
-
-	public void setOutsideTouchable(boolean touchable) {
-		/* FIXME: the semantics are different, this seems to specifically exist for cases
-		 * where the popup is *not* modal, so that in addition to the window behind getting
-		 * the real event, the popup gets a special MotionEvent.ACTION_OUTSIDE event */
-		native_setTouchModal(popover, touchable);
-	}
-
-	public void setTouchInterceptor(View.OnTouchListener listener) {}
-
-	public void showAsDropDown(View anchor, int xoff, int yoff, int gravity) {
-		native_showAsDropDown(popover, anchor.widget, xoff, yoff, gravity);
+		if (context == null && view != null)
+			context = view.getContext();
 	}
 
 	public View getContentView() {
 		return contentView;
 	}
 
-	public void setTouchable(boolean touchable) {
-		native_setTouchable(popover, touchable);
+	public int getMaxAvailableHeight(View anchor, int yOffset) {
+		return getMaxAvailableHeight(anchor, yOffset, false);
+	}
+
+	public int getMaxAvailableHeight(View anchor, int yOffset, boolean ignoreKeyboard) {
+		ViewRootImpl root = rootFor(anchor);
+		if (root == null || root.getHeight() == 0)
+			return 500;
+		Rect anchorRect = new Rect();
+		anchor.getGlobalVisibleRect(anchorRect);
+		int below = root.getHeight() - anchorRect.bottom - yOffset;
+		int above = anchorRect.top + yOffset;
+		return Math.max(below, above);
+	}
+
+	public void setOutsideTouchable(boolean touchable) {}
+
+	public void setTouchInterceptor(View.OnTouchListener listener) {}
+
+	public void setTouchable(boolean touchable) {}
+
+	public void setTouchModal(boolean touchModal) {}
+
+	private ViewRootImpl rootFor(View anchor) {
+		ViewRootImpl root = anchor != null ? anchor.getViewRootImpl() : null;
+		return root != null ? root : WindowManagerGlobal.getActiveViewRoot();
+	}
+
+	private FrameLayout makeDecor() {
+		decor = new FrameLayout(context != null ? context : contentView.getContext());
+		if (background != null)
+			decor.setBackgroundDrawable(background);
+		if (contentView.getParent() instanceof ViewGroup)
+			((ViewGroup)contentView.getParent()).removeView(contentView);
+		decor.addView(contentView, new FrameLayout.LayoutParams(
+		    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		return decor;
+	}
+
+	/** measure the decor as the panel layout will, so show-position math can use real sizes */
+	private void measureDecor(ViewRootImpl root) {
+		int ws = width >= 0
+		    ? View.MeasureSpec.makeMeasureSpec(Math.min(width, root.getWidth()), View.MeasureSpec.EXACTLY)
+		    : View.MeasureSpec.makeMeasureSpec(root.getWidth(),
+		        width == ViewGroup.LayoutParams.MATCH_PARENT ? View.MeasureSpec.EXACTLY : View.MeasureSpec.AT_MOST);
+		int hs = height >= 0
+		    ? View.MeasureSpec.makeMeasureSpec(Math.min(height, root.getHeight()), View.MeasureSpec.EXACTLY)
+		    : View.MeasureSpec.makeMeasureSpec(root.getHeight(),
+		        height == ViewGroup.LayoutParams.MATCH_PARENT ? View.MeasureSpec.EXACTLY : View.MeasureSpec.AT_MOST);
+		decor.measure(ws, hs);
+	}
+
+	private void addPanel(ViewRootImpl root, int x, int y, int gravity) {
+		WindowManager.LayoutParams lp = new WindowManager.LayoutParams(width, height, 0, 0, 0);
+		lp.x = x;
+		lp.y = y;
+		lp.gravity = gravity == Gravity.NO_GRAVITY ? (Gravity.TOP | Gravity.LEFT) : gravity;
+		if (!focusable)
+			lp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+		panelParams = lp;
+		hostRoot = root;
+		root.addPanel(decor, lp, panelCallbacks);
+		showing = true;
+	}
+
+	public void showAsDropDown(View anchor) {
+		showAsDropDown(anchor, 0, 0, Gravity.NO_GRAVITY);
 	}
 
 	public void showAsDropDown(View anchor, int xoff, int yoff) {
+		showAsDropDown(anchor, xoff, yoff, Gravity.NO_GRAVITY);
+	}
+
+	public void showAsDropDown(View anchor, int xoff, int yoff, int gravity) {
+		if (showing || contentView == null)
+			return;
 		if (!anchor.isAttachedToWindow()) {
 			Log.e("PopupWindow", "anchor is not attached to window");
 			return;
 		}
-		native_showAsDropDown(popover, anchor.widget, xoff, yoff, Gravity.NO_GRAVITY);
+		ViewRootImpl root = rootFor(anchor);
+		if (root == null)
+			return;
+		makeDecor();
+		measureDecor(root);
+		Rect anchorRect = new Rect();
+		anchor.getGlobalVisibleRect(anchorRect);
+		int x = anchorRect.left + xoff;
+		if ((gravity & Gravity.RIGHT) == Gravity.RIGHT)
+			x = anchorRect.right - decor.getMeasuredWidth() + xoff;
+		int y = anchorRect.bottom + yoff;
+		// not enough room below and more above: pop up over the anchor instead
+		int h = decor.getMeasuredHeight();
+		if (y + h > root.getHeight() && anchorRect.top - h - yoff >= 0)
+			y = anchorRect.top - h - yoff;
+		addPanel(root, x, y, Gravity.TOP | Gravity.LEFT);
 	}
 
 	public void showAtLocation(View parent, int gravity, int x, int y) {
-		native_showAsDropDown(popover, parent.widget, x, y, gravity);
+		if (showing || contentView == null)
+			return;
+		ViewRootImpl root = rootFor(parent);
+		if (root == null)
+			return;
+		makeDecor();
+		addPanel(root, x, y, gravity);
 	}
 
 	public void dismiss() {
-		native_dismiss(popover);
+		if (!showing)
+			return;
+		showing = false;
+		if (hostRoot != null) {
+			hostRoot.removePanel(decor);
+			hostRoot = null;
+		}
+		if (decor != null) {
+			decor.removeAllViews(); // free the content for the next show()
+			decor = null;
+		}
+		if (onDismissListener != null)
+			onDismissListener.onDismiss();
+	}
+
+	public void setOnDismissListener(OnDismissListener listener) {
+		onDismissListener = listener;
 	}
 
 	public void setAnimationStyle(int animationStyle) {}
 
-	public void setTouchModal(boolean touchModal) {
-		native_setTouchModal(popover, touchModal);
-	}
-
 	public void setElevation(float elevation) {}
 
 	public void update(View anchor, int xoff, int yoff, int width, int height) {
-		native_update(popover, anchor.widget, xoff, yoff, width, height);
+		if (width != -1 && width != ViewGroup.LayoutParams.WRAP_CONTENT)
+			this.width = width;
+		if (height != -1 && height != ViewGroup.LayoutParams.WRAP_CONTENT)
+			this.height = height;
+		if (!showing || hostRoot == null || panelParams == null)
+			return;
+		Rect anchorRect = new Rect();
+		anchor.getGlobalVisibleRect(anchorRect);
+		panelParams.width = this.width;
+		panelParams.height = this.height;
+		panelParams.x = anchorRect.left + xoff;
+		panelParams.y = anchorRect.bottom + yoff;
+		hostRoot.updatePanel(decor, panelParams);
+	}
+
+	public void update(int x, int y, int width, int height) {
+		if (width >= 0 || width == ViewGroup.LayoutParams.MATCH_PARENT)
+			this.width = width;
+		if (height >= 0 || height == ViewGroup.LayoutParams.MATCH_PARENT)
+			this.height = height;
+		if (!showing || hostRoot == null || panelParams == null)
+			return;
+		panelParams.width = this.width;
+		panelParams.height = this.height;
+		panelParams.x = x;
+		panelParams.y = y;
+		hostRoot.updatePanel(decor, panelParams);
 	}
 
 	public void setWindowLayoutType(int type) {}
@@ -139,64 +287,29 @@ public class PopupWindow {
 
 	public void setClippingEnabled(boolean enabled) {}
 
-	/* TODO: handle LayoutParams.WRAP_CONTENT and LayoutParams.MATCH_PARENT */
 	public void setWidth(int width) {
-		if (width < 0)
-			return;
-
-		native_setWidth(popover, width);
+		this.width = width;
 	}
 
 	public void setHeight(int height) {
-		if (height < 0)
-			return;
-
-		native_setHeight(popover, height);
+		this.height = height;
 	}
 
 	public int getWidth() {
-		return native_getWidth(popover);
+		return width;
 	}
 
 	public int getHeight() {
-		return native_getHeight(popover);
+		return height;
 	}
-
-	public void update(int x, int y, int width, int height) {}
 
 	public void setWindowLayoutMode(int widthSpec, int heightSpec) {}
 
 	public boolean isTouchable() {
-		return native_isTouchable(popover);
+		return true;
 	}
 
-	public void setOverlapAnchor(boolean overlap) {
-	}
+	public void setOverlapAnchor(boolean overlap) {}
 
 	public void setSoftInputMode(int mode) {}
-
-	protected long native_constructor() {
-		return 0;
-	}
-	protected void native_setContentView(long widget, long contentView) {}
-	protected void native_showAsDropDown(long widget, long anchor, int xoff, int yoff, int gravity) {}
-	protected boolean native_isShowing(long widget) {
-		return false;
-	}
-	protected void native_setTouchable(long widget, boolean touchable) {}
-	protected void native_setTouchModal(long widget, boolean touchable) {}
-	protected void native_dismiss(long widget) {}
-	protected void native_update(long widget, long anchor, int xoff, int yoff, int width, int height) {}
-	public void setOnDismissListener(OnDismissListener listener) {}
-	public void native_setWidth(long widget, int width) {}
-	public void native_setHeight(long widget, int height) {}
-	public int native_getWidth(long widget) {
-		return 0;
-	}
-	public int native_getHeight(long widget) {
-		return 0;
-	}
-	public boolean native_isTouchable(long widget) {
-		return false;
-	}
 }

@@ -28,9 +28,6 @@ void atl_window_hide(ATLWindow *window);
 bool atl_window_is_visible(ATLWindow *window);
 void atl_window_focus(ATLWindow *window);
 int atl_window_get_width(ATLWindow *window);
-/* java object whose dismiss() is called when the user closes the window;
- * windows without one close the whole application */
-void atl_window_set_dismiss_target(ATLWindow *window, JNIEnv *env, jobject target);
 void atl_window_set_jobject(ATLWindow *window, JNIEnv *env, jobject window_obj);
 jobject atl_window_get_jobject(ATLWindow *window);
 void atl_window_focus(ATLWindow *window);

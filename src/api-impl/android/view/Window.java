@@ -96,9 +96,12 @@ public class Window {
 	 *  (re)claim it — otherwise after a child activity finishes, the resumed
 	 *  activity's view tree is never re-attached and the window stays blank. */
 	public void attachViewRoot() {
+		if (native_window == 0)
+			return; // sub-window (Dialog/popup): its decor attaches as a panel on the active root instead
 		ViewRootImpl root = getViewRootImpl();
 		root.setView(decorView);
 		native_set_view_root(native_window, root);
+		WindowManagerGlobal.setActiveViewRoot(root);
 	}
 
 	public View getDecorView() {
@@ -164,7 +167,14 @@ public class Window {
 	public void setLayout(int width, int height) {
 		params.width = width;
 		params.height = height;
-		set_layout(native_window, width, height);
+		if (native_window != 0) {
+			set_layout(native_window, width, height);
+		} else {
+			// sub-window shown as a panel: re-measure it with the new params
+			ViewRootImpl root = decorView.getViewRootImpl();
+			if (root != null)
+				root.updatePanel(decorView, params);
+		}
 	}
 
 	public WindowManager getWindowManager() {
@@ -192,7 +202,8 @@ public class Window {
 	}
 
 	public void setTitle(CharSequence title) {
-		set_title(native_window, title != null ? title.toString() : context.getPackageName());
+		if (native_window != 0)
+			set_title(native_window, title != null ? title.toString() : context.getPackageName());
 	}
 
 	public Transition getSharedElementEnterTransition() {

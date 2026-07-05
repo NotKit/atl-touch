@@ -24,7 +24,6 @@ struct ATLWindow {
 	jmethodID dispatch_touch_event;
 	jmethodID dispatch_key_event;
 	jmethodID dispatch_character;
-	jobject dismiss_target; // global ref: java Dialog to dismiss on close
 	jobject window_jobj;    // weak ref to the java android.view.Window
 	bool needs_redraw;
 	bool pointer_down;
@@ -239,20 +238,9 @@ static void on_framebuffer_size(GLFWwindow *glfw_window, int width, int height)
 
 static void on_window_close(GLFWwindow *glfw_window)
 {
-	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
-	if (window->dismiss_target) {
-		glfwSetWindowShouldClose(glfw_window, GLFW_FALSE);
-		glfwHideWindow(glfw_window);
-		JNIEnv *env = get_jni_env();
-		jmethodID dismiss = _METHOD(_CLASS(window->dismiss_target), "dismiss", "()V");
-		(*env)->CallVoidMethod(env, window->dismiss_target, dismiss);
-		if ((*env)->ExceptionCheck(env))
-			(*env)->ExceptionDescribe(env);
-	} else {
-		fprintf(stderr, "ATLWindow: window close event from compositor -> closing all activities and exiting\n");
-		activity_close_all();
-		exit(0);
-	}
+	fprintf(stderr, "ATLWindow: window close event from compositor -> closing all activities and exiting\n");
+	activity_close_all();
+	exit(0);
 }
 
 /* --- rendering: raster Skia scene blitted through GL --- */
@@ -532,11 +520,6 @@ int atl_window_get_width(ATLWindow *window)
 	int width, height;
 	glfwGetFramebufferSize(window->glfw_window, &width, &height);
 	return width;
-}
-
-void atl_window_set_dismiss_target(ATLWindow *window, JNIEnv *env, jobject target)
-{
-	window->dismiss_target = (*env)->NewGlobalRef(env, target);
 }
 
 void atl_window_set_jobject(ATLWindow *window, JNIEnv *env, jobject window_obj)
