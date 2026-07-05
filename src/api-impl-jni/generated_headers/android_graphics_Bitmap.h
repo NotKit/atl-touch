@@ -27,22 +27,6 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1canvas
 
 /*
  * Class:     android_graphics_Bitmap
- * Method:    native_create_gdk_texture
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1gdk_1texture
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_graphics_Bitmap
- * Method:    native_unref_gdk_texture
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1unref_1gdk_1texture
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_graphics_Bitmap
  * Method:    native_get_width
  * Signature: (J)I
  */
@@ -68,10 +52,10 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1erase_1color
 /*
  * Class:     android_graphics_Bitmap
  * Method:    native_recycle
- * Signature: (JJJ)V
+ * Signature: (JJ)V
  */
 JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1recycle
-  (JNIEnv *, jclass, jlong, jlong, jlong);
+  (JNIEnv *, jclass, jlong, jlong);
 
 /*
  * Class:     android_graphics_Bitmap

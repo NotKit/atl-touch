@@ -1,4 +1,4 @@
-#include <gdk/gdk.h>
+#include <gio/gio.h>
 #include <libportal/portal.h>
 
 #include "../defines.h"
@@ -12,15 +12,14 @@ static void wallpaper_ready_cb(GObject *source, GAsyncResult *res, gpointer user
 	g_object_unref(file);
 }
 
-JNIEXPORT void JNICALL Java_android_app_WallpaperManager_set_1bitmap(JNIEnv *env, jclass clazz, jlong texture_ptr)
+JNIEXPORT void JNICALL Java_android_app_WallpaperManager_set_1wallpaper(JNIEnv *env, jclass clazz, jstring path_jstr)
 {
-	GdkTexture *texture = _PTR(texture_ptr);
-	GFileIOStream *stream;
-	GFile *file = g_file_new_tmp("XXXXXX.png", &stream, NULL);
-	g_io_stream_close(G_IO_STREAM(stream), NULL, NULL);
-	g_object_unref(stream);
-	gdk_texture_save_to_png(texture, g_file_get_path(file));
+	const char *path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
+	GFile *file = g_file_new_for_path(path);
+	(*env)->ReleaseStringUTFChars(env, path_jstr, path);
 	XdpPortal *portal = xdp_portal_new();
-	xdp_portal_set_wallpaper(portal, NULL, g_file_get_uri(file), XDP_WALLPAPER_FLAG_NONE, NULL, wallpaper_ready_cb, file);
+	char *uri = g_file_get_uri(file);
+	xdp_portal_set_wallpaper(portal, NULL, uri, XDP_WALLPAPER_FLAG_NONE, NULL, wallpaper_ready_cb, file);
+	g_free(uri);
 	g_object_unref(portal);
 }

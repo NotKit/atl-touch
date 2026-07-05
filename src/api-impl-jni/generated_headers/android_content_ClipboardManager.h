@@ -17,6 +17,14 @@ extern "C" {
 JNIEXPORT void JNICALL Java_android_content_ClipboardManager_native_1set_1clipboard
   (JNIEnv *, jclass, jstring);
 
+/*
+ * Class:     android_content_ClipboardManager
+ * Method:    native_get_clipboard
+ * Signature: ()Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_content_ClipboardManager_native_1get_1clipboard
+  (JNIEnv *, jclass);
+
 #ifdef __cplusplus
 }
 #endif

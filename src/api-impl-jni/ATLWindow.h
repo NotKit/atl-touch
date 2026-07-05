@@ -33,6 +33,9 @@ int atl_window_get_width(ATLWindow *window);
 void atl_window_set_dismiss_target(ATLWindow *window, JNIEnv *env, jobject target);
 void atl_window_set_jobject(ATLWindow *window, JNIEnv *env, jobject window_obj);
 jobject atl_window_get_jobject(ATLWindow *window);
+void atl_window_focus(ATLWindow *window);
+void atl_window_set_clipboard(ATLWindow *window, const char *text);
+const char *atl_window_get_clipboard(ATLWindow *window);
 
 /* WPE WebView offscreen integration. Called from the C++ WebView module, so
  * these must keep C linkage to match their definitions in ATLWindow.c. */

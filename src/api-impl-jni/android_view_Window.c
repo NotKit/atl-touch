@@ -1,4 +1,4 @@
-#include <gtk/gtk.h>
+#include <gio/gio.h>
 
 #include "defines.h"
 #include "util.h"
@@ -18,12 +18,6 @@ JNIEXPORT void JNICALL Java_android_view_Window_set_1title(JNIEnv *env, jobject 
 	atl_window_set_title((ATLWindow *)_PTR(window), title);
 	(*env)->ReleaseStringUTFChars(env, title_jstr, title);
 }
-
-// FIXME put this in a header file
-struct input_queue {
-	int fd;
-	GtkEventController *controller;
-};
 
 JNIEXPORT void JNICALL Java_android_view_Window_take_1input_1queue(JNIEnv *env, jobject this, jlong native_window, jobject callback, jobject queue)
 {

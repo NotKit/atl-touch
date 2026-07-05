@@ -1,5 +1,7 @@
 #include <gio/gdesktopappinfo.h>
-#include <gtk/gtk.h>
+#include <gio/gio.h>
+
+#include "../ATLWindow.h"
 
 #include "../defines.h"
 #include "../util.h"
@@ -162,11 +164,12 @@ void remove_ongoing_notifications()
 static MediaPlayer2 *mpris = NULL;
 static int dbus_name_id = 0;
 extern MediaPlayer2Player *mpris_player;
-extern GtkWindow *window;
 
 static gboolean on_media_player_handle_raise(MediaPlayer2 *mpris, GDBusMethodInvocation *invocation, gpointer user_data)
 {
-	gtk_window_present(window);
+	extern ATLWindow *atl_window;
+	if (atl_window)
+		atl_window_focus(atl_window);
 	media_player2_complete_raise(mpris, invocation);
 	return TRUE;
 }
@@ -187,7 +190,7 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowMPRIS(JNIE
 		g_signal_connect(mpris, "handle-raise", G_CALLBACK(on_media_player_handle_raise), NULL);
 	}
 	const char *package_name = NULL;
-	const char *app_id = g_application_get_application_id(G_APPLICATION(gtk_window_get_application(window)));
+	const char *app_id = g_application_get_application_id(g_application_get_default());
 	if ((app_id == NULL || strcmp(app_id, "com.example.demo_application") == 0) && package_name_jstr) {
 		// fall back to package name
 		app_id = package_name = (*env)->GetStringUTFChars(env, package_name_jstr, NULL);

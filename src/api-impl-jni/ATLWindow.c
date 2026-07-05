@@ -516,6 +516,17 @@ void atl_window_focus(ATLWindow *window)
 	glfwFocusWindow(window->glfw_window);
 }
 
+void atl_window_set_clipboard(ATLWindow *window, const char *text)
+{
+	glfwSetClipboardString(window->glfw_window, text);
+}
+
+/* returns a string owned by GLFW, valid until the next clipboard call */
+const char *atl_window_get_clipboard(ATLWindow *window)
+{
+	return glfwGetClipboardString(window->glfw_window);
+}
+
 int atl_window_get_width(ATLWindow *window)
 {
 	int width, height;

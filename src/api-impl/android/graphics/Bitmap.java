@@ -8,9 +8,7 @@ import java.nio.Buffer;
 /*
  * Bitmap is implemented as an SkBitmap (the `texture` field) plus a lazily
  * created native canvas drawing into it (the `snapshot` field). Drawing
- * mutates the pixels in place, so both representations coexist. A GdkTexture
- * copy for GTK-side consumers (ImageView, backgrounds, ...) is cached in
- * `gdk_texture` and invalidated whenever the bitmap is drawn into.
+ * mutates the pixels in place, so both representations coexist.
  */
 public final class Bitmap {
 
@@ -60,7 +58,6 @@ public final class Bitmap {
 	private int stride;
 	private long texture;     // SkBitmap*
 	private long snapshot;    // ATLCanvas*
-	private long gdk_texture; // cached GdkTexture* copy for GTK consumers
 	private Config config = Config.ARGB_8888;
 	private boolean hasMipMap = false;
 	private boolean hasAlpha = true;
@@ -151,11 +148,6 @@ public final class Bitmap {
 		if (snapshot == 0) {
 			snapshot = native_create_canvas(getTexture());
 		}
-		// the pixels are about to be drawn into: drop the cached GTK copy
-		if (gdk_texture != 0) {
-			native_unref_gdk_texture(gdk_texture);
-			gdk_texture = 0;
-		}
 		return snapshot;
 	}
 
@@ -164,26 +156,15 @@ public final class Bitmap {
 		return getTexture();
 	}
 
-	public synchronized long getGdkTexture() {
-		/* always take a fresh copy: a Canvas may have drawn into the pixels
-		 * since the last call (the AOSP Canvas does not notify us) */
-		if (gdk_texture != 0) {
-			native_unref_gdk_texture(gdk_texture);
-		}
-		gdk_texture = native_create_gdk_texture(getTexture());
-		return gdk_texture;
-	}
-
 	public void eraseColor(int color) {
-		getSnapshot(); // invalidates the cached GdkTexture
+		getSnapshot();
 		native_erase_color(getTexture(), color);
 	}
 
 	public void recycle() {
-		native_recycle(texture, snapshot, gdk_texture);
+		native_recycle(texture, snapshot);
 		texture = 0;
 		snapshot = 0;
-		gdk_texture = 0;
 		recycled = true;
 	}
 
@@ -296,7 +277,7 @@ public final class Bitmap {
 	}
 
 	public void setPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
-		getSnapshot(); // invalidates the cached GdkTexture
+		getSnapshot();
 		native_set_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
 	}
 
@@ -326,12 +307,10 @@ public final class Bitmap {
 
 	private static native long native_create_bitmap(int width, int height, int stride, int format);
 	private static native long native_create_canvas(long bitmap);
-	private static native long native_create_gdk_texture(long bitmap);
-	private static native void native_unref_gdk_texture(long gdk_texture);
 	private static native int native_get_width(long bitmap);
 	private static native int native_get_height(long bitmap);
 	private static native void native_erase_color(long bitmap, int color);
-	private static native void native_recycle(long bitmap, long canvas, long gdk_texture);
+	private static native void native_recycle(long bitmap, long canvas);
 	private static native long native_copy_bitmap(long bitmap);
 	private static native void native_get_pixels(long bitmap, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native void native_copy_to_buffer(long bitmap, Buffer buffer, int format, int stride);

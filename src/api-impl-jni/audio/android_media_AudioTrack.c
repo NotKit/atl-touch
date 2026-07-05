@@ -1,4 +1,4 @@
-#include <gtk/gtk.h>
+#include <glib.h>
 
 #include <alsa/asoundlib.h>
 #include <stdint.h>

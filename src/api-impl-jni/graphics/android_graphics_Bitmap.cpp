@@ -17,9 +17,9 @@ extern "C" {
 
 /*
  * Bitmap is implemented as an SkBitmap (the `texture` field) plus a lazily
- * created ATLCanvas drawing into it (the `snapshot` field). Unlike the
- * GdkTexture/GtkSnapshot model, both coexist: drawing mutates the pixels in
- * place, so no conversion between the two is ever needed.
+ * created ATLCanvas drawing into it (the `snapshot` field). Both coexist:
+ * drawing mutates the pixels in place, so no conversion between the two is
+ * ever needed.
  */
 
 /* ANDROID_BITMAP_FORMAT_* values, as stored in Bitmap.Config */
@@ -60,23 +60,6 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1canvas(JNIE
 	return _INTPTR(ATLCanvas::for_bitmap((SkBitmap *)_PTR(bitmap_ptr)));
 }
 
-JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1gdk_1texture(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
-{
-	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
-	if (bitmap->colorType() == kRGBA_8888_SkColorType)
-		return _INTPTR(atl_skbitmap_to_gdk_texture(bitmap));
-	/* convert other formats to RGBA8888 first */
-	SkBitmap converted;
-	converted.allocPixels(SkImageInfo::Make(bitmap->width(), bitmap->height(), kRGBA_8888_SkColorType, kPremul_SkAlphaType));
-	bitmap->readPixels(converted.pixmap());
-	return _INTPTR(atl_skbitmap_to_gdk_texture(&converted));
-}
-
-JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1unref_1gdk_1texture(JNIEnv *env, jclass clazz, jlong texture_ptr)
-{
-	g_object_unref(GDK_TEXTURE(_PTR(texture_ptr)));
-}
-
 JNIEXPORT jint JNICALL Java_android_graphics_Bitmap_native_1get_1width(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
 {
 	return ((SkBitmap *)_PTR(bitmap_ptr))->width();
@@ -92,14 +75,12 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1erase_1color(JNIEnv 
 	((SkBitmap *)_PTR(bitmap_ptr))->eraseColor((SkColor)(uint32_t)color);
 }
 
-JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1recycle(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jlong canvas_ptr, jlong gdk_texture_ptr)
+JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1recycle(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jlong canvas_ptr)
 {
 	if (canvas_ptr)
 		delete (ATLCanvas *)_PTR(canvas_ptr);
 	if (bitmap_ptr)
 		delete (SkBitmap *)_PTR(bitmap_ptr);
-	if (gdk_texture_ptr)
-		g_object_unref(GDK_TEXTURE(_PTR(gdk_texture_ptr)));
 }
 
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1copy_1bitmap(JNIEnv *env, jclass clazz, jlong bitmap_ptr)

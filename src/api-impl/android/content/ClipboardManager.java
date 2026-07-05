@@ -84,7 +84,8 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * Returns the current primary clip on the clipboard.
 	 */
 	public ClipData getPrimaryClip() {
-		return null;
+		String text = native_get_clipboard();
+		return text != null ? ClipData.newPlainText(null, text) : null;
 	}
 	/**
 	 * Returns a description of the current primary clip on the clipboard
@@ -97,7 +98,8 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * Returns true if there is currently a primary clip on the clipboard.
 	 */
 	public boolean hasPrimaryClip() {
-		return false;
+		String text = native_get_clipboard();
+		return text != null && !text.isEmpty();
 	}
 	public void addPrimaryClipChangedListener(OnPrimaryClipChangedListener what) {
 	}
@@ -108,7 +110,7 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * the primary clip and tries to coerce it to a string.
 	 */
 	public CharSequence getText() {
-		return null;
+		return native_get_clipboard();
 	}
 	/**
 	 * @deprecated Use {@link #setPrimaryClip(ClipData)} instead.  This
@@ -116,15 +118,18 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * primary clip.  It has no label or icon.
 	 */
 	public void setText(CharSequence text) {
+		native_set_clipboard(text != null ? text.toString() : "");
 	}
 	/**
 	 * @deprecated Use {@link #hasPrimaryClip()} instead.
 	 */
 	public boolean hasText() {
-		return false;
+		String text = native_get_clipboard();
+		return text != null && !text.isEmpty();
 	}
 	void reportPrimaryClipChanged() {
 	}
 
 	public static native void native_set_clipboard(String text);
+	public static native String native_get_clipboard();
 }

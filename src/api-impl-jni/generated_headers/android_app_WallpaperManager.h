@@ -9,11 +9,11 @@ extern "C" {
 #endif
 /*
  * Class:     android_app_WallpaperManager
- * Method:    set_bitmap
- * Signature: (J)V
+ * Method:    set_wallpaper
+ * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_android_app_WallpaperManager_set_1bitmap
-  (JNIEnv *, jclass, jlong);
+JNIEXPORT void JNICALL Java_android_app_WallpaperManager_set_1wallpaper
+  (JNIEnv *, jclass, jstring);
 
 #ifdef __cplusplus
 }

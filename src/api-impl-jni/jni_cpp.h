@@ -7,7 +7,7 @@
  * layout and linkage are unaffected.
  */
 
-#include <gtk/gtk.h>
+#include <glib.h>
 #include <jni.h>
 
 #define class klass

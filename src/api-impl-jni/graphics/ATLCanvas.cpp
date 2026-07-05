@@ -1,7 +1,5 @@
 #include "ATLCanvas.h"
 
-#include <gtk/gtk.h>
-
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkSamplingOptions.h"
 #include "include/core/SkImageInfo.h"
@@ -126,36 +124,5 @@ extern "C" const void *atl_canvas_get_pixels(void *atl_canvas, int *width, int *
 	*height = bitmap->height();
 	*stride = (int)bitmap->rowBytes();
 	return bitmap->getPixels();
-}
-
-extern "C" GdkTexture *atl_skbitmap_to_gdk_texture(void *skbitmap)
-{
-	SkBitmap *bitmap = (SkBitmap *)skbitmap;
-	GBytes *bytes = g_bytes_new(bitmap->getPixels(), bitmap->computeByteSize());
-	GdkTexture *texture = gdk_memory_texture_new(bitmap->width(), bitmap->height(),
-	                                             GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, bytes, bitmap->rowBytes());
-	g_bytes_unref(bytes);
-	return texture;
-}
-
-extern "C" GdkTexture *atl_canvas_to_gdk_texture(void *atl_canvas)
-{
-	return atl_skbitmap_to_gdk_texture(((ATLCanvas *)atl_canvas)->bitmap);
-}
-
-extern "C" void *atl_skbitmap_from_gdk_texture(GdkTexture *texture)
-{
-	SkBitmap *bitmap = (SkBitmap *)g_object_get_data(G_OBJECT(texture), "atl-skbitmap");
-	if (bitmap)
-		return bitmap;
-	bitmap = new SkBitmap();
-	bitmap->allocPixels(atl_image_info(gdk_texture_get_width(texture), gdk_texture_get_height(texture)));
-	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
-	gdk_texture_downloader_set_format(downloader, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED);
-	gdk_texture_downloader_download_into(downloader, (guchar *)bitmap->getPixels(), bitmap->rowBytes());
-	gdk_texture_downloader_free(downloader);
-	g_object_set_data_full(G_OBJECT(texture), "atl-skbitmap", bitmap,
-	                       [](gpointer data) { delete (SkBitmap *)data; });
-	return bitmap;
 }
 
