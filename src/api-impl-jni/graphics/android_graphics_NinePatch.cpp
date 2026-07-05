@@ -6,6 +6,7 @@
 #include "../defines.h"
 #include "ATLCanvas.h"
 #include "AndroidPaint.h"
+#include "NinePatchChunk.h"
 
 #include "include/core/SkCanvas.h"
 #include "include/core/SkSamplingOptions.h"
@@ -22,21 +23,6 @@ extern "C" {
  * the struct), as produced by validateNinePatchChunk().
  */
 
-struct Res_png_9patch {
-	int8_t wasDeserialized;
-	uint8_t numXDivs;
-	uint8_t numYDivs;
-	uint8_t numColors;
-	// Offsets (from the start of this structure) to the xDivs, yDivs and
-	// colors arrays. The serialized (aapt/PNG file) form places the arrays
-	// immediately after the struct in network byte order.
-	uint32_t xDivsOffset;
-	uint32_t yDivsOffset;
-	int32_t paddingLeft, paddingRight;
-	int32_t paddingTop, paddingBottom;
-	uint32_t colorsOffset;
-} __attribute__((packed));
-
 enum {
 	// The 9 patch segment is not a solid color.
 	NO_COLOR = 0x00000001,
@@ -47,7 +33,7 @@ enum {
 /* Validate the chunk bytes and return a malloc'd host-endian copy, or NULL.
  * Handles both the serialized form (network order, offsets relative to the
  * struct) and the already-deserialized form. */
-static struct Res_png_9patch *ninepatch_chunk_parse(const uint8_t *data, uint32_t size)
+struct Res_png_9patch *atl_ninepatch_chunk_parse(const uint8_t *data, uint32_t size)
 {
 	if (size < sizeof(struct Res_png_9patch) || size > 1024 * 1024)
 		return NULL;
@@ -106,7 +92,7 @@ JNIEXPORT jlong JNICALL Java_android_graphics_NinePatch_validateNinePatchChunk(J
 {
 	uint32_t size = env->GetArrayLength(chunk_array);
 	jbyte *data = env->GetByteArrayElements(chunk_array, NULL);
-	struct Res_png_9patch *chunk = ninepatch_chunk_parse((const uint8_t *)data, size);
+	struct Res_png_9patch *chunk = atl_ninepatch_chunk_parse((const uint8_t *)data, size);
 	env->ReleaseByteArrayElements(chunk_array, data, JNI_ABORT);
 	if (!chunk) {
 		jclass exception = env->FindClass("java/lang/RuntimeException");

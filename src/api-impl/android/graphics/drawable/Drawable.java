@@ -34,6 +34,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Insets;
+import android.graphics.NinePatch;
 import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
@@ -1081,10 +1082,8 @@ public abstract class Drawable {
 	 * Create a drawable from an inputstream, using the given resources and
 	 * value to determine density information.
 	 *
-	 * ATL: AOSP decodes through ImageDecoder (opts == null) or a ninepatch-aware
-	 * BitmapFactory path (opts != null); our BitmapFactory JNI does not extract
-	 * the npTc chunk yet, so compiled .9.png resources are materialized to disk
-	 * and parsed by NinePatchDrawable itself.
+	 * ATL: AOSP decodes through ImageDecoder here; we use the ninepatch-aware
+	 * BitmapFactory path (the JNI extracts the npTc chunk during decode).
 	 *
 	 * @deprecated Prefer the version without an Options object.
 	 */
@@ -1095,39 +1094,23 @@ public abstract class Drawable {
 			return null;
 		}
 
-		if (srcName == null || !srcName.endsWith(".9.png")) {
-			Rect pad = new Rect();
-			Bitmap bm = BitmapFactory.decodeResourceStream(res, value, is, pad, opts);
-			if (bm != null) {
-				return new BitmapDrawable(res, bm);
+		Rect pad = new Rect();
+		Bitmap bm = BitmapFactory.decodeResourceStream(res, value, is, pad, opts);
+		if (bm != null) {
+			byte[] np = bm.getNinePatchChunk();
+			if (np == null || !NinePatch.isNinePatchChunk(np)) {
+				np = null;
+				pad = null;
 			}
-			return null;
-		}
 
-		/* ninepatch: materialize the compiled .9.png so the native chunk
-		 * parser can read it */
-		java.nio.file.Path path = java.nio.file.Paths.get(
-		    android.os.Environment.getExternalStorageDirectory().getPath(), srcName);
-		if (!java.nio.file.Files.exists(path)) {
-			try {
-				java.nio.file.Files.createDirectories(path.getParent());
-				java.nio.file.Files.copy(is, path);
-			} catch (IOException e) {
-				Log.e("Drawable", "failed to materialize " + srcName, e);
-				return null;
-			}
+			return drawableFromBitmap(res, bm, np, pad, null, srcName);
 		}
-		return new NinePatchDrawable(path.toString());
+		return null;
 	}
 
 	private static Drawable getBitmapDrawable(Resources res, @Nullable TypedValue value,
 	                                          @NonNull InputStream is) {
-		Rect pad = new Rect();
-		Bitmap bm = BitmapFactory.decodeResourceStream(res, value, is, pad, null);
-		if (bm != null) {
-			return new BitmapDrawable(res, bm);
-		}
-		return null;
+		return createFromResourceStream(res, value, is, null, null);
 	}
 
 	/**

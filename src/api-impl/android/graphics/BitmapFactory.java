@@ -596,8 +596,13 @@ public class BitmapFactory {
 			tempStorage = opts.inTempStorage;
 		if (tempStorage == null)
 			tempStorage = new byte[DECODE_BUFFER_SIZE];
-		final long texture = nativeDecodeStream(is, tempStorage, outPadding, opts);
-		return texture == 0 ? null : new Bitmap(texture);
+		final byte[][] ninePatchChunk = new byte[1][];
+		final long texture = nativeDecodeStream(is, tempStorage, outPadding, opts, ninePatchChunk);
+		if (texture == 0)
+			return null;
+		Bitmap bm = new Bitmap(texture);
+		bm.mNinePatchChunk = ninePatchChunk[0];
+		return bm;
 	}
 
 	/**
@@ -671,7 +676,7 @@ public class BitmapFactory {
 	}
 
 	private static native long nativeDecodeStream(InputStream is, byte[] storage,
-	                                              Rect padding, Options opts);
+	                                              Rect padding, Options opts, byte[][] ninePatchChunk);
 	private static native Bitmap nativeDecodeFileDescriptor(FileDescriptor fd,
 	                                                        Rect padding, Options opts);
 	private static native Bitmap nativeDecodeAsset(int asset, Rect padding, Options opts);

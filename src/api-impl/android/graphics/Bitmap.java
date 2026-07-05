@@ -211,6 +211,13 @@ public final class Bitmap {
 		this.hasMipMap = hasMipMap;
 	}
 
+	/* npTc chunk from a compiled .9.png, set by BitmapFactory */
+	byte[] mNinePatchChunk;
+
+	public byte[] getNinePatchChunk() {
+		return mNinePatchChunk;
+	}
+
 	public boolean hasMipMap() {
 		return hasMipMap;
 	}
