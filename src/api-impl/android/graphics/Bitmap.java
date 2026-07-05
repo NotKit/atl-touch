@@ -222,12 +222,28 @@ public final class Bitmap {
 		return hasMipMap;
 	}
 
-	public int getScaledWidth(int density) {
-		return width;
+	public int getScaledWidth(int targetDensity) {
+		return scaleFromDensity(width, mDensity, targetDensity);
 	}
 
-	public int getScaledHeight(int density) {
-		return height;
+	public int getScaledHeight(int targetDensity) {
+		return scaleFromDensity(height, mDensity, targetDensity);
+	}
+
+	public int getScaledWidth(Canvas canvas) {
+		return scaleFromDensity(width, mDensity, canvas.getDensity());
+	}
+
+	public int getScaledHeight(Canvas canvas) {
+		return scaleFromDensity(height, mDensity, canvas.getDensity());
+	}
+
+	public int getScaledWidth(DisplayMetrics metrics) {
+		return scaleFromDensity(width, mDensity, metrics.densityDpi);
+	}
+
+	public int getScaledHeight(DisplayMetrics metrics) {
+		return scaleFromDensity(height, mDensity, metrics.densityDpi);
 	}
 
 	public boolean isRecycled() {

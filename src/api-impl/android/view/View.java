@@ -1401,9 +1401,17 @@ public class View implements Drawable.Callback {
 		Slog.w(TAG, "calling setPressed on " + this + " with value: " + pressed);
 		if (this.pressed != pressed) {
 			this.pressed = pressed;
-			if (background != null && background.isStateful())
-				background.setState(getDrawableState());
+			drawableStateChanged();
 		}
+	}
+
+	/* minimal version of AOSP's drawable state plumbing: push the current
+	 * state to the stateful drawables this view owns; subclasses with more
+	 * drawables (e.g. TextView's compound drawables) override this */
+	protected void drawableStateChanged() {
+		final int[] state = getDrawableState();
+		if (background != null && background.isStateful() && background.setState(state))
+			invalidate();
 	}
 
 	public void setSelected(boolean selected) {}
@@ -1596,6 +1604,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public void refreshDrawableState() {
+		drawableStateChanged();
 	}
 
 	public void setDescendantFocusability(int value) {}

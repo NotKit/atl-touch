@@ -522,6 +522,17 @@ public class TextView extends View {
 		return drawableTint;
 	}
 
+	@Override
+	protected void drawableStateChanged() {
+		super.drawableStateChanged();
+		final int[] state = getDrawableState();
+		final Drawable[] drawables = {drawableLeft, drawableTop, drawableRight, drawableBottom};
+		for (Drawable dr : drawables) {
+			if (dr != null && dr.isStateful() && dr.setState(state))
+				invalidate();
+		}
+	}
+
 	public void setAllCaps(boolean allCaps) {
 		String[] classesToRemove = {"ATL-text-uppercase"};
 		native_removeClasses(widget, classesToRemove);

@@ -509,28 +509,26 @@ public class BitmapFactory {
 
 	/**
 	 * Set the newly decoded bitmap's density based on the Options.
+	 *
+	 * ATL note: unlike AOSP, the decode itself never pre-scales pixels, so a
+	 * density-tagged bitmap keeps its source dimensions; consumers scale via
+	 * Bitmap.getScaledWidth/Height and shader matrices (like unscaled AOSP
+	 * decodes).
 	 */
-	private static void setDensityFromOptions(Bitmap outputBitmap, Options opts) { /*
-	     if (outputBitmap == null || opts == null) return;
+	private static void setDensityFromOptions(Bitmap outputBitmap, Options opts) {
+		if (outputBitmap == null || opts == null) return;
 
-	     final int density = opts.inDensity;
-	     if (density != 0) {
-		 outputBitmap.setDensity(density);
-		 final int targetDensity = opts.inTargetDensity;
-		 if (targetDensity == 0 || density == targetDensity || density == opts.inScreenDensity) {
-		     return;
-		 }
-
-		 byte[] np = outputBitmap.getNinePatchChunk();
-		 final boolean isNinePatch = np != null && NinePatch.isNinePatchChunk(np);
-		 if (opts.inScaled || isNinePatch) {
-		     outputBitmap.setDensity(targetDensity);
-		 }
-	     } else if (opts.inBitmap != null) {
-		 // bitmap was reused, ensure density is reset
-		 outputBitmap.setDensity(Bitmap.getDefaultDensity());
-	     }
-	 */
+		final int density = opts.inDensity;
+		if (density != 0) {
+			outputBitmap.setDensity(density);
+			final int targetDensity = opts.inTargetDensity;
+			if (targetDensity == 0 || density == targetDensity || density == opts.inScreenDensity) {
+				return;
+			}
+		} else if (opts.inBitmap != null) {
+			// bitmap was reused, ensure density is reset
+			outputBitmap.setDensity(Bitmap.getDefaultDensity());
+		}
 	}
 
 	/**
