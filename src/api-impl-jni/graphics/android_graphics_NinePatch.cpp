@@ -66,21 +66,25 @@ struct Res_png_9patch *atl_ninepatch_chunk_parse(const uint8_t *data, uint32_t s
 
 	if (!chunk->wasDeserialized) {
 		/* A raw npTc chunk straight from the PNG file stores its multi-byte
-		 * fields — the div/color arrays AND the padding — in network order.
-		 * (The offsets are recomputed above, so they don't need swapping.)
-		 * Padding is usually 0, where the swap is a no-op, which is why a
-		 * non-zero padding like a Material box's 4px bottom is the first place
-		 * a missing swap shows up: 0x04000000 instead of 4. */
+		 * fields — the div/color arrays AND the four padding ints — in network
+		 * order. This mirrors AOSP's Res_png_9patch::fileToDevice()
+		 * (ResourceTypes.cpp), which ntohl's xDivs, yDivs, the paddings, then
+		 * colors; NinePatchPeeker::readChunk calls it right after capturing the
+		 * chunk during decode, exactly as we do here. (Offsets are recomputed
+		 * above, so they don't need swapping.) Padding is usually 0, where the
+		 * swap is a no-op — which is why a non-zero padding like a Material
+		 * text-box's 4px bottom was the first place the missing padding swap
+		 * showed up: 0x04000000 instead of 4. */
 		for (int i = 0; i < chunk->numXDivs; i++)
 			xDivs[i] = ntohl(xDivs[i]);
 		for (int i = 0; i < chunk->numYDivs; i++)
 			yDivs[i] = ntohl(yDivs[i]);
-		for (int i = 0; i < chunk->numColors; i++)
-			colors[i] = ntohl(colors[i]);
 		chunk->paddingLeft = ntohl(chunk->paddingLeft);
 		chunk->paddingRight = ntohl(chunk->paddingRight);
 		chunk->paddingTop = ntohl(chunk->paddingTop);
 		chunk->paddingBottom = ntohl(chunk->paddingBottom);
+		for (int i = 0; i < chunk->numColors; i++)
+			colors[i] = ntohl(colors[i]);
 		chunk->wasDeserialized = 1;
 	}
 
