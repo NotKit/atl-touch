@@ -95,6 +95,23 @@ public class TextView extends View {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
 				setAllCaps(allCaps);
 			}
+
+			Drawable left = a.getDrawable(com.android.internal.R.styleable.TextView_drawableLeft);
+			Drawable top = a.getDrawable(com.android.internal.R.styleable.TextView_drawableTop);
+			Drawable right = a.getDrawable(com.android.internal.R.styleable.TextView_drawableRight);
+			Drawable bottom = a.getDrawable(com.android.internal.R.styleable.TextView_drawableBottom);
+			// LTR only: start/end alias left/right and win over them
+			Drawable start = a.getDrawable(com.android.internal.R.styleable.TextView_drawableStart);
+			Drawable end = a.getDrawable(com.android.internal.R.styleable.TextView_drawableEnd);
+			if (start != null)
+				left = start;
+			if (end != null)
+				right = end;
+			if (a.hasValue(com.android.internal.R.styleable.TextView_drawableTint))
+				drawableTint = a.getColorStateList(com.android.internal.R.styleable.TextView_drawableTint);
+			drawablePadding = a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_drawablePadding, drawablePadding);
+			if (left != null || top != null || right != null || bottom != null)
+				setCompoundDrawablesWithIntrinsicBounds(left, top, right, bottom);
 		} catch (java.lang.Exception e) {
 			System.out.println("exception while inflating TextView:");
 			e.printStackTrace();
@@ -127,7 +144,9 @@ public class TextView extends View {
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
 		int widthSize = MeasureSpec.getSize(widthMeasureSpec);
-		int desiredWidth = (int)Math.ceil(Layout.getDesiredWidth(text, paint)) + paddingLeft + paddingRight;
+		final int hPadding = getCompoundPaddingLeft() + getCompoundPaddingRight();
+		final int vPadding = getCompoundPaddingTop() + getCompoundPaddingBottom();
+		int desiredWidth = (int)Math.ceil(Layout.getDesiredWidth(text, paint)) + hPadding;
 		int width;
 		if (widthMode == MeasureSpec.EXACTLY)
 			width = widthSize;
@@ -135,19 +154,70 @@ public class TextView extends View {
 			width = Math.min(Math.max(desiredWidth, getSuggestedMinimumWidth()), widthSize);
 		else
 			width = Math.max(desiredWidth, getSuggestedMinimumWidth());
-		text_layout = makeLayout(Math.max(0, width - paddingLeft - paddingRight));
-		int desiredHeight = text_layout.getHeight() + paddingTop + paddingBottom;
+		text_layout = makeLayout(Math.max(0, width - hPadding));
+		int desiredHeight = text_layout.getHeight() + vPadding;
+		/* a left/right drawable may be taller than the text */
+		if (drawableLeft != null)
+			desiredHeight = Math.max(desiredHeight, drawableLeft.getBounds().height() + paddingTop + paddingBottom);
+		if (drawableRight != null)
+			desiredHeight = Math.max(desiredHeight, drawableRight.getBounds().height() + paddingTop + paddingBottom);
 		setMeasuredDimension(width, resolveSize(Math.max(desiredHeight, getSuggestedMinimumHeight()), heightMeasureSpec));
+	}
+
+	/* draw the compound drawables like AOSP: left/right at the raw view
+	 * padding, centered vertically within the content area; top/bottom
+	 * centered horizontally */
+	private void drawCompoundDrawables(Canvas canvas) {
+		if (drawableLeft == null && drawableTop == null && drawableRight == null && drawableBottom == null)
+			return;
+		final int compoundPaddingLeft = getCompoundPaddingLeft();
+		final int compoundPaddingTop = getCompoundPaddingTop();
+		final int compoundPaddingRight = getCompoundPaddingRight();
+		final int compoundPaddingBottom = getCompoundPaddingBottom();
+		final int vspace = getHeight() - compoundPaddingBottom - compoundPaddingTop;
+		final int hspace = getWidth() - compoundPaddingRight - compoundPaddingLeft;
+
+		if (drawableLeft != null) {
+			canvas.save();
+			canvas.translate(paddingLeft,
+			                 compoundPaddingTop + (vspace - drawableLeft.getBounds().height()) / 2);
+			drawableLeft.draw(canvas);
+			canvas.restore();
+		}
+		if (drawableRight != null) {
+			canvas.save();
+			canvas.translate(getWidth() - paddingRight - drawableRight.getBounds().width(),
+			                 compoundPaddingTop + (vspace - drawableRight.getBounds().height()) / 2);
+			drawableRight.draw(canvas);
+			canvas.restore();
+		}
+		if (drawableTop != null) {
+			canvas.save();
+			canvas.translate(compoundPaddingLeft + (hspace - drawableTop.getBounds().width()) / 2,
+			                 paddingTop);
+			drawableTop.draw(canvas);
+			canvas.restore();
+		}
+		if (drawableBottom != null) {
+			canvas.save();
+			canvas.translate(compoundPaddingLeft + (hspace - drawableBottom.getBounds().width()) / 2,
+			                 getHeight() - paddingBottom - drawableBottom.getBounds().height());
+			drawableBottom.draw(canvas);
+			canvas.restore();
+		}
 	}
 
 	@Override
 	public void onDraw(Canvas canvas) {
+		drawCompoundDrawables(canvas);
+		final int compoundPaddingLeft = getCompoundPaddingLeft();
+		final int compoundPaddingTop = getCompoundPaddingTop();
 		if (text_layout == null)
-			text_layout = makeLayout(Math.max(0, getWidth() - paddingLeft - paddingRight));
-		float tx = paddingLeft;
-		float ty = paddingTop;
-		int innerWidth = getWidth() - paddingLeft - paddingRight;
-		int innerHeight = getHeight() - paddingTop - paddingBottom;
+			text_layout = makeLayout(Math.max(0, getWidth() - compoundPaddingLeft - getCompoundPaddingRight()));
+		float tx = compoundPaddingLeft;
+		float ty = compoundPaddingTop;
+		int innerWidth = getWidth() - compoundPaddingLeft - getCompoundPaddingRight();
+		int innerHeight = getHeight() - compoundPaddingTop - getCompoundPaddingBottom();
 		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
 		if (verticalGravity == Gravity.CENTER_VERTICAL)
 			ty += Math.max(0, (innerHeight - text_layout.getHeight()) / 2);
@@ -335,26 +405,121 @@ public class TextView extends View {
 		return gravity;
 	}
 
-	public int getCompoundPaddingTop() { return 0; }
-	public int getCompoundPaddingBottom() { return 0; }
+	/* compound drawables (AOSP TextView.Drawables, LTR-only: start==left, end==right) */
+	private Drawable drawableLeft = null;
+	private Drawable drawableTop = null;
+	private Drawable drawableRight = null;
+	private Drawable drawableBottom = null;
+	private int drawablePadding = 0;
+	private ColorStateList drawableTint = null;
+
+	/* the compound padding is the view padding plus the space taken by the
+	 * drawable (its bounds) and the drawable padding on that edge */
+	public int getCompoundPaddingLeft() {
+		return paddingLeft + (drawableLeft != null ? drawablePadding + drawableLeft.getBounds().width() : 0);
+	}
+
+	public int getCompoundPaddingRight() {
+		return paddingRight + (drawableRight != null ? drawablePadding + drawableRight.getBounds().width() : 0);
+	}
+
+	public int getCompoundPaddingTop() {
+		return paddingTop + (drawableTop != null ? drawablePadding + drawableTop.getBounds().height() : 0);
+	}
+
+	public int getCompoundPaddingBottom() {
+		return paddingBottom + (drawableBottom != null ? drawablePadding + drawableBottom.getBounds().height() : 0);
+	}
 
 	public CharSequence getText() {
 		return text;
 	};
 
-	public void setCompoundDrawablePadding(int pad) {}
+	public void setCompoundDrawablePadding(int pad) {
+		if (pad != drawablePadding) {
+			drawablePadding = pad;
+			text_layout = null;
+			requestLayout();
+			invalidate();
+		}
+	}
 
-	// TODO: draw these in onDraw like AOSP TextView.Drawables
-	private Drawable drawableLeft = null;
-	private Drawable drawableTop = null;
-	private Drawable drawableRight = null;
-	private Drawable drawableBottom = null;
+	public int getCompoundDrawablePadding() {
+		return drawablePadding;
+	}
+
+	private Drawable applyCompoundTint(Drawable dr) {
+		if (dr != null) {
+			dr.setCallback(this);
+			dr.setState(getDrawableState());
+			if (drawableTint != null)
+				dr.setTintList(drawableTint);
+		}
+		return dr;
+	}
 
 	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
-		drawableLeft = left;
-		drawableTop = top;
-		drawableRight = right;
-		drawableBottom = bottom;
+		drawableLeft = applyCompoundTint(left);
+		drawableTop = applyCompoundTint(top);
+		drawableRight = applyCompoundTint(right);
+		drawableBottom = applyCompoundTint(bottom);
+		text_layout = null;
+		requestLayout();
+		invalidate();
+	}
+
+	public void setCompoundDrawablesWithIntrinsicBounds(Drawable left, Drawable top, Drawable right, Drawable bottom) {
+		if (left != null)
+			left.setBounds(0, 0, left.getIntrinsicWidth(), left.getIntrinsicHeight());
+		if (top != null)
+			top.setBounds(0, 0, top.getIntrinsicWidth(), top.getIntrinsicHeight());
+		if (right != null)
+			right.setBounds(0, 0, right.getIntrinsicWidth(), right.getIntrinsicHeight());
+		if (bottom != null)
+			bottom.setBounds(0, 0, bottom.getIntrinsicWidth(), bottom.getIntrinsicHeight());
+		setCompoundDrawables(left, top, right, bottom);
+	}
+
+	public void setCompoundDrawablesWithIntrinsicBounds(int left, int top, int right, int bottom) {
+		final Context context = getContext();
+		setCompoundDrawablesWithIntrinsicBounds(
+		    left != 0 ? context.getDrawable(left) : null,
+		    top != 0 ? context.getDrawable(top) : null,
+		    right != 0 ? context.getDrawable(right) : null,
+		    bottom != 0 ? context.getDrawable(bottom) : null);
+	}
+
+	public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start, Drawable top, Drawable end, Drawable bottom) {
+		setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
+	}
+
+	public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start, int top, int end, int bottom) {
+		setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
+	}
+
+	public Drawable[] getCompoundDrawables() {
+		return new Drawable[] {drawableLeft, drawableTop, drawableRight, drawableBottom};
+	}
+
+	public Drawable[] getCompoundDrawablesRelative() {
+		return getCompoundDrawables();
+	}
+
+	public void setCompoundDrawableTintList(ColorStateList tint) {
+		drawableTint = tint;
+		if (drawableLeft != null)
+			drawableLeft.setTintList(tint);
+		if (drawableTop != null)
+			drawableTop.setTintList(tint);
+		if (drawableRight != null)
+			drawableRight.setTintList(tint);
+		if (drawableBottom != null)
+			drawableBottom.setTintList(tint);
+		invalidate();
+	}
+
+	public ColorStateList getCompoundDrawableTintList() {
+		return drawableTint;
 	}
 
 	public void setAllCaps(boolean allCaps) {
@@ -422,7 +587,7 @@ public class TextView extends View {
 
 	public Layout getLayout() {
 		if (text_layout == null)
-			text_layout = makeLayout(Math.max(0, getWidth() - paddingLeft - paddingRight));
+			text_layout = makeLayout(Math.max(0, getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight()));
 		return text_layout;
 	}
 
@@ -432,33 +597,17 @@ public class TextView extends View {
 
 	public void setSingleLine(boolean singleLine) {}
 
-	public int getCompoundPaddingLeft() { return 0; }
-
-	public int getCompoundPaddingRight() { return 0; }
-
 	public void setHint(int resId) {
 		setHint(getContext().getResources().getText(resId));
 	}
 
 	public float getLetterSpacing() { return 0.f; }
 
-	public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start, int top, int end, int bottom) {}
-
-	public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start, Drawable top, Drawable end, Drawable bottom) {}
-
 	public boolean getLinksClickable() { return true; }
 
 	public boolean isTextSelectable() { return true; }
 
-	public void setCompoundDrawablesWithIntrinsicBounds(int left, int top, int right, int bottom) {}
-
-	public void setCompoundDrawablesWithIntrinsicBounds(Drawable left, Drawable top, Drawable right, Drawable bottom) {}
-
 	public void setHint(CharSequence s) {}
-
-	public Drawable[] getCompoundDrawablesRelative() { return new Drawable[4]; }
-
-	public Drawable[] getCompoundDrawables() { return new Drawable[4]; }
 
 	public void setTextAppearance(int appearance) {
 		applyTextAppearance(getContext(), appearance);
@@ -500,8 +649,6 @@ public class TextView extends View {
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
 
-	public int getCompoundDrawablePadding() { return 0; }
-
 	public int getPaintFlags() { return 0; }
 
 	public void setPaintFlags(int flags) {}
@@ -521,8 +668,6 @@ public class TextView extends View {
 	}
 
 	public void setAutoSizeTextTypeUniformWithPresetSizes(int[] presetSizes, int unit) {}
-
-	public void setCompoundDrawableTintList(ColorStateList tint) {}
 
 	public int getHyphenationFrequency() {
 		return hyphenation_frequency;
