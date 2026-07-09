@@ -13,10 +13,21 @@
  * A GPU->CPU readback per frame is deliberate: ATL's Skia scene is raster, so
  * this is the simplest correct path. Zero-copy texture compositing would need
  * Skia on a Ganesh/GPU backend and is a later optimization.
+ *
+ * When there is no GPU (Mesa swrast/llvmpipe, e.g. a headless VPS), the EGLImage
+ * path is not just slow but broken: WebKit exports dmabuf-backed wl_buffers that
+ * software EGL cannot honour, and WPEBackend-fdo then dereferences a NULL request
+ * handler while dispatching a wl_buffer over its nested wl_display -> SIGSEGV. In
+ * that case we fall back to WPE's SHM backend (wpe_fdo_initialize_shm): the
+ * WebProcess software-paints into wl_shm buffers that we memcpy straight into the
+ * raster scene, with no EGLImage, no GL texture and no readback. The buffer path
+ * is chosen once, at first WebView creation, from whether a DRM render node
+ * (i.e. a usable GPU for dmabuf) is present.
  */
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <gio/gio.h>
 #include <GL/gl.h>
@@ -26,6 +37,10 @@
 #include <wpe/fdo.h>
 #include <wpe/fdo-egl.h>
 #include <wpe/wpe.h>
+#include <wpe/unstable/fdo-shm.h>
+
+#include <wayland-server-core.h>
+#include <wayland-server-protocol.h>
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkImage.h"
@@ -63,7 +78,32 @@ struct webview_peer {
 };
 
 static bool wpe_initialized = false;
+/* true once we've decided to ship web frames as CPU wl_shm buffers rather than
+ * EGLImages (set in ensure_wpe_initialized, process-wide). */
+static bool use_shm = false;
 static PFN_glEGLImageTargetTexture2DOES image_target_texture_2d = nullptr;
+
+/* The EGLImage buffer-sharing path needs a real GPU; without one WebKit hands
+ * WPEBackend-fdo dmabuf wl_buffers it cannot back, and fdo crashes on a NULL
+ * handler (see file comment). ATL_WEBVIEW_SHM=1/0 forces the SHM/EGL path. */
+static bool webview_should_use_shm(void)
+{
+	const char *force = getenv("ATL_WEBVIEW_SHM");
+	if (force)
+		return atoi(force) != 0;
+
+	/* dmabuf buffer sharing (what the EGLImage path relies on) needs a DRM
+	 * render node / GBM. On a machine without one — headless VPS, many
+	 * containers — there is simply no dmabuf path, so ship CPU (wl_shm) frames.
+	 * Real GPU devices (incl. the Ubuntu Touch target) expose renderD128+. */
+	for (int minor = 128; minor < 128 + 16; minor++) {
+		char path[64];
+		snprintf(path, sizeof(path), "/dev/dri/renderD%d", minor);
+		if (access(path, R_OK | W_OK) == 0)
+			return false;
+	}
+	return true;
+}
 /* an app AssetManager (global ref), captured from the first WebView created, so
  * the android-asset:// scheme handler can serve files out of the APK. */
 static jobject g_asset_manager = nullptr;
@@ -153,12 +193,13 @@ static bool ensure_wpe_initialized(void)
 		fprintf(stderr, "WebView: no EGLDisplay (is a window open yet?) - cannot init WPE\n");
 		return false;
 	}
-	image_target_texture_2d =
-		(PFN_glEGLImageTargetTexture2DOES)eglGetProcAddress("glEGLImageTargetTexture2DOES");
-	if (!image_target_texture_2d) {
-		fprintf(stderr, "WebView: glEGLImageTargetTexture2DOES unavailable (no GL_OES_EGL_image)\n");
-		return false;
-	}
+
+	use_shm = webview_should_use_shm();
+	atl_primary_make_context_current();
+	const char *gl_renderer = (const char *)glGetString(GL_RENDERER);
+	fprintf(stderr, "WebView: GL renderer='%s' -> %s buffer path\n",
+	        gl_renderer ? gl_renderer : "(null)", use_shm ? "SHM/CPU" : "EGLImage/GPU");
+
 	/* libwpe's loader otherwise dlopen()s the hardcoded default backend name
 	 * "libWPEBackend-default.so", which several distros (e.g. Manjaro) don't
 	 * ship as a symlink — only the real "libWPEBackend-fdo-1.0.so". Missing it,
@@ -166,7 +207,29 @@ static bool ensure_wpe_initialized(void)
 	 * swallowed, so it looks like a silent exit). Point the loader at fdo
 	 * explicitly; this also propagates to the WPEWebProcess subprocess. */
 	wpe_loader_init("libWPEBackend-fdo-1.0.so");
-	wpe_fdo_initialize_for_egl_display(display);
+
+	if (use_shm) {
+		/* We ship CPU (wl_shm) frames, but the WebProcess still has to paint them.
+		 * With no usable GPU its accelerated (GL) compositor fails to initialize
+		 * (Mesa: "ZINK: failed to choose pdev" / "failed to create dri2 screen")
+		 * and produces no frames at all -> blank WebView. Force non-accelerated,
+		 * CPU-side painting so pages render without a GPU. Set before the first
+		 * WebProcess is spawned; WebKit forwards these to the subprocess. */
+		setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1);
+		setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 1);
+		if (!wpe_fdo_initialize_shm()) {
+			fprintf(stderr, "WebView: wpe_fdo_initialize_shm() failed - WebView unavailable\n");
+			return false;
+		}
+	} else {
+		image_target_texture_2d =
+			(PFN_glEGLImageTargetTexture2DOES)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+		if (!image_target_texture_2d) {
+			fprintf(stderr, "WebView: glEGLImageTargetTexture2DOES unavailable (no GL_OES_EGL_image)\n");
+			return false;
+		}
+		wpe_fdo_initialize_for_egl_display(display);
+	}
 
 	/* serve the app's assets (card CSS/JS/images linked as file:///android_asset,
 	 * rewritten to android-asset:// in WebView.loadDataWithBaseURL) */
@@ -211,6 +274,43 @@ static void on_export_egl_image(void *data, struct wpe_fdo_egl_exported_image *i
 	atl_window_invalidate_all();
 }
 
+/* Software path: WebKit software-painted a wl_shm buffer. Copy it into
+ * peer->frame (no GL involved) and hand the buffer back. Runs on the GLib main
+ * thread. Wayland ARGB8888/XRGB8888 is little-endian B,G,R,A in memory, i.e.
+ * Skia's BGRA_8888. */
+static void on_export_shm_buffer(void *data, struct wpe_fdo_shm_exported_buffer *buffer)
+{
+	webview_peer *peer = (webview_peer *)data;
+	struct wl_shm_buffer *shm = wpe_fdo_shm_exported_buffer_get_shm_buffer(buffer);
+	if (shm) {
+		int w = wl_shm_buffer_get_width(shm);
+		int h = wl_shm_buffer_get_height(shm);
+		int32_t stride = wl_shm_buffer_get_stride(shm);
+		uint32_t format = wl_shm_buffer_get_format(shm);
+
+		wl_shm_buffer_begin_access(shm);
+		const uint8_t *src = (const uint8_t *)wl_shm_buffer_get_data(shm);
+		if (src && w > 0 && h > 0 && stride > 0) {
+			SkAlphaType alpha = format == WL_SHM_FORMAT_XRGB8888 ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
+			if (peer->frame.width() != w || peer->frame.height() != h || peer->frame.alphaType() != alpha)
+				peer->frame.allocPixels(SkImageInfo::Make(w, h, kBGRA_8888_SkColorType, alpha));
+
+			uint8_t *dst = (uint8_t *)peer->frame.getPixels();
+			size_t dst_stride = peer->frame.rowBytes();
+			size_t row = (size_t)stride < dst_stride ? (size_t)stride : dst_stride;
+			for (int y = 0; y < h; y++)
+				memcpy(dst + (size_t)y * dst_stride, src + (size_t)y * stride, row);
+			peer->has_frame = true;
+		}
+		wl_shm_buffer_end_access(shm);
+	}
+
+	wpe_view_backend_exportable_fdo_dispatch_release_shm_exported_buffer(peer->exportable, buffer);
+	wpe_view_backend_exportable_fdo_dispatch_frame_complete(peer->exportable);
+
+	atl_window_invalidate_all();
+}
+
 static void on_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer data)
 {
 	webview_peer *peer = (webview_peer *)data;
@@ -243,14 +343,25 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1create(JNIEnv *env, 
 			g_asset_manager = env->NewGlobalRef(am);
 	}
 
-	static const struct wpe_view_backend_exportable_fdo_egl_client client = {
-		.export_egl_image = nullptr,
-		.export_fdo_egl_image = on_export_egl_image,
-		.export_shm_buffer = nullptr,
-		._wpe_reserved0 = nullptr,
-		._wpe_reserved1 = nullptr,
-	};
-	peer->exportable = wpe_view_backend_exportable_fdo_egl_create(&client, peer, peer->width, peer->height);
+	if (use_shm) {
+		static const struct wpe_view_backend_exportable_fdo_client shm_client = {
+			.export_buffer_resource = nullptr,
+			.export_dmabuf_resource = nullptr,
+			.export_shm_buffer = on_export_shm_buffer,
+			._wpe_reserved0 = nullptr,
+			._wpe_reserved1 = nullptr,
+		};
+		peer->exportable = wpe_view_backend_exportable_fdo_create(&shm_client, peer, peer->width, peer->height);
+	} else {
+		static const struct wpe_view_backend_exportable_fdo_egl_client egl_client = {
+			.export_egl_image = nullptr,
+			.export_fdo_egl_image = on_export_egl_image,
+			.export_shm_buffer = nullptr,
+			._wpe_reserved0 = nullptr,
+			._wpe_reserved1 = nullptr,
+		};
+		peer->exportable = wpe_view_backend_exportable_fdo_egl_create(&egl_client, peer, peer->width, peer->height);
+	}
 	peer->backend = wpe_view_backend_exportable_fdo_get_view_backend(peer->exportable);
 
 	WebKitWebViewBackend *view_backend =

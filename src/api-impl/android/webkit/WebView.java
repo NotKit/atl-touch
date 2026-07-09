@@ -27,27 +27,46 @@ public class WebView extends ViewGroup {
 		super(context, attrs, defStyleAttr);
 	}
 
+	/* size last pushed to the native WPE backend; the peer is often created at
+	 * 1x1 (loadData runs before the view is laid out), so we must resize it once
+	 * a real size is known — otherwise WebKit renders a 1x1 page that gets scaled
+	 * up to fill the view, i.e. one stretched pixel (a blank-looking fill). */
+	private int peerW = -1, peerH = -1;
+
 	private long ensurePeer() {
 		if (peer == 0) {
 			int w = getWidth() > 0 ? getWidth() : 1;
 			int h = getHeight() > 0 ? getHeight() : 1;
 			peer = native_create(w, h);
+			peerW = w;
+			peerH = h;
 		}
 		return peer;
+	}
+
+	/* keep the WPE backend sized to the view; safe to call every frame */
+	private void syncPeerSize() {
+		int w = getWidth(), h = getHeight();
+		if (peer != 0 && w > 0 && h > 0 && (w != peerW || h != peerH)) {
+			native_setSize(peer, w, h);
+			peerW = w;
+			peerH = h;
+		}
 	}
 
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
 		super.onSizeChanged(w, h, oldw, oldh);
-		if (peer != 0 && w > 0 && h > 0)
-			native_setSize(peer, w, h);
+		syncPeerSize();
 	}
 
 	@Override
 	public void onDraw(Canvas canvas) {
 		long p = ensurePeer();
-		if (p != 0)
+		if (p != 0) {
+			syncPeerSize();
 			native_draw(p, canvas.getNativeCanvasWrapper(), getWidth(), getHeight());
+		}
 	}
 
 	public WebSettings getSettings() {
