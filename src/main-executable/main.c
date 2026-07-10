@@ -36,7 +36,6 @@
 	#error unknown native architecture
 #endif
 
-void *window = NULL; /* legacy: still referenced by libandroid's egl.c */
 ATLWindow *atl_window = NULL;
 char *apk_path;
 

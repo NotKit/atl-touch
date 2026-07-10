@@ -185,6 +185,14 @@ struct handle_cache {
 		jclass class;
 		jmethodID postEventFromNative;
 	} media_player;
+	struct {
+		jclass class;
+		jmethodID fromNative;
+	} bitmap;
+	struct {
+		jclass class;
+		jmethodID postFrame;
+	} surface;
 };
 
 extern struct handle_cache handle_cache;

@@ -5,36 +5,32 @@ converted from GtkApplication+libportal to plain GApplication/GIO. Numbers are c
 of `gtk_*`/`gdk_*`/`gsk_*`/GTK-type references per file; "include-only" files just
 need the `#include` dropped.
 
-Note: nothing calls `gtk_init()` anymore (GtkApplication used to do it implicitly).
-Any GTK codepath that still executes must call `gtk_init_check()` lazily first, or be
-replaced. Until M1 completes, GTK-dependent features are expected to be broken in the
-GApplication launcher; this list tracks them.
+**M1 IS COMPLETE: nothing links GTK anymore** — `libgtk-4`/`libgdk` are gone
+from the NEEDED entries of the launcher, `libtranslation_layer_main.so` and
+`libandroid.so`. Remaining follow-ups are features, not de-GTK:
 
-## Heavy — rendering/graphics spine (replace with Skia / Wayland)
-
-| File | Refs | Role / replacement |
-|---|---|---|
-| `src/libandroid/egl.c` | 21 | NDK EGL over GdkSurface; extern `window` global from launcher → Wayland EGL (wl_egl_window) |
-| `src/libandroid/native_window.c/.h` | 18+1 | ANativeWindow over GTK → Wayland surface/subsurface |
-| `src/libandroid/input.c` | 7 | GDK event translation for NativeActivity → GLFW/Wayland input |
-| `src/api-impl-jni/widgets/android_view_SurfaceView.c/.h` | 3+5 | GTK subsurface embedding → wl_subsurface |
-
-(These are the NativeActivity/NDK GL path — only used by native games, currently
-stubbed; they come back together in the wl_egl_window bring-up.)
-
-## Medium — host integration (replace with Wayland/DBus/UT services)
-
-| File | Refs | Role / replacement |
-|---|---|---|
-| `src/api-impl-jni/media/android_media_MediaCodec.c` | 23 | GdkDmabufTexture video frames → dmabuf/EGLImage into Skia/GL. **MediaCodec task**: codec-level backend — libavcodec hwdevice (VAAPI/V4L2 → DRM prime dmabuf) on mainline, Android codecs via libhybris on halium |
-
-MediaPlayer and SoundPool are DONE (GStreamer playbin — see below); MediaCodec
-is the remaining media file. Audio goes through playbin's default sink
-(PulseAudio/PipeWire); `ATL_MEDIA_AUDIO_SINK` overrides it for headless test
-machines. Video in MediaPlayer is currently decode-and-drop (fakesink) until
-the MediaCodec/dmabuf rendering path lands.
+- **NDK-GL bring-up** (`src/libandroid/egl.c`, `native_window.c`, `input.c`):
+  the GTK code there was dead (stubs) and has been stripped; NativeActivity
+  rendering returns with the wl_subsurface + wl_egl_window work (handles from
+  GLFW, geometry from SurfaceView, input teed from ATLWindow callbacks).
+- **Zero-copy video** (dmabuf → EGLImage into a GL-composited scene) for
+  MediaCodec/MediaPlayer; decode is already hw-accelerated where available,
+  presentation goes through CPU RGBA today.
+- **hybris "ndk" codec backend** (libmediandk via libhybris) for Android
+  hardware codecs on halium devices — slot into `media/codec_backend.h`.
+- The OSK (ATLKeyboardDialog) lost its gtk4-layer-shell window; needs a
+  canvas-drawn replacement.
 
 ## Done in M1 so far
+
+- **MediaCodec over the pluggable codec backend** — `media/codec_backend.h`
+  defines a decoder-level interface (create/configure/queue-input/
+  dequeue-audio/dequeue-video); `codec_backend_ffmpeg.c` implements it with
+  libavcodec (hwdevice VAAPI/DRM_PRIME decode, CPU transfer + swscale → RGBA
+  output); `ATL_MEDIA_CODEC_BACKEND` selects (default `ffmpeg`; `ndk` reserved
+  for hybris/libmediandk). Video frames now flow `Surface.postFrame(Bitmap)` →
+  `SurfaceView` → Skia scene — the GdkDmabufTexture/GdkMemoryTexture path and
+  the `SurfaceViewWidget` GTK type are deleted.
 
 - **MediaPlayer + SoundPool over GStreamer** — `android_media_MediaPlayer.c`
   rewritten as a playbin peer (prepare/prepareAsync/start/pause/stop/seek/

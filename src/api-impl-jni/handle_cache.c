@@ -167,4 +167,10 @@ void set_up_handle_cache(JNIEnv *env)
 
 	handle_cache.media_player.class = _REF((*env)->FindClass(env, "android/media/MediaPlayer"));
 	handle_cache.media_player.postEventFromNative = _METHOD(handle_cache.media_player.class, "postEventFromNative", "(III)V");
+
+	handle_cache.bitmap.class = _REF((*env)->FindClass(env, "android/graphics/Bitmap"));
+	handle_cache.bitmap.fromNative = _STATIC_METHOD(handle_cache.bitmap.class, "fromNative", "(J)Landroid/graphics/Bitmap;");
+
+	handle_cache.surface.class = _REF((*env)->FindClass(env, "android/view/Surface"));
+	handle_cache.surface.postFrame = _METHOD(handle_cache.surface.class, "postFrame", "(Landroid/graphics/Bitmap;)V");
 }

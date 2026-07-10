@@ -1,17 +1,14 @@
-
 #include <EGL/egl.h>
 #include <GL/gl.h>
-#include <X11/Xlib.h>
-#include <gtk/gtk.h>
 #include <jni.h>
 
+struct wl_display;
+struct wl_surface;
+
 struct ANativeWindow {
-	EGLNativeWindowType egl_window;
-	GtkWidget *surface_view_widget;
+	EGLNativeWindowType egl_window; /* a wl_egl_window once the bring-up lands */
 	struct wl_display *wayland_display;
 	struct wl_surface *wayland_surface;
-	Display *x11_display;
-	gulong resize_handler;
 	int refcount;
 	int width;
 	int height;

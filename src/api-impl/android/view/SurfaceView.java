@@ -14,18 +14,21 @@ public class SurfaceView extends View {
 		super(context);
 
 		mSurface.widget = this.widget;
+		mSurface.view = this;
 	}
 
 	public SurfaceView(Context context, AttributeSet attrs) {
 		super(context, attrs);
 
 		mSurface.widget = this.widget;
+		mSurface.view = this;
 	}
 
 	public SurfaceView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
 
 		mSurface.widget = this.widget;
+		mSurface.view = this;
 	}
 
 	private void surfaceChanged(int format, int width, int height) {

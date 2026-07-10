@@ -17,25 +17,18 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <EGL/egl.h>
 
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/extensions/shape.h>
-
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_android.h>
 #include <vulkan/vulkan_wayland.h>
-#include <vulkan/vulkan_xlib.h>
-
-#include <gdk/wayland/gdkwayland.h>
-#include <gdk/x11/gdkx.h>
-#include <gtk/gtk.h>
 
 // FIXME: move this together with the other stuff that doesn't belong in this file
 #include <openxr/openxr.h>
@@ -45,7 +38,6 @@
 	#define XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT 1000426000
 #endif
 
-#include <assert.h>
 #include <dlfcn.h>
 
 #include <jni.h>
@@ -72,18 +64,8 @@ enum ANativeWindowTransform {
 	ANATIVEWINDOW_TRANSFORM_ROTATE_270 = ANATIVEWINDOW_TRANSFORM_ROTATE_180 | ANATIVEWINDOW_TRANSFORM_ROTATE_90,
 };
 
-/**
- * Opaque type that provides access to a native window.
- *
- * A pointer can be obtained using {@link ANativeWindow_fromSurface()}.
- */
 typedef struct ANativeWindow ANativeWindow;
 
-/**
- * Struct that represents a windows buffer.
- *
- * A pointer can be obtained using {@link ANativeWindow_lock()}.
- */
 typedef struct ANativeWindow_Buffer {
 	// The number of pixels that are show horizontally.
 	int32_t width;
@@ -105,10 +87,6 @@ typedef struct ANativeWindow_Buffer {
 	uint32_t reserved[6];
 } ANativeWindow_Buffer;
 
-/**
- * Acquire a reference on the given {@link ANativeWindow} object. This prevents the object
- * from being deleted until the reference is removed.
- */
 void ANativeWindow_acquire(struct ANativeWindow *native_window)
 {
 	native_window->refcount++;
@@ -118,12 +96,9 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 {
 	native_window->refcount--;
 	if (native_window->refcount == 0) {
-		g_clear_signal_handler(&native_window->resize_handler, native_window->surface_view_widget);
 		if (native_window->wayland_display) {
 			wl_egl_window_destroy((struct wl_egl_window *)native_window->egl_window);
 			wl_surface_destroy(native_window->wayland_surface);
-		} else if (native_window->x11_display) {
-			XDestroyWindow(native_window->x11_display, native_window->egl_window);
 		}
 		free(native_window);
 	}
@@ -131,57 +106,24 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 
 int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window)
 {
-	return gtk_widget_get_width(native_window->surface_view_widget);
+	return native_window->width;
 }
 
 int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
 {
-	return gtk_widget_get_height(native_window->surface_view_widget);
+	return native_window->height;
 }
 
-/**
- * Return the current pixel format (AHARDWAREBUFFER_FORMAT_*) of the window surface.
- *
- * \return a negative value on error.
- */
 int32_t ANativeWindow_getFormat(ANativeWindow *window)
 {
 	return -1;
 }
 
-/**
- * Change the format and size of the window buffers.
- *
- * The width and height control the number of pixels in the buffers, not the
- * dimensions of the window on screen. If these are different than the
- * window's physical size, then its buffer will be scaled to match that size
- * when compositing it to the screen. The width and height must be either both zero
- * or both non-zero.
- *
- * For all of these parameters, if 0 is supplied then the window's base
- * value will come back in force.
- *
- * \param width width of the buffers in pixels.
- * \param height height of the buffers in pixels.
- * \param format one of AHARDWAREBUFFER_FORMAT_* constants.
- * \return 0 for success, or a negative value on error.
- */
 int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
                                          int32_t width, int32_t height, int32_t format)
 {
 	return -1;
 }
-
-/**
- * Lock the window's next drawing surface for writing.
- * inOutDirtyBounds is used as an in/out parameter, upon entering the
- * function, it contains the dirty region, that is, the region the caller
- * intends to redraw. When the function returns, inOutDirtyBounds is updated
- * with the actual area the caller needs to redraw -- this region is often
- * extended by {@link ANativeWindow_lock}.
- *
- * \return 0 for success, or a negative value on error.
- */
 
 typedef void ARect;
 
@@ -191,12 +133,6 @@ int32_t ANativeWindow_lock(ANativeWindow *window, ANativeWindow_Buffer *outBuffe
 	return -1;
 }
 
-/**
- * Unlock the window's drawing surface after previously locking it,
- * posting the new buffer to the display.
- *
- * \return 0 for success, or a negative value on error.
- */
 int32_t ANativeWindow_unlockAndPost(ANativeWindow *window)
 {
 	return -1;
@@ -207,195 +143,18 @@ int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_
 	return 0; // success
 }
 
-/**
- * Set a transform that will be applied to future buffers posted to the window.
- *
- * \param transform combination of {@link ANativeWindowTransform} flags
- * \return 0 for success, or -EINVAL if \p transform is invalid
- */
 int32_t ANativeWindow_setBuffersTransform(ANativeWindow *window, int32_t transform)
 {
 	return -1;
 }
 
-void wl_registry_global_handler(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
-{
-	struct wl_subcompositor **subcompositor = data;
-	printf("interface: '%s', version: %u, name: %u\n", interface, version, name);
-	if (!strcmp(interface, "wl_subcompositor")) {
-		*subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
-	}
-}
-
-void wl_registry_global_handler_compositor(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
-{
-	struct wl_subcompositor **compositor = data;
-	if (!strcmp(interface, "wl_compositor")) {
-		*compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1);
-	}
-}
-
-void wl_registry_global_remove_handler(void *data, struct wl_registry *registry, uint32_t name)
-{
-	printf("removed: %u\n", name);
-}
-
-static void on_resize(GtkWidget *self, gint width, gint height, ANativeWindow *native_window)
-{
-	if (native_window->wayland_display) {
-		wl_egl_window_resize((struct wl_egl_window *)native_window->egl_window, width, height, 0, 0);
-	} else if (native_window->x11_display) {
-		XResizeWindow(native_window->x11_display, (Window)native_window->egl_window, width, height);
-	}
-}
-
-extern GThread *main_thread_id;
 ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 {
-	int width;
-	int height;
-
-	int ret;
-
-	graphene_point_t pos;
-	double off_x;
-	double off_y;
-
-	static struct wl_subcompositor *wl_subcompositor = NULL;
-	static struct wl_registry_listener wl_registry_listener = {
-		.global = wl_registry_global_handler,
-		.global_remove = wl_registry_global_remove_handler
-	};
-
-	jlong widget_ptr = _GET_LONG_FIELD(surface, "widget");
-	if (!widget_ptr) {
-		/* SurfaceView no longer has a GTK widget; native EGL rendering is
-		 * unavailable until the GLFW/EGL windowing phase lands */
-		fprintf(stderr, "ANativeWindow_fromSurface: native window rendering is not currently supported\n");
-		return NULL;
-	}
-	GtkWidget *surface_view_widget = gtk_widget_get_first_child(_PTR(widget_ptr));
-	GtkWidget *window = GTK_WIDGET(gtk_widget_get_native(surface_view_widget));
-	while ((width = gtk_widget_get_width(surface_view_widget)) == 0) {
-		// FIXME: UGLY: this loop waits until the SurfaceView widget gets mapped
-		if (g_thread_self() == main_thread_id)
-			g_main_context_iteration(g_main_context_default(), false);
-	}
-	height = gtk_widget_get_height(surface_view_widget);
-
-	// get position of the SurfaceView widget wrt the toplevel window
-	ret = gtk_widget_compute_point(surface_view_widget, window, &GRAPHENE_POINT_INIT(0, 0), &pos);
-	assert(ret);
-	// compensate for offset between the widget coordinates and the surface coordinates
-	gtk_native_get_surface_transform(GTK_NATIVE(window), &off_x, &off_y);
-	pos.x += off_x;
-	pos.y += off_y;
-
-	printf("XXXXX: SurfaceView widget: %p (%s), width: %d, height: %d\n", surface_view_widget, gtk_widget_get_name(surface_view_widget), width, height);
-	printf("XXXXX: SurfaceView widget: x: %lf, y: %lf\n", pos.x, pos.y);
-	printf("XXXXX: native offset: x: %lf, y: %lf\n", off_x, off_y);
-
-	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
-	native_window->refcount = 1; // probably, 0 doesn't work
-	native_window->surface_view_widget = surface_view_widget;
-	native_window->width = width;
-	native_window->height = height;
-
-	GdkDisplay *display = gtk_root_get_display(GTK_ROOT(window));
-
-	if (!getenv("ATL_DIRECT_EGL")) {
-		// nothing to do
-	} else if (GDK_IS_WAYLAND_DISPLAY(display)) {
-		struct wl_display *wl_display = gdk_wayland_display_get_wl_display(display);
-		struct wl_compositor *wl_compositor = gdk_wayland_display_get_wl_compositor(display);
-
-		if (!wl_subcompositor) { // FIXME this assumes the wl_display doesn't change
-			struct wl_registry *wl_registry = wl_display_get_registry(wl_display);
-			wl_registry_add_listener(wl_registry, &wl_registry_listener, &wl_subcompositor);
-			wl_display_roundtrip(wl_display);
-			printf("XXX: wl_subcompositor: %p\n", wl_subcompositor);
-		}
-
-		struct wl_surface *toplevel_surface = gdk_wayland_surface_get_wl_surface(gtk_native_get_surface(GTK_NATIVE(window)));
-
-		struct wl_surface *wayland_surface = wl_compositor_create_surface(wl_compositor);
-
-		struct wl_subsurface *subsurface = wl_subcompositor_get_subsurface(wl_subcompositor, wayland_surface, toplevel_surface);
-		wl_subsurface_set_desync(subsurface);
-		wl_subsurface_set_position(subsurface, pos.x, pos.y);
-
-#if (GTK_MAJOR_VERSION >= 4 && GTK_MINOR_VERSION >= 22)
-		/* in Gtk 4.22+ we are able to do hole punching */
-		wl_subsurface_place_below(subsurface, toplevel_surface);
-#endif
-
-		struct wl_region *empty_region = wl_compositor_create_region(wl_compositor);
-		wl_surface_set_input_region(wayland_surface, empty_region);
-		wl_region_destroy(empty_region);
-
-		struct wl_egl_window *egl_window = wl_egl_window_create(wayland_surface, width, height);
-		native_window->egl_window = (EGLNativeWindowType)egl_window;
-		native_window->wayland_display = wl_display;
-		native_window->wayland_surface = wayland_surface;
-		printf("EGL::: wayland_surface: %p\n", wayland_surface);
-	} else if (GDK_IS_X11_DISPLAY(display)) {
-		/* X11 support is deprecated, which means that if we decide to switch to Gtk 5 we will lose the ability to run ATL on X11.
-		 * for now, silence the warnings */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
-		int major;
-		int minor;
-
-		/* Check if we support EGL */
-		if (gdk_x11_display_get_egl_version(display, &major, &minor)) {
-			printf("XXX: EGL version: %d.%d\n", major, minor);
-		} else {
-			fprintf(stderr, "ANativeWindow_fromSurface: crashing here;\n"
-			                "The GTK X11 context was made using GLX, which isn't and won't be supported\n"
-			                "Please use GDK_DEBUG='gl-egl' to use EGL\n");
-			exit(1);
-		}
-
-		/* Get the X11 display server */
-		Display *x11_display = gdk_x11_display_get_xdisplay(display);
-		native_window->x11_display = x11_display;
-
-		/* Get the top level window's X11 window ID */
-		Window toplevel_window = gdk_x11_surface_get_xid(gtk_native_get_surface(GTK_NATIVE(window)));
-
-		/*
-		 * Make a new X11 window inheriting from the GTK top level window.
-		 * The reason why it's first bound to the default root window and
-		 * then reparented to the GTK window is because on NVIDIA drivers
-		 * the GTK window selects a visual mode that's not compatible with
-		 * NVIDIA's implementation of EGL for some reason.
-		 */
-		Window x11_window = XCreateSimpleWindow(x11_display, DefaultRootWindow(x11_display), 0, 0, width, height, 0, 0, 0xffffffff);
-		XReparentWindow(x11_display, x11_window, toplevel_window, pos.x, pos.y);
-
-		XMapWindow(x11_display, x11_window);
-
-		/* Make the X11 window able to be clicked through */
-		Region region = XCreateRegion();
-		XRectangle rectangle;
-		rectangle.x = 0;
-		rectangle.y = 0;
-		rectangle.width = 0;
-		rectangle.height = 0;
-		XUnionRectWithRegion(&rectangle, region, region);
-		XShapeCombineRegion(x11_display, x11_window, ShapeInput, 0, 0, region, ShapeSet);
-		XDestroyRegion(region);
-
-		native_window->egl_window = (EGLNativeWindowType)x11_window;
-
-#pragma GCC diagnostic pop
-	}
-
-	if (getenv("ATL_DIRECT_EGL") && native_window->resize_handler == 0)
-		native_window->resize_handler = g_signal_connect(surface_view_widget, "resize", G_CALLBACK(on_resize), native_window);
-
-	return native_window;
+	/* Native (NDK GL) rendering needs a wl_subsurface + wl_egl_window over the
+	 * GLFW toplevel; that bring-up hasn't happened yet in the GTK-free
+	 * windowing stack, so NativeActivity/SurfaceView EGL apps get no window. */
+	fprintf(stderr, "ANativeWindow_fromSurface: native window rendering is not currently supported\n");
+	return NULL;
 }
 
 ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceTexture)
@@ -407,38 +166,27 @@ ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceText
 
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
-	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
-
-	if (GDK_IS_WAYLAND_DISPLAY(display)) {
-		VkWaylandSurfaceCreateInfoKHR wayland_create_info = {
-			.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
-			.display = pCreateInfo->window->wayland_display,
-			.surface = pCreateInfo->window->wayland_surface,
-		};
-
-		return vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
-	} else if (GDK_IS_X11_DISPLAY(display)) {
-		VkXlibSurfaceCreateInfoKHR x11_create_info = {
-			.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
-			.dpy = pCreateInfo->window->x11_display,
-			.window = pCreateInfo->window->egl_window,
-		};
-
-		return vkCreateXlibSurfaceKHR(instance, &x11_create_info, pAllocator, pSurface);
-	} else {
-		fprintf(stderr, "bionic_vkCreateAndroidSurfaceKHR: the GDK backend is neither Wayland nor X11, no SurfaceView for you");
+	if (!pCreateInfo->window->wayland_display) {
+		fprintf(stderr, "bionic_vkCreateAndroidSurfaceKHR: no wayland surface on the native window\n");
 		return VK_ERROR_UNKNOWN;
 	}
+
+	VkWaylandSurfaceCreateInfoKHR wayland_create_info = {
+		.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+		.display = pCreateInfo->window->wayland_display,
+		.surface = pCreateInfo->window->wayland_surface,
+	};
+
+	return vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
 }
 
 VkResult bionic_vkCreateInstance(VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance)
 {
 	int original_extension_count = pCreateInfo->enabledExtensionCount;
-	int new_extension_count = original_extension_count + 2;
+	int new_extension_count = original_extension_count + 1;
 	const char **enabled_exts = malloc(new_extension_count * sizeof(char *));
 	memcpy(enabled_exts, pCreateInfo->ppEnabledExtensionNames, original_extension_count * sizeof(char *));
 	enabled_exts[original_extension_count] = "VK_KHR_wayland_surface";
-	enabled_exts[original_extension_count + 1] = "VK_KHR_xlib_surface";
 
 	pCreateInfo->enabledExtensionCount = new_extension_count;
 	pCreateInfo->ppEnabledExtensionNames = enabled_exts;

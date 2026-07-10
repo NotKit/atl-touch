@@ -52,13 +52,6 @@ skia_dep = dependency('skia')
 # minikin (text shaping/measurement/line breaking), vendored from AOSP-13
 subdir('third_party/minikin')
 
-layer_shell_dep = dependency('gtk4-layer-shell-0', required : false)
-if layer_shell_dep.found()
-  extra_deps = [ layer_shell_dep ]
-  # the OSK (ATLKeyboardDialog) depended on the GTK widget hierarchy; needs a
-  # canvas-drawn replacement
-
-endif
 
 # libandroid
 libandroid_so = shared_library('android', [
@@ -76,7 +69,9 @@ libandroid_so = shared_library('android', [
                                           install: true,
                                           soversion: 0,
                                           dependencies: [
-                                          	dependency('gtk4'), dependency('jni'), dependency('vulkan'), dependency('openxr').partial_dependency(includes: true)
+                                          	dependency('glib-2.0'), dependency('jni'), dependency('egl'), dependency('gl'),
+                                          	dependency('wayland-client'), dependency('wayland-egl'),
+                                          	dependency('vulkan'), dependency('openxr').partial_dependency(includes: true)
                                           ],
                                           c_args: [
                                           	'-D_LARGEFILE64_SOURCE',
@@ -137,6 +132,9 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/android_view_RenderNode.cpp',
                                                                   	'src/api-impl-jni/location/android_location_LocationManager.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
+                                                                  	'src/api-impl-jni/media/codec_backend.c',
+                                                                  	'src/api-impl-jni/media/codec_backend_ffmpeg.c',
+                                                                  	'src/api-impl-jni/media/video_frame_skia.cpp',
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',
                                                                   	'src/api-impl-jni/media/atl_gst.c',
                                                                   	'src/api-impl-jni/media/android_media_session_MediaSession.c',
@@ -166,7 +164,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   install_rpath: '$ORIGIN/:' + get_option('prefix') / get_option('libdir') / 'art',
                                                                   dependencies: [
                                                                         extra_deps,
-                                                                  	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
+                                                                  	dependency('gio-2.0'), dependency('graphene-1.0'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
                                                                   	dependency('glfw3'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),

@@ -1,10 +1,19 @@
+/*
+ * NDK input queue (AInputQueue/AInputEvent) shims for NativeActivity.
+ *
+ * Events used to be translated from GDK; with the GTK windowing gone the
+ * queue exists but nothing feeds it — the wl_egl_window/NativeActivity
+ * bring-up will tee ATLWindow's GLFW input callbacks into the queue pipe.
+ */
+
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
-
-#include <gtk/gtk.h>
 
 #include "looper.h"
 
@@ -163,82 +172,15 @@ struct android_poll_source {
 // TODO: malloc on getEvent and free on finishEvent? malloc isn't very fast though, and events can in principle be pretty frequent
 struct AInputEvent fixme_ugly_current_event;
 
-static inline void make_touch_event(GdkEvent *event, GtkEventControllerLegacy *event_controller, struct AInputEvent *ainput_event)
-{
-	GtkWidget *window = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(event_controller));
-	GtkWidget *child;
-
-	gdk_event_get_position(event, &ainput_event->x, &ainput_event->y);
-
-	// the window's coordinate system starts at the top left of the header bar, which is not ideal
-	// apps expect it to start at the top left of the area where child widgets get placed, so that
-	// the top left of the window is the same as the top left of a single widget filling the entire window
-	// while it's quite hacky, the following should realistically work for most if not all cases
-	if ((child = gtk_window_get_child(GTK_WINDOW(window)))) {
-		int ret;
-		graphene_point_t p;
-		ret = gtk_widget_compute_point(window, child, &GRAPHENE_POINT_INIT(ainput_event->x, ainput_event->y), &p);
-		assert(ret);
-
-		ainput_event->x = p.x;
-		ainput_event->y = p.y;
-	}
-
-	switch (gdk_event_get_event_type(event)) {
-		case GDK_BUTTON_PRESS:
-		case GDK_TOUCH_BEGIN:
-			ainput_event->action = AMOTION_EVENT_ACTION_DOWN;
-			break;
-		case GDK_BUTTON_RELEASE:
-		case GDK_TOUCH_END:
-			ainput_event->action = AMOTION_EVENT_ACTION_UP;
-			break;
-		case GDK_MOTION_NOTIFY:
-		case GDK_TOUCH_UPDATE:
-			ainput_event->action = AMOTION_EVENT_ACTION_MOVE;
-			break;
-		default:
-			fprintf(stderr, "%s: %s: passed in GdkEvent is not a touch event or equivalent\n", __FILE__, __func__);
-			break;
-	}
-}
-
-static gboolean on_event(GtkEventControllerLegacy *self, GdkEvent *event, int input_queue_pipe_fd)
-{
-	struct AInputEvent ainput_event;
-
-	// TODO: this doesn't work for multitouch
-	switch (gdk_event_get_event_type(event)) {
-		// mouse click/move (currently we convert these to touch events)
-		case GDK_BUTTON_PRESS:
-		case GDK_BUTTON_RELEASE:
-		case GDK_MOTION_NOTIFY:
-		// touchscreen
-		case GDK_TOUCH_BEGIN:
-		case GDK_TOUCH_END:
-		case GDK_TOUCH_UPDATE:
-			make_touch_event(event, self, &ainput_event);
-			write(input_queue_pipe_fd, &ainput_event, sizeof(struct AInputEvent));
-			break;
-		default:
-			return false;
-			break;
-	}
-
-	return true;
-}
-
 // FIXME put this in a header file
 struct input_queue {
 	int fd;
-	GtkEventController *controller;
 };
 
 void AInputQueue_attachLooper(struct input_queue *queue, struct ALooper *looper, int ident, Looper_callbackFunc callback, void *data)
 {
 	struct android_poll_source *poll_source = (struct android_poll_source *)data;
-	//printf("AInputQueue_attachLooper called: queue: %p, looper: %p, ident: %d, callback %p, data: %p, process_func: %p\n", queue, looper, ident, callback, poll_source, poll_source ? poll_source->process : 0);
-	if (poll_source == NULL)
+	if (poll_source == NULL || queue == NULL)
 		return;
 	int input_queue_pipe[2];
 	if (pipe(input_queue_pipe)) {
@@ -247,13 +189,14 @@ void AInputQueue_attachLooper(struct input_queue *queue, struct ALooper *looper,
 	}
 	fcntl(input_queue_pipe[0], F_SETFL, O_NONBLOCK);
 	ALooper_addFd(looper, input_queue_pipe[0], ident, (1 << 0) /*? ALOOPER_EVENT_INPUT*/, callback, data);
-	g_signal_connect(queue->controller, "event", G_CALLBACK(on_event), GINT_TO_POINTER(input_queue_pipe[1]));
+	/* nothing writes input_queue_pipe[1] yet: the NativeActivity input
+	 * bring-up will tee ATLWindow's GLFW events into it */
 	queue->fd = input_queue_pipe[0];
 }
 
 int32_t AInputQueue_getEvent(struct input_queue *queue, struct AInputEvent **outEvent)
 {
-	if (read(queue->fd, &fixme_ugly_current_event, sizeof(struct AInputEvent)) == sizeof(struct AInputEvent)) {
+	if (queue && read(queue->fd, &fixme_ugly_current_event, sizeof(struct AInputEvent)) == sizeof(struct AInputEvent)) {
 		*outEvent = &fixme_ugly_current_event;
 		return 0;
 	} else {
