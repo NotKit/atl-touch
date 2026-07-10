@@ -26,10 +26,10 @@ JNIEXPORT jint JNICALL Java_android_media_SoundPool_nativeLoad
 /*
  * Class:     android_media_SoundPool
  * Method:    nativePlay
- * Signature: (JI)I
+ * Signature: (JIFI)I
  */
 JNIEXPORT jint JNICALL Java_android_media_SoundPool_nativePlay
-  (JNIEnv *, jclass, jlong, jint);
+  (JNIEnv *, jclass, jlong, jint, jfloat, jint);
 
 #ifdef __cplusplus
 }

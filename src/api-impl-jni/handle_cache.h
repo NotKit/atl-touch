@@ -181,6 +181,10 @@ struct handle_cache {
 		jclass class;
 		jmethodID onDateChange;
 	} date_picker;
+	struct {
+		jclass class;
+		jmethodID postEventFromNative;
+	} media_player;
 };
 
 extern struct handle_cache handle_cache;

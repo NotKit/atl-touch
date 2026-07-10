@@ -164,4 +164,7 @@ void set_up_handle_cache(JNIEnv *env)
 
 	handle_cache.date_picker.class = _REF((*env)->FindClass(env, "android/widget/DatePicker"));
 	handle_cache.date_picker.onDateChange = _METHOD(handle_cache.date_picker.class, "onDateChange", "()V");
+
+	handle_cache.media_player.class = _REF((*env)->FindClass(env, "android/media/MediaPlayer"));
+	handle_cache.media_player.postEventFromNative = _METHOD(handle_cache.media_player.class, "postEventFromNative", "(III)V");
 }

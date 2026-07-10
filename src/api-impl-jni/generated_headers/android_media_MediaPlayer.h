@@ -7,29 +7,47 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_media_MediaPlayer_EVENT_PREPARED
+#define android_media_MediaPlayer_EVENT_PREPARED 1L
+#undef android_media_MediaPlayer_EVENT_COMPLETION
+#define android_media_MediaPlayer_EVENT_COMPLETION 2L
+#undef android_media_MediaPlayer_EVENT_SEEK_COMPLETE
+#define android_media_MediaPlayer_EVENT_SEEK_COMPLETE 3L
+#undef android_media_MediaPlayer_EVENT_ERROR
+#define android_media_MediaPlayer_EVENT_ERROR 100L
+#undef android_media_MediaPlayer_MEDIA_ERROR_UNKNOWN
+#define android_media_MediaPlayer_MEDIA_ERROR_UNKNOWN 1L
 /*
  * Class:     android_media_MediaPlayer
- * Method:    native_prepare
- * Signature: (J)V
+ * Method:    native_create
+ * Signature: ()J
  */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1prepare
-  (JNIEnv *, jclass, jlong);
+JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1create
+  (JNIEnv *, jobject);
 
 /*
  * Class:     android_media_MediaPlayer
  * Method:    native_setDataSource
- * Signature: (Ljava/lang/String;)J
+ * Signature: (JLjava/lang/String;)V
  */
-JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1setDataSource
-  (JNIEnv *, jobject, jstring);
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setDataSource
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     android_media_MediaPlayer
- * Method:    native_setOnCompletionListener
- * Signature: (JLandroid/media/MediaPlayer/OnCompletionListener;)V
+ * Method:    native_prepare
+ * Signature: (J)Z
  */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setOnCompletionListener
-  (JNIEnv *, jclass, jlong, jobject);
+JNIEXPORT jboolean JNICALL Java_android_media_MediaPlayer_native_1prepare
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_prepareAsync
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1prepareAsync
+  (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     android_media_MediaPlayer
@@ -38,6 +56,54 @@ JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setOnCompletionLis
  */
 JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1start
   (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_pause
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1pause
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_stop
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1stop
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_isPlaying
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_media_MediaPlayer_native_1isPlaying
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_seekTo
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1seekTo
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_setLooping
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setLooping
+  (JNIEnv *, jclass, jlong, jboolean);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_setVolume
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setVolume
+  (JNIEnv *, jclass, jlong, jfloat);
 
 /*
  * Class:     android_media_MediaPlayer
@@ -53,6 +119,22 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getDuration
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getCurrentPosition
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_reset
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1reset
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_release
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1release
   (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus

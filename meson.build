@@ -138,6 +138,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/location/android_location_LocationManager.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',
+                                                                  	'src/api-impl-jni/media/atl_gst.c',
                                                                   	'src/api-impl-jni/media/android_media_session_MediaSession.c',
                                                                   	'src/api-impl-jni/net/android_net_ConnectivityManager.c',
                                                                   	'src/api-impl-jni/os/android_atl_GVariantBuilderParcel.c',
@@ -170,6 +171,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),
                                                                   	dependency('wpe-webkit-2.0'), dependency('wpebackend-fdo-1.0'), dependency('wpe-1.0'), dependency('wayland-server'),
+                                                                  	dependency('gstreamer-1.0'),
                                                                         libart_dep, wayland_protos_dep, skia_dep, minikin_dep
                                                                   ],
                                                                   link_with: [ libandroid_so ],

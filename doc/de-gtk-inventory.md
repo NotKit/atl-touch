@@ -26,20 +26,23 @@ stubbed; they come back together in the wl_egl_window bring-up.)
 
 | File | Refs | Role / replacement |
 |---|---|---|
-| `src/api-impl-jni/media/android_media_MediaCodec.c` | 23 | GdkDmabufTexture video frames → dmabuf/EGLImage into Skia/GL. **Media-backend task**: also uses GtkMediaStream-less libav decode |
-| `src/api-impl-jni/media/android_media_MediaPlayer.c` | 18 | GtkMediaStream playback → media backend. **Media-backend task** |
-| `src/api-impl-jni/audio/android_media_SoundPool.c` | 8 | GtkMediaStream one-shot playback → same media backend. **Media-backend task** |
+| `src/api-impl-jni/media/android_media_MediaCodec.c` | 23 | GdkDmabufTexture video frames → dmabuf/EGLImage into Skia/GL. **MediaCodec task**: codec-level backend — libavcodec hwdevice (VAAPI/V4L2 → DRM prime dmabuf) on mainline, Android codecs via libhybris on halium |
 
-The three media files form one **media-backend task**. Requirements: audio
-through PulseAudio/PipeWire (libpulse serves both), NOT ALSA; video decode
-hw-accelerated on mainline (libavcodec hwdevice → DRM prime dmabuf →
-EGLImage) AND through Android codecs via libhybris on halium devices — a
-pluggable decoder backend. GStreamer is a candidate for the MediaPlayer/
-SoundPool playback side (demux/sync/seek for free) but is not installed on
-the dev machine.
+MediaPlayer and SoundPool are DONE (GStreamer playbin — see below); MediaCodec
+is the remaining media file. Audio goes through playbin's default sink
+(PulseAudio/PipeWire); `ATL_MEDIA_AUDIO_SINK` overrides it for headless test
+machines. Video in MediaPlayer is currently decode-and-drop (fakesink) until
+the MediaCodec/dmabuf rendering path lands.
 
 ## Done in M1 so far
 
+- **MediaPlayer + SoundPool over GStreamer** — `android_media_MediaPlayer.c`
+  rewritten as a playbin peer (prepare/prepareAsync/start/pause/stop/seek/
+  isPlaying/looping/volume/reset/release; bus watch on the GLib loop posts
+  prepared/completion/seek-complete/error to Java via `postEventFromNative`);
+  `android_media_SoundPool.c` plays samples through transient playbins
+  (overlap-safe, loop counts, volume, real `onLoadComplete`). GtkMediaStream
+  is gone from both; shared lazy `gst_init` in `media/atl_gst.c`.
 - **In-scene file picker + share dialog** — `ATLFilePicker.java` (open/save/
   select-folder on the dialog panel infra) replaced `nativeFileChooser`
   (GtkFileDialog) and `ATLMediaContentProvider`'s folder picker (that JNI file
