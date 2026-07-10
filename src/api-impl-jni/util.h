@@ -51,8 +51,6 @@ void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **arr
 void release_nio_buffer(JNIEnv *env, jarray array_ref, jbyte *array);
 int get_nio_buffer_size(JNIEnv *env, jobject buffer);
 
-/* GTK widget helpers moved to util_gtk.h */
-
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);
 jobject intent_deserialize(JNIEnv *env, GVariant *variant);

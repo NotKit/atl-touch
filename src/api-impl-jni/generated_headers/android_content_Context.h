@@ -35,10 +35,10 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeOpenFile
 
 /*
  * Class:     android_content_Context
- * Method:    nativeShareFile
+ * Method:    nativeComposeEmail
  * Signature: (Ljava/lang/String;I)V
  */
-JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile
+JNIEXPORT void JNICALL Java_android_content_Context_nativeComposeEmail
   (JNIEnv *, jclass, jstring, jint);
 
 /*

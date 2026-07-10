@@ -26,20 +26,33 @@ stubbed; they come back together in the wl_egl_window bring-up.)
 
 | File | Refs | Role / replacement |
 |---|---|---|
-| `src/api-impl-jni/util.c` | 25 | misc helpers incl. `atl_safe_gtk_*` (declared in `util_gtk.h`); split/replace per-caller |
 | `src/api-impl-jni/media/android_media_MediaCodec.c` | 23 | GdkDmabufTexture video frames → dmabuf/EGLImage into Skia/GL. **Media-backend task**: also uses GtkMediaStream-less libav decode |
-| `src/api-impl-jni/media/android_media_MediaPlayer.c` | 18 | GtkMediaStream playback → GStreamer or libav+ALSA. **Media-backend task** |
+| `src/api-impl-jni/media/android_media_MediaPlayer.c` | 18 | GtkMediaStream playback → media backend. **Media-backend task** |
 | `src/api-impl-jni/audio/android_media_SoundPool.c` | 8 | GtkMediaStream one-shot playback → same media backend. **Media-backend task** |
-| `src/api-impl-jni/content/android_content_Context.c` | 17 | GTK file chooser / portal-ish helpers → in-scene picker or UT Content Hub |
-| `src/api-impl-jni/app/android_app_Activity.c` | 18 | dialogs, window glue → in-scene views |
-| `src/api-impl-jni/content/android_atl_ATLMediaContentProvider.c` | 6 | `gtk_file_dialog` folder picker → in-scene picker / Content Hub |
 
-The three media files form one **media-backend task**: GStreamer isn't
-installed on the dev machine, and libavcodec is already a dependency, so the
-likely path is libav decode → ALSA (audio) / dmabuf-EGLImage (video), replacing
-the GtkMediaStream/GdkDmabufTexture usage in all three at once.
+The three media files form one **media-backend task**. Requirements: audio
+through PulseAudio/PipeWire (libpulse serves both), NOT ALSA; video decode
+hw-accelerated on mainline (libavcodec hwdevice → DRM prime dmabuf →
+EGLImage) AND through Android codecs via libhybris on halium devices — a
+pluggable decoder backend. GStreamer is a candidate for the MediaPlayer/
+SoundPool playback side (demux/sync/seek for free) but is not installed on
+the dev machine.
 
 ## Done in M1 so far
+
+- **In-scene file picker + share dialog** — `ATLFilePicker.java` (open/save/
+  select-folder on the dialog panel infra) replaced `nativeFileChooser`
+  (GtkFileDialog) and `ATLMediaContentProvider`'s folder picker (that JNI file
+  is deleted); the ACTION_SEND share dialog is a Java `AlertDialog`
+  (Cancel/Copy/Email; Copy → GLFW clipboard as text, Email → the existing
+  `org.freedesktop.portal.Email` call, kept as `nativeComposeEmail`).
+- `android_content_Context.c` — screen size via `atl_screen_size()` (GLFW
+  video mode) instead of GdkMonitor; the GtkSettings dark-theme setter is gone
+  (the portal `color-scheme` → `Configuration.uiMode` propagation stays).
+- `android_app_Activity.c` — GTK-free; `isInMultiWindowMode` uses
+  `atl_window_is_maximized()` (GLFW_MAXIMIZED).
+- `util.c` — GTK-free; the `atl_safe_gtk_*` snapshot-safety helpers and
+  `util_gtk.h` are deleted (no callers since the AOSP drawable/text lifts).
 
 - **Bitmap / ATLCanvas** — GdkTexture bridge deleted (`atl_skbitmap_to/from_gdk_texture`,
   `atl_canvas_to_gdk_texture`, `Bitmap.getGdkTexture` + the cached `gdk_texture`

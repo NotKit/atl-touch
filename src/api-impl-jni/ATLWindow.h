@@ -33,6 +33,12 @@ jobject atl_window_get_jobject(ATLWindow *window);
 void atl_window_focus(ATLWindow *window);
 void atl_window_set_clipboard(ATLWindow *window, const char *text);
 const char *atl_window_get_clipboard(ATLWindow *window);
+bool atl_window_is_maximized(ATLWindow *window);
+
+/* size of the primary monitor in pixels; false if there is no monitor
+ * (or GLFW is not initialized yet), in which case *width/*height are
+ * left untouched */
+bool atl_screen_size(int *width, int *height);
 
 /* WPE WebView offscreen integration. Called from the C++ WebView module, so
  * these must keep C linkage to match their definitions in ATLWindow.c. */

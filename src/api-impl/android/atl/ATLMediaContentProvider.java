@@ -36,7 +36,13 @@ public class ATLMediaContentProvider extends ContentProvider {
 			new Handler(Looper.getMainLooper()).post(new Runnable() {
 				@Override
 				public void run() {
-					native_open_media_folder();
+					new ATLFilePicker(android.content.Context.this_application, ATLFilePicker.ACTION_SELECT_FOLDER,
+					                  "Open Media Folder", null, new ATLFilePicker.ResultListener() {
+						@Override
+						public void onResult(File file) {
+							setSelectedFile(file != null ? file.getAbsolutePath() : null);
+						}
+					}).show();
 				}
 			});
 		}
@@ -146,8 +152,6 @@ public class ATLMediaContentProvider extends ContentProvider {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException("Unimplemented method 'delete'");
 	}
-
-	private native void native_open_media_folder();
 
 	@Override
 	public AssetFileDescriptor openAssetFile(Uri uri, String mode) throws FileNotFoundException {

@@ -1,6 +1,7 @@
 package android.app;
 
 import android.app.ActionBar;
+import android.atl.ATLFilePicker;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -319,16 +320,26 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {}
 
-	// the order must match GtkFileChooserAction enum
+	// the order must match the ATLFilePicker.ACTION_* values
 	private static final List<String> FILE_CHOOSER_ACTIONS = Arrays.asList(
-	    "android.intent.action.OPEN_DOCUMENT",     // (0) GTK_FILE_CHOOSER_ACTION_OPEN
-	    "android.intent.action.CREATE_DOCUMENT",   // (1) GTK_FILE_CHOOSER_ACTION_SAVE
-	    "android.intent.action.OPEN_DOCUMENT_TREE" // (2) GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER
+	    "android.intent.action.OPEN_DOCUMENT",     // (0) ATLFilePicker.ACTION_OPEN
+	    "android.intent.action.CREATE_DOCUMENT",   // (1) ATLFilePicker.ACTION_SAVE
+	    "android.intent.action.OPEN_DOCUMENT_TREE" // (2) ATLFilePicker.ACTION_SELECT_FOLDER
 	);
 
-	// callback from native code
 	protected void fileChooserResultCallback(int requestCode, int resultCode, int action, String uri) {
 		onActivityResult(requestCode, resultCode, new Intent(FILE_CHOOSER_ACTIONS.get(action), uri != null ? Uri.parse(uri) : null));
+	}
+
+	private void showFilePicker(final int action, Intent intent, final int requestCode) {
+		new ATLFilePicker(this, action, null, intent.getStringExtra(Intent.EXTRA_TITLE),
+		                  new ATLFilePicker.ResultListener() {
+			@Override
+			public void onResult(java.io.File file) {
+				fileChooserResultCallback(requestCode, file != null ? -1 /*RESULT_OK*/ : 0 /*RESULT_CANCELED*/,
+				                          action, file != null ? Uri.fromFile(file).toString() : null);
+			}
+		}).show();
 	}
 
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
@@ -348,9 +359,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 				onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 			}
 		} else if (FILE_CHOOSER_ACTIONS.contains(intent.getAction())) {
-			nativeFileChooser(FILE_CHOOSER_ACTIONS.indexOf(intent.getAction()), intent.getType(), intent.getStringExtra("android.intent.extra.TITLE"), requestCode);
+			showFilePicker(FILE_CHOOSER_ACTIONS.indexOf(intent.getAction()), intent, requestCode);
 		} else if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())) {
-			nativeFileChooser(0 /*GTK_FILE_CHOOSER_ACTION_OPEN*/, intent.getType(), intent.getStringExtra(Intent.EXTRA_TITLE), requestCode);
+			showFilePicker(ATLFilePicker.ACTION_OPEN, intent, requestCode);
 		} else if ("android.intent.action.INSTALL_PACKAGE".equals(intent.getAction())) {
 			try {
 				Process p = new ProcessBuilder("/usr/bin/env", "android-translation-layer", "--install", intent.getData().getPath()).start();
@@ -626,7 +637,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public static native void nativeStartActivity(Activity activity);
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
 	public static native void nativeOpenURI(String uri);
-	public native void nativeFileChooser(int action, String type, String title, int requestCode);
 	public void reportFullyDrawn() {}
 	public void setVisible(boolean visible) {}
 	public Uri getReferrer() { return null; }

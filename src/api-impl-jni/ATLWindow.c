@@ -68,6 +68,12 @@ static void dispatch_pointer_event(ATLWindow *window, int action)
 	if (!window->view_root)
 		return;
 	JNIEnv *env = get_jni_env();
+	/* A pending exception (e.g. thrown by an app callback under a nested native
+	 * frame that couldn't handle it) makes every JNI call below misbehave —
+	 * object creation returns NULL and the dispatch call aborts the runtime
+	 * ("with unexpected pending exception"). Surface and clear it instead. */
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
 	/* GLFW reports the cursor in window (logical) coordinates, but the scene is
 	 * laid out and rendered in framebuffer pixels. On a scaled/HiDPI output the
 	 * two differ by the content scale, so convert before dispatching or touches
@@ -513,6 +519,24 @@ void atl_window_set_clipboard(ATLWindow *window, const char *text)
 const char *atl_window_get_clipboard(ATLWindow *window)
 {
 	return glfwGetClipboardString(window->glfw_window);
+}
+
+bool atl_window_is_maximized(ATLWindow *window)
+{
+	return glfwGetWindowAttrib(window->glfw_window, GLFW_MAXIMIZED);
+}
+
+bool atl_screen_size(int *width, int *height)
+{
+	GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+	if (!monitor)
+		return false;
+	const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+	if (!mode)
+		return false;
+	*width = mode->width;
+	*height = mode->height;
+	return true;
 }
 
 int atl_window_get_width(ATLWindow *window)

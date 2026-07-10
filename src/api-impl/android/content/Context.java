@@ -157,7 +157,7 @@ public abstract class Context {
 	private static native String native_get_apk_path();
 	protected static native void native_updateConfig(Configuration config);
 	private static native void nativeOpenFile(int fd);
-	private static native void nativeShareFile(String text, int fd);
+	private static native void nativeComposeEmail(String text, int fd);
 	private static native void nativeExportUnifiedPush(String packageName);
 	private static native void nativeRegisterUnifiedPush(String token, String application);
 	private static native void nativeStartExternalService(Intent service);
@@ -565,8 +565,8 @@ public abstract class Context {
 			className = intent.getComponent().getClassName();
 		} else {
 			if (intent.getAction() != null && intent.getAction().equals("android.intent.action.SEND")) {
-				Slog.i(TAG, "sharing intent via composeMail: " + intent);
-				String text = intent.getStringExtra("android.intent.extra.TEXT");
+				Slog.i(TAG, "sharing intent via share dialog: " + intent);
+				final String text = intent.getStringExtra("android.intent.extra.TEXT");
 				ParcelFileDescriptor fd = null;
 				if (intent.hasExtra(Intent.EXTRA_STREAM)) {
 					try {
@@ -576,17 +576,54 @@ public abstract class Context {
 					}
 				}
 				final ParcelFileDescriptor fd_final = fd;
+				/* The XDG specification does not provide anything comparable to the
+				 * Android share API, so we offer copying to the clipboard or sending
+				 * per mail through the org.freedesktop.portal.Email portal. The fd
+				 * stays open until the dialog is dismissed. */
 				Runnable runnable = new Runnable() {
 					@Override
 					public void run() {
-						nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1);
+						String path = null;
 						if (fd_final != null) {
 							try {
-								fd_final.close();
+								path = java.nio.file.Files.readSymbolicLink(
+								    java.nio.file.Paths.get("/proc/self/fd/" + fd_final.getFd())).toString();
 							} catch (IOException e) {
 								e.printStackTrace();
 							}
 						}
+						final String detail = path != null ? path : text;
+						android.app.AlertDialog dialog = new android.app.AlertDialog(Context.this);
+						dialog.setTitle("Share");
+						if (detail != null)
+							dialog.setMessage(detail);
+						dialog.setButton(DialogInterface.BUTTON_NEGATIVE, "Cancel", null);
+						dialog.setButton(DialogInterface.BUTTON_POSITIVE, "Copy", new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface d, int which) {
+								if (detail != null)
+									new ClipboardManager().setPrimaryClip(ClipData.newPlainText(null, detail));
+							}
+						});
+						dialog.setButton(DialogInterface.BUTTON_NEUTRAL, "Email", new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface d, int which) {
+								nativeComposeEmail(text, fd_final != null ? fd_final.getFd() : -1);
+							}
+						});
+						dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+							@Override
+							public void onDismiss(DialogInterface d) {
+								if (fd_final != null) {
+									try {
+										fd_final.close();
+									} catch (IOException e) {
+										e.printStackTrace();
+									}
+								}
+							}
+						});
+						dialog.show();
 					}
 				};
 				if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -645,6 +682,15 @@ public abstract class Context {
 
 	public void startActivity(Intent intent, Bundle options) {
 		startActivity(intent);
+	}
+
+	public void startActivities(Intent[] intents, Bundle options) {
+		for (Intent intent : intents)
+			startActivity(intent, options);
+	}
+
+	public void startActivities(Intent[] intents) {
+		startActivities(intents, null);
 	}
 
 	public final TypedArray obtainStyledAttributes(AttributeSet set, int[] attrs) {
