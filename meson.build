@@ -46,6 +46,15 @@ unifiedpush_connector = gnome.gdbus_codegen('unifiedpush-connector',
 extra_deps = []
 extra_jni_srcs = []
 
+# Maliit D-Bus input method (soft keyboard on Lomiri/Ubuntu Touch and
+# SailfishOS); the generic backend framework always builds, this backend
+# only when maliit-glib is available.
+maliit_glib_dep = dependency('maliit-glib', required: false)
+if maliit_glib_dep.found()
+	extra_deps += maliit_glib_dep
+	extra_jni_srcs += files('src/api-impl-jni/input/input_method_maliit.c')
+endif
+
 # Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap
 skia_dep = dependency('skia')
 
@@ -148,6 +157,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/util.c',
                                                                   	'src/api-impl-jni/ATLWindow.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
+                                                                  	'src/api-impl-jni/input/input_method.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
                                                                   	'src/api-impl-jni/widgets/android_webkit_WebView.cpp',
                                                                   	mpris,
