@@ -82,7 +82,7 @@ public abstract class Context {
 	public static final String AUDIO_SERVICE = "audio";
 	public static final String CLIPBOARD_SERVICE = "clipboard";
 	public static final String DISPLAY_SERVICE = "display";
-	public static final String INPUT_METHOD_SERVICE = "input";
+	public static final String INPUT_METHOD_SERVICE = "input_method";
 	public static final String LOCATION_SERVICE = "location";
 	public static final String MEDIA_ROUTER_SERVICE = "media_router";
 	public static final String POWER_SERVICE = "power";
