@@ -441,6 +441,53 @@ static void on_window_close(GLFWwindow *glfw_window)
 	exit(0);
 }
 
+/* --- IME event injection (used by input method backends) --- */
+
+void atl_windows_ime_commit_text(const char *utf8)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root || !window->dispatch_character || !utf8)
+		return;
+	JNIEnv *env = get_jni_env();
+	glong len = 0;
+	gunichar *codepoints = g_utf8_to_ucs4_fast(utf8, -1, &len);
+	for (glong i = 0; i < len; i++) {
+		(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_character, (jint)codepoints[i]);
+		if ((*env)->ExceptionCheck(env))
+			(*env)->ExceptionDescribe(env);
+	}
+	g_free(codepoints);
+}
+
+void atl_windows_ime_key(int action, int keycode)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root)
+		return;
+	JNIEnv *env = get_jni_env();
+	jobject key_event = (*env)->NewObject(env, handle_cache.key_event.class, handle_cache.key_event.constructor,
+	                                      (jlong)0, (jlong)0, action, keycode, 0, 0);
+	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_key_event, key_event);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, key_event);
+}
+
+static int ime_inset = 0;
+
+void atl_windows_set_ime_inset(int inset)
+{
+	if (inset < 0)
+		inset = 0;
+	if (ime_inset == inset)
+		return;
+	ime_inset = inset;
+	for (ATLWindow *w = windows; w; w = w->next) {
+		w->layout_width = 0; /* force relayout with the new inset */
+		w->needs_redraw = true;
+	}
+}
+
 /* --- rendering: raster Skia scene blitted through GL --- */
 
 /* Per-phase frame timing, gated behind ATL_DEBUG_RENDER. Layout and draw are
@@ -468,8 +515,10 @@ static void atl_window_render(ATLWindow *window)
 	if (width != window->layout_width || height != window->layout_height) {
 		window->layout_width = width;
 		window->layout_height = height;
+		/* keep the layout clear of the soft keyboard (adjustResize) */
+		int layout_height = height > ime_inset ? height - ime_inset : height;
 		jlong t = debug_render() ? atl_uptime_millis() : 0;
-		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, height);
+		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, layout_height);
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 		if (debug_render())

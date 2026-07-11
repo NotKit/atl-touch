@@ -324,7 +324,15 @@ public class TextView extends View {
 	}
 	public final void setLinksClickable(boolean whether) {}
 
-	public void setInputType(int type) {}
+	private int inputType = 0x00000001; // InputType.TYPE_CLASS_TEXT
+
+	public void setInputType(int type) {
+		inputType = type;
+	}
+
+	public int getInputType() {
+		return inputType;
+	}
 	public void setFilters(InputFilter[] filters) {}
 	public void setCursorVisible(boolean visible) {}
 	public void setImeOptions(int imeOptions) {}
@@ -550,7 +558,6 @@ public class TextView extends View {
 
 	public KeyListener getKeyListener() { return null; }
 
-	public int getInputType() { return 0; }
 
 	public final void setTransformationMethod(TransformationMethod method) {}
 

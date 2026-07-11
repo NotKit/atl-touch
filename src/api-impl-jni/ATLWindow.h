@@ -19,6 +19,13 @@ typedef struct ATLWindow ATLWindow;
 /* call once on the main thread before creating windows */
 void atl_windows_init(void);
 
+/* IME event injection, used by input method backends (src/api-impl-jni/input/):
+ * text and key events go through the same dispatch as hardware keyboard
+ * input; the inset shrinks the layout so the panel doesn't cover the UI. */
+void atl_windows_ime_commit_text(const char *utf8);
+void atl_windows_ime_key(int action, int keycode);
+void atl_windows_set_ime_inset(int inset);
+
 ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated);
 void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root);
 void atl_window_set_title(ATLWindow *window, const char *title);

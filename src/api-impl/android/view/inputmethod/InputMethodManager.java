@@ -53,11 +53,7 @@ public class InputMethodManager {
 		return new InputMethodSubtype();
 	}
 
-	private static long nativeInit() {
-		return 0;
-	}
-	private boolean nativeShowSoftInput(long im_context, long widget, InputConnection ic, int inputType) {
-		return false;
-	}
-	private void nativeHideSoftInput(long im_context) {}
+	private static native long nativeInit();
+	private native boolean nativeShowSoftInput(long im_context, long widget, InputConnection ic, int inputType);
+	private native void nativeHideSoftInput(long im_context);
 }

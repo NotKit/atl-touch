@@ -12,6 +12,10 @@ import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.inputmethod.BaseInputConnection;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
 import android.view.MotionEvent;
 import java.util.ArrayList;
 
@@ -188,9 +192,18 @@ public class EditText extends TextView {
 		if (event.getAction() == MotionEvent.ACTION_UP) {
 			requestFocus();
 			setCaret(caretFromX(event.getX()));
+			InputMethodManager imm = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+			if (imm != null)
+				imm.showSoftInput(this, 0);
 		}
 		super.onTouchEvent(event);
 		return true; // a text field always consumes touches
+	}
+
+	@Override
+	public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+		outAttrs.inputType = getInputType();
+		return new BaseInputConnection(this, true);
 	}
 
 	/** Map a touch x (view coords) to the nearest character boundary. */
