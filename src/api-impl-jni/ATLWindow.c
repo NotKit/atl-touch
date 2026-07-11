@@ -3,7 +3,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define GL_GLEXT_PROTOTYPES 1
 #include <GL/gl.h>
+#include <GL/glext.h>
+#include <string.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_EGL
 #include <GLFW/glfw3native.h>
@@ -31,10 +34,65 @@ struct ATLWindow {
 	double pointer_x, pointer_y;
 	int layout_width, layout_height;
 	unsigned int gl_texture;
+	unsigned int gl_program;
+	int gl_attr_pos, gl_attr_uv;
 	struct ATLWindow *next;
 };
 
 static struct ATLWindow *windows = NULL;
+
+/* --- ES2-compatible blit ---------------------------------------------
+ * The fixed-function path (glBegin/glMatrixMode/...) does not exist on
+ * OpenGL ES, which is all that hybris EGL offers on Ubuntu Touch. This
+ * shader path works on both GLES 2.0 and desktop GL 2.1 contexts. */
+
+static unsigned int atl_gl_compile(unsigned int type, const char *src)
+{
+	unsigned int shader = glCreateShader(type);
+	glShaderSource(shader, 1, &src, NULL);
+	glCompileShader(shader);
+	int ok = 0;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+	if (!ok) {
+		char log[512] = {0};
+		glGetShaderInfoLog(shader, sizeof(log) - 1, NULL, log);
+		fprintf(stderr, "ATLWindow: shader compile failed: %s\n", log);
+	}
+	return shader;
+}
+
+static unsigned int atl_gl_make_blit_program(int *attr_pos, int *attr_uv)
+{
+	static const char *vs_src =
+		"attribute vec2 pos;\n"
+		"attribute vec2 uv;\n"
+		"varying vec2 v_uv;\n"
+		"void main() { gl_Position = vec4(pos, 0.0, 1.0); v_uv = uv; }\n";
+	static const char *fs_src =
+		"#ifdef GL_ES\n"
+		"precision mediump float;\n"
+		"#endif\n"
+		"varying vec2 v_uv;\n"
+		"uniform sampler2D tex;\n"
+		"void main() { gl_FragColor = texture2D(tex, v_uv); }\n";
+
+	unsigned int program = glCreateProgram();
+	glAttachShader(program, atl_gl_compile(GL_VERTEX_SHADER, vs_src));
+	glAttachShader(program, atl_gl_compile(GL_FRAGMENT_SHADER, fs_src));
+	glLinkProgram(program);
+	int ok = 0;
+	glGetProgramiv(program, GL_LINK_STATUS, &ok);
+	if (!ok) {
+		char log[512] = {0};
+		glGetProgramInfoLog(program, sizeof(log) - 1, NULL, log);
+		fprintf(stderr, "ATLWindow: program link failed: %s\n", log);
+	}
+	*attr_pos = glGetAttribLocation(program, "pos");
+	*attr_uv = glGetAttribLocation(program, "uv");
+	glUseProgram(program);
+	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	return program;
+}
 
 extern void activity_close_all(void); // app/android_app_Activity.c
 
@@ -296,6 +354,8 @@ static void atl_window_render(ATLWindow *window)
 	const void *pixels = atl_canvas_get_pixels(canvas, &pixel_width, &pixel_height, &stride);
 
 	glfwMakeContextCurrent(window->glfw_window);
+	if (!window->gl_program)
+		window->gl_program = atl_gl_make_blit_program(&window->gl_attr_pos, &window->gl_attr_uv);
 	if (!window->gl_texture) {
 		glGenTextures(1, &window->gl_texture);
 		glBindTexture(GL_TEXTURE_2D, window->gl_texture);
@@ -304,28 +364,38 @@ static void atl_window_render(ATLWindow *window)
 	} else {
 		glBindTexture(GL_TEXTURE_2D, window->gl_texture);
 	}
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / 4);
+	/* OpenGL ES 2.0 has no GL_UNPACK_ROW_LENGTH; skia raster surfaces are
+	 * tightly packed in practice, repack in the (unexpected) padded case */
+	void *packed = NULL;
+	if (stride != pixel_width * 4) {
+		packed = malloc((size_t)pixel_width * 4 * pixel_height);
+		for (int y = 0; y < pixel_height; y++)
+			memcpy((char *)packed + (size_t)y * pixel_width * 4,
+			       (const char *)pixels + (size_t)y * stride,
+			       (size_t)pixel_width * 4);
+		pixels = packed;
+	}
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pixel_width, pixel_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	free(packed);
 
 	glViewport(0, 0, width, height);
 	glClearColor(1, 1, 1, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
-	glEnable(GL_TEXTURE_2D);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	glBegin(GL_TRIANGLE_STRIP);
-	glTexCoord2f(0, 1);
-	glVertex2f(-1, -1);
-	glTexCoord2f(1, 1);
-	glVertex2f(1, -1);
-	glTexCoord2f(0, 0);
-	glVertex2f(-1, 1);
-	glTexCoord2f(1, 0);
-	glVertex2f(1, 1);
-	glEnd();
+	glUseProgram(window->gl_program);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, window->gl_texture);
+	static const float verts[] = {
+		/* pos      uv */
+		-1, -1,     0, 1,
+		 1, -1,     1, 1,
+		-1,  1,     0, 0,
+		 1,  1,     1, 0,
+	};
+	glVertexAttribPointer(window->gl_attr_pos, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), verts);
+	glVertexAttribPointer(window->gl_attr_uv, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), verts + 2);
+	glEnableVertexAttribArray(window->gl_attr_pos);
+	glEnableVertexAttribArray(window->gl_attr_uv);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glfwSwapBuffers(window->glfw_window);
 
 	atl_canvas_free(canvas);
@@ -407,6 +477,13 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	if (getenv("ATL_WEBVIEW_EGL"))
 		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 	window->glfw_window = glfwCreateWindow(width, height, "android-translation-layer", NULL, NULL);
+	if (!window->glfw_window) {
+		/* mobile GPUs (e.g. hybris EGL on Ubuntu Touch) only do OpenGL ES */
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+		window->glfw_window = glfwCreateWindow(width, height, "android-translation-layer", NULL, NULL);
+	}
 	if (!window->glfw_window) {
 		const char *desc = NULL;
 		glfwGetError(&desc);
