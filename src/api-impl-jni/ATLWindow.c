@@ -476,6 +476,12 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	 * users who want WebView on X11, at the cost of switching the GL backend. */
 	if (getenv("ATL_WEBVIEW_EGL"))
 		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+#ifdef GLFW_WAYLAND_APP_ID
+	/* Lomiri/Mir associates windows with their launcher entry through the
+	 * wayland app_id */
+	if (getenv("APP_ID"))
+		glfwWindowHintString(GLFW_WAYLAND_APP_ID, getenv("APP_ID"));
+#endif
 	window->glfw_window = glfwCreateWindow(width, height, "android-translation-layer", NULL, NULL);
 	if (!window->glfw_window) {
 		/* mobile GPUs (e.g. hybris EGL on Ubuntu Touch) only do OpenGL ES */
