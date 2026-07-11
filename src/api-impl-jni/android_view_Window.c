@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <gio/gio.h>
 
 #include "defines.h"

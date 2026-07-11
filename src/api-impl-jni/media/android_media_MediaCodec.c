@@ -8,6 +8,7 @@
  * into the Skia scene, same path as SurfaceHolder.lockCanvas frames).
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

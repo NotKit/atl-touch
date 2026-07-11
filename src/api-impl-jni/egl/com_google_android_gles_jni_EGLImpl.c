@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <EGL/egl.h>
 
 #include "../defines.h"

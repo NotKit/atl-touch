@@ -1,6 +1,8 @@
 // for dladdr
 #define _GNU_SOURCE
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <gio/gio.h>
 #include <GLFW/glfw3.h>
 

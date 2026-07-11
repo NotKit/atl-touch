@@ -11,6 +11,8 @@
  * https://git.sr.ht/~emersion/vaapi-decoder/tree/wayland/
  */
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

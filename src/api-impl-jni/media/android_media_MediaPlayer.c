@@ -13,6 +13,7 @@
  * dmabuf task.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include <gst/gst.h>

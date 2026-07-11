@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <graphene.h>
 #include <libportal/portal.h>
 #include <sys/param.h>

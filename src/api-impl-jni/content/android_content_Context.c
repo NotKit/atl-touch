@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <stdint.h>
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 #include <libportal/portal.h>

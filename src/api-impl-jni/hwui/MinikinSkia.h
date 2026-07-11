@@ -1,3 +1,4 @@
+#include <stdint.h>
 /*
  * Copyright (C) 2013 The Android Open Source Project
  *

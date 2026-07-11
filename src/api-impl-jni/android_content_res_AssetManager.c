@@ -1,3 +1,5 @@
+#include <stdbool.h>
+#include <stdint.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>

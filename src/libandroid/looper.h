@@ -1,5 +1,7 @@
 #ifndef LOOPER_H
 #define LOOPER_H
+#include <stdbool.h>
+
 
 typedef void ALooper;
 typedef int (*Looper_callbackFunc)(int fd, int events, void *data);

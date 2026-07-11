@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <GLES3/gl3.h>
 #include <jni.h>
 
