@@ -2612,6 +2612,26 @@ public class View implements Drawable.Callback {
 	}
 
 	/** A typed character (Unicode codepoint, post keyboard-layout). Editable views override. */
+	/** IME committed text (finalized); default treats it as typed input. */
+	public boolean onCommitText(CharSequence text) {
+		boolean any = false;
+		for (int i = 0; i < text.length(); ) {
+			int cp = Character.codePointAt(text, i);
+			any |= onTextInput(cp);
+			i += Character.charCount(cp);
+		}
+		return any;
+	}
+
+	/** IME composing (preedit) text; overridden by editable views. */
+	public boolean onComposingText(CharSequence text) {
+		return false;
+	}
+
+	/** Finalize any composing region, keeping its current text. */
+	public void onFinishComposing() {
+	}
+
 	public boolean onTextInput(int codePoint) {
 		return false;
 	}

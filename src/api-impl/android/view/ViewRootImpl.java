@@ -286,6 +286,22 @@ public class ViewRootImpl implements ViewParent {
 		return focusedView != null && focusedView.onTextInput(codePoint);
 	}
 
+	/* IME text: a finalized string replacing any composing region. */
+	protected boolean dispatchCommitText(String text) {
+		return focusedView != null && focusedView.onCommitText(text);
+	}
+
+	/* IME preedit: provisional (underlined) text, replaced in place until
+	 * committed. */
+	protected boolean dispatchComposingText(String text) {
+		return focusedView != null && focusedView.onComposingText(text);
+	}
+
+	protected void dispatchFinishComposing() {
+		if (focusedView != null)
+			focusedView.onFinishComposing();
+	}
+
 	public View getFocusedView() {
 		return focusedView;
 	}

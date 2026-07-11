@@ -75,9 +75,10 @@ static gboolean on_update_preedit(MaliitContext *obj, GDBusMethodInvocation *inv
                                   gint replace_start, gint replace_length, gint cursor_pos,
                                   gpointer user_data)
 {
-	/* We ask for prediction/correction to be disabled in the widget
-	 * information, so the keyboard should commit directly; a composing-text
-	 * UI needs InputConnection plumbing we don't have yet. */
+	/* Show the in-progress word as composing (underlined) text; it is
+	 * replaced in place by the next preedit update and finalized by
+	 * commit-string. */
+	atl_windows_ime_set_composing(string ? string : "");
 	return TRUE;
 }
 
@@ -113,6 +114,7 @@ static gboolean on_update_input_method_area(MaliitContext *obj, GDBusMethodInvoc
 static gboolean on_im_initiated_hide(MaliitContext *obj, GDBusMethodInvocation *invocation,
                                      gpointer user_data)
 {
+	atl_windows_ime_finish_composing();
 	atl_windows_set_ime_inset(0);
 	return TRUE;
 }
@@ -175,15 +177,15 @@ static void maliit_im_show(int input_type)
 		          variation == TYPE_TEXT_VARIATION_WEB_PASSWORD);
 	}
 
-	/* Without composing-text support in the views, ask the keyboard to skip
-	 * prediction/correction so text arrives as commit-string/key events. */
+	/* Composing text is rendered as an underlined preedit region, so let the
+	 * keyboard predict/correct normally (space/suggestion finalizes). */
 	GVariantBuilder state;
 	g_variant_builder_init(&state, G_VARIANT_TYPE("a{sv}"));
 	g_variant_builder_add(&state, "{sv}", "focusState", g_variant_new_boolean(TRUE));
 	g_variant_builder_add(&state, "{sv}", "contentType", g_variant_new_int32(content_type));
 	g_variant_builder_add(&state, "{sv}", "hiddenText", g_variant_new_boolean(hidden));
-	g_variant_builder_add(&state, "{sv}", "predictionEnabled", g_variant_new_boolean(FALSE));
-	g_variant_builder_add(&state, "{sv}", "correctionEnabled", g_variant_new_boolean(FALSE));
+	g_variant_builder_add(&state, "{sv}", "predictionEnabled", g_variant_new_boolean(TRUE));
+	g_variant_builder_add(&state, "{sv}", "correctionEnabled", g_variant_new_boolean(TRUE));
 	g_variant_builder_add(&state, "{sv}", "autocapitalizationEnabled", g_variant_new_boolean(FALSE));
 	if (!maliit_server_call_update_widget_information_sync(server, g_variant_builder_end(&state),
 	                                                       TRUE, NULL, &error)) {
@@ -206,6 +208,7 @@ static void maliit_im_hide(void)
 {
 	GError *error = NULL;
 
+	atl_windows_ime_finish_composing();
 	if (!maliit_server_call_reset_sync(server, NULL, &error)) {
 		fprintf(stderr, "maliit: reset failed: %s\n", error->message);
 		g_clear_error(&error);

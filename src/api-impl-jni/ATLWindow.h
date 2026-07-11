@@ -23,6 +23,8 @@ void atl_windows_init(void);
  * text and key events go through the same dispatch as hardware keyboard
  * input; the inset shrinks the layout so the panel doesn't cover the UI. */
 void atl_windows_ime_commit_text(const char *utf8);
+void atl_windows_ime_set_composing(const char *utf8);
+void atl_windows_ime_finish_composing(void);
 void atl_windows_ime_key(int action, int keycode);
 void atl_windows_set_ime_inset(int inset);
 

@@ -30,6 +30,9 @@ struct ATLWindow {
 	jmethodID dispatch_touch_event;
 	jmethodID dispatch_key_event;
 	jmethodID dispatch_character;
+	jmethodID dispatch_commit_text;
+	jmethodID dispatch_composing_text;
+	jmethodID dispatch_finish_composing;
 	jobject window_jobj;    // weak ref to the java android.view.Window
 	bool needs_redraw;
 	bool pointer_down;
@@ -446,17 +449,38 @@ static void on_window_close(GLFWwindow *glfw_window)
 void atl_windows_ime_commit_text(const char *utf8)
 {
 	ATLWindow *window = windows;
-	if (!window || !window->view_root || !window->dispatch_character || !utf8)
+	if (!window || !window->view_root || !utf8)
 		return;
 	JNIEnv *env = get_jni_env();
-	glong len = 0;
-	gunichar *codepoints = g_utf8_to_ucs4_fast(utf8, -1, &len);
-	for (glong i = 0; i < len; i++) {
-		(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_character, (jint)codepoints[i]);
-		if ((*env)->ExceptionCheck(env))
-			(*env)->ExceptionDescribe(env);
-	}
-	g_free(codepoints);
+	jstring str = (*env)->NewStringUTF(env, utf8);
+	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_commit_text, str);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, str);
+}
+
+void atl_windows_ime_set_composing(const char *utf8)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root || !utf8)
+		return;
+	JNIEnv *env = get_jni_env();
+	jstring str = (*env)->NewStringUTF(env, utf8);
+	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_composing_text, str);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, str);
+}
+
+void atl_windows_ime_finish_composing(void)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root)
+		return;
+	JNIEnv *env = get_jni_env();
+	(*env)->CallVoidMethod(env, window->view_root, window->dispatch_finish_composing);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
 }
 
 void atl_windows_ime_key(int action, int keycode)
@@ -741,6 +765,9 @@ void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
 	window->dispatch_touch_event = (*env)->GetMethodID(env, view_root_class, "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z");
 	window->dispatch_key_event = (*env)->GetMethodID(env, view_root_class, "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
 	window->dispatch_character = (*env)->GetMethodID(env, view_root_class, "dispatchCharacter", "(I)Z");
+	window->dispatch_commit_text = (*env)->GetMethodID(env, view_root_class, "dispatchCommitText", "(Ljava/lang/String;)Z");
+	window->dispatch_composing_text = (*env)->GetMethodID(env, view_root_class, "dispatchComposingText", "(Ljava/lang/String;)Z");
+	window->dispatch_finish_composing = (*env)->GetMethodID(env, view_root_class, "dispatchFinishComposing", "()V");
 	(*env)->SetLongField(env, view_root, (*env)->GetFieldID(env, view_root_class, "scene", "J"), _INTPTR(window));
 	window->layout_width = window->layout_height = 0; // force a layout pass
 	window->needs_redraw = true;

@@ -23,6 +23,8 @@ public class EditText extends TextView {
 	private CharSequence hint = "";
 	/** Caret position; selStart==selEnd means a plain cursor (no range selection). */
 	private int selStart = 0, selEnd = 0;
+	/** Active IME composing region; composeStart==-1 means none. */
+	private int composeStart = -1, composeEnd = -1;
 	private final ArrayList<TextWatcher> watchers = new ArrayList<>();
 	private OnEditorActionListener editorActionListener;
 	private final Paint cursorPaint = new Paint();
@@ -180,9 +182,51 @@ public class EditText extends TextView {
 	}
 
 	@Override
+	public boolean onComposingText(CharSequence text) {
+		String cur = content();
+		int s, e;
+		if (composeStart >= 0) {
+			s = Math.max(0, Math.min(composeStart, cur.length()));
+			e = Math.max(0, Math.min(composeEnd, cur.length()));
+		} else {
+			s = Math.max(0, Math.min(Math.min(selStart, selEnd), cur.length()));
+			e = Math.max(0, Math.min(Math.max(selStart, selEnd), cur.length()));
+		}
+		String ins = text == null ? "" : text.toString();
+		composeStart = s;
+		composeEnd = s + ins.length();
+		setContent(cur.substring(0, s) + ins + cur.substring(e), composeEnd);
+		return true;
+	}
+
+	@Override
+	public boolean onCommitText(CharSequence text) {
+		String cur = content();
+		int s, e;
+		if (composeStart >= 0) {
+			s = Math.max(0, Math.min(composeStart, cur.length()));
+			e = Math.max(0, Math.min(composeEnd, cur.length()));
+		} else {
+			s = Math.max(0, Math.min(Math.min(selStart, selEnd), cur.length()));
+			e = Math.max(0, Math.min(Math.max(selStart, selEnd), cur.length()));
+		}
+		String ins = text == null ? "" : text.toString();
+		composeStart = composeEnd = -1;
+		setContent(cur.substring(0, s) + ins + cur.substring(e), s + ins.length());
+		return true;
+	}
+
+	@Override
+	public void onFinishComposing() {
+		composeStart = composeEnd = -1;
+		invalidate();
+	}
+
+	@Override
 	public boolean onTextInput(int codePoint) {
 		if (codePoint == 0)
 			return false;
+		composeStart = composeEnd = -1;
 		replaceSelection(new String(Character.toChars(codePoint)));
 		return true;
 	}
@@ -234,6 +278,12 @@ public class EditText extends TextView {
 		float lineHeight = getPaint().getTextSize() * 1.2f;
 		int innerHeight = getHeight() - paddingTop - paddingBottom;
 		float top = paddingTop + Math.max(0, (innerHeight - lineHeight) / 2f);
+		if (composeStart >= 0 && composeEnd > composeStart && composeEnd <= cur.length()) {
+			float x0 = paddingLeft + Layout.getDesiredWidth(cur.subSequence(0, composeStart), getPaint());
+			float x1 = paddingLeft + Layout.getDesiredWidth(cur.subSequence(0, composeEnd), getPaint());
+			float baseline = top + lineHeight - getPaint().descent();
+			canvas.drawLine(x0, baseline + 2, x1, baseline + 2, getPaint());
+		}
 		canvas.drawLine(cursorX, top, cursorX, top + lineHeight, cursorPaint);
 	}
 
