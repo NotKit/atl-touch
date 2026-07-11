@@ -316,6 +316,7 @@ public class ViewRootImpl implements ViewParent {
 			old.dispatchFocusChanged(false);
 		if (v != null)
 			v.dispatchFocusChanged(true);
+		android.view.inputmethod.InputMethodManager.onFocusChanged(v);
 	}
 
 	public void invalidate() {

@@ -232,6 +232,11 @@ public class EditText extends TextView {
 	}
 
 	@Override
+	public boolean onCheckIsTextEditor() {
+		return true;
+	}
+
+	@Override
 	public boolean onTouchEvent(MotionEvent event) {
 		if (event.getAction() == MotionEvent.ACTION_UP) {
 			requestFocus();

@@ -18,6 +18,17 @@ public class InputMethodManager {
 		return false;
 	}
 
+	/* Called when the focused view changes. Hides the keyboard when focus
+	 * leaves the editor it was shown for (including focus cleared to null,
+	 * e.g. a dialog being dismissed). */
+	public static void onFocusChanged(View newFocus) {
+		if (activeView != null && newFocus != activeView
+		    && (newFocus == null || !newFocus.onCheckIsTextEditor())) {
+			nativeHideSoftInput(im_context);
+			activeView = null;
+		}
+	}
+
 	public boolean showSoftInput(View view, int flags) {
 		if (view == activeView) {
 			return nativeShowSoftInput(im_context, view.widget, null, 0);
@@ -55,5 +66,5 @@ public class InputMethodManager {
 
 	private static native long nativeInit();
 	private native boolean nativeShowSoftInput(long im_context, long widget, InputConnection ic, int inputType);
-	private native void nativeHideSoftInput(long im_context);
+	private static native void nativeHideSoftInput(long im_context);
 }
