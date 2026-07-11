@@ -276,10 +276,14 @@ public class DisplayMetrics {
 	}
 
 	private static int getDeviceDensity() {
-		// qemu.sf.lcd_density can be used to override ro.sf.lcd_density
-		// when running in the emulator, allowing for dynamic configurations.
-		// The reason for this is that ro.sf.lcd_density is write-once and is
-		// set by the init process when it parses build.prop before anything else.
+		/* Lomiri (Ubuntu Touch) does not use wl_output scaling; the UI scale
+		 * is communicated as GRID_UNIT_PX, pixels per grid unit (8 px = 1x). */
+		String gridUnitPx = System.getenv("GRID_UNIT_PX");
+		if (gridUnitPx != null) {
+			try {
+				return Math.round(DENSITY_DEFAULT * Integer.parseInt(gridUnitPx.trim()) / 8.0f);
+			} catch (NumberFormatException ignored) {}
+		}
 		return DENSITY_DEFAULT;
 	}
 }
