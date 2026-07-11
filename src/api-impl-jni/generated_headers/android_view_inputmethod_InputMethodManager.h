@@ -29,7 +29,7 @@ JNIEXPORT jboolean JNICALL Java_android_view_inputmethod_InputMethodManager_nati
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_android_view_inputmethod_InputMethodManager_nativeHideSoftInput
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }
