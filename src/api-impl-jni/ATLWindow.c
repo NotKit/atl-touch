@@ -7,8 +7,10 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <string.h>
+#include <wayland-client.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_EGL
+#define GLFW_EXPOSE_NATIVE_WAYLAND
 #include <GLFW/glfw3native.h>
 #include <glib.h>
 
@@ -186,6 +188,137 @@ static void on_mouse_button(GLFWwindow *glfw_window, int button, int action, int
 		dispatch_pointer_event(window, ACTION_UP);
 		window->pointer_down = false;
 	}
+}
+
+/* --- wayland touch input ----------------------------------------------
+ * GLFW has no touch API; its wayland backend only listens to wl_pointer,
+ * and Lomiri/Mir does not emulate a pointer for finger input. Bind our own
+ * wl_touch from the seat and feed the existing dispatch path (first touch
+ * point only for now). Events arrive through GLFW's wl_display, dispatched
+ * from glfwPollEvents(). */
+
+static ATLWindow *atl_touch_window;
+static int32_t atl_touch_id = -1;
+
+static ATLWindow *atl_window_from_wl_surface(struct wl_surface *surface)
+{
+	for (ATLWindow *w = windows; w; w = w->next)
+		if (glfwGetWaylandWindow(w->glfw_window) == surface)
+			return w;
+	return NULL;
+}
+
+static void atl_wl_touch_down(void *data, struct wl_touch *touch, uint32_t serial,
+                              uint32_t time, struct wl_surface *surface, int32_t id,
+                              wl_fixed_t x, wl_fixed_t y)
+{
+	if (atl_touch_id != -1)
+		return;
+	ATLWindow *window = atl_window_from_wl_surface(surface);
+	if (!window)
+		return;
+	atl_touch_id = id;
+	atl_touch_window = window;
+	window->pointer_x = wl_fixed_to_double(x);
+	window->pointer_y = wl_fixed_to_double(y);
+	window->pointer_down = true;
+	dispatch_pointer_event(window, ACTION_DOWN);
+}
+
+static void atl_wl_touch_up(void *data, struct wl_touch *touch, uint32_t serial,
+                            uint32_t time, int32_t id)
+{
+	if (id != atl_touch_id || !atl_touch_window)
+		return;
+	dispatch_pointer_event(atl_touch_window, ACTION_UP);
+	atl_touch_window->pointer_down = false;
+	atl_touch_window = NULL;
+	atl_touch_id = -1;
+}
+
+static void atl_wl_touch_motion(void *data, struct wl_touch *touch, uint32_t time,
+                                int32_t id, wl_fixed_t x, wl_fixed_t y)
+{
+	if (id != atl_touch_id || !atl_touch_window)
+		return;
+	atl_touch_window->pointer_x = wl_fixed_to_double(x);
+	atl_touch_window->pointer_y = wl_fixed_to_double(y);
+	dispatch_pointer_event(atl_touch_window, ACTION_MOVE);
+}
+
+static void atl_wl_touch_frame(void *data, struct wl_touch *touch)
+{
+}
+
+static void atl_wl_touch_cancel(void *data, struct wl_touch *touch)
+{
+	if (!atl_touch_window)
+		return;
+	dispatch_pointer_event(atl_touch_window, ACTION_CANCEL);
+	atl_touch_window->pointer_down = false;
+	atl_touch_window = NULL;
+	atl_touch_id = -1;
+}
+
+static const struct wl_touch_listener atl_wl_touch_listener = {
+	.down = atl_wl_touch_down,
+	.up = atl_wl_touch_up,
+	.motion = atl_wl_touch_motion,
+	.frame = atl_wl_touch_frame,
+	.cancel = atl_wl_touch_cancel,
+};
+
+static void atl_wl_seat_capabilities(void *data, struct wl_seat *seat, uint32_t caps)
+{
+	static struct wl_touch *touch;
+	if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !touch) {
+		touch = wl_seat_get_touch(seat);
+		wl_touch_add_listener(touch, &atl_wl_touch_listener, NULL);
+	}
+}
+
+static void atl_wl_seat_name(void *data, struct wl_seat *seat, const char *name)
+{
+}
+
+static const struct wl_seat_listener atl_wl_seat_listener = {
+	.capabilities = atl_wl_seat_capabilities,
+	.name = atl_wl_seat_name,
+};
+
+static void atl_wl_registry_global(void *data, struct wl_registry *registry, uint32_t name,
+                                   const char *interface, uint32_t version)
+{
+	static struct wl_seat *seat;
+	if (!strcmp(interface, wl_seat_interface.name) && !seat) {
+		seat = wl_registry_bind(registry, name, &wl_seat_interface,
+		                        version < 5 ? version : 5);
+		wl_seat_add_listener(seat, &atl_wl_seat_listener, NULL);
+	}
+}
+
+static void atl_wl_registry_global_remove(void *data, struct wl_registry *registry, uint32_t name)
+{
+}
+
+static const struct wl_registry_listener atl_wl_registry_listener = {
+	.global = atl_wl_registry_global,
+	.global_remove = atl_wl_registry_global_remove,
+};
+
+static void atl_touch_init(void)
+{
+	static bool done;
+	if (done)
+		return;
+	done = true;
+	struct wl_display *display = glfwGetWaylandDisplay();
+	if (!display)
+		return;
+	struct wl_registry *registry = wl_display_get_registry(display);
+	wl_registry_add_listener(registry, &atl_wl_registry_listener, NULL);
+	wl_display_roundtrip(display); /* deliver globals (binds the seat) */
+	wl_display_roundtrip(display); /* deliver seat capabilities */
 }
 
 #define KEYCODE_BACK        4
@@ -503,6 +636,8 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwSetCharCallback(window->glfw_window, on_char);
 	glfwSetFramebufferSizeCallback(window->glfw_window, on_framebuffer_size);
 	glfwSetWindowCloseCallback(window->glfw_window, on_window_close);
+	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+		atl_touch_init();
 	glfwMakeContextCurrent(window->glfw_window);
 	glfwSwapInterval(0); // frame pacing comes from the render tick, don't block on vsync
 
