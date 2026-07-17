@@ -129,6 +129,14 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawRoundRect
 
 /*
  * Class:     android_graphics_BaseCanvas
+ * Method:    nDrawShadow
+ * Signature: (JFFFFFFFFFFII)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawShadow
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jint, jint);
+
+/*
+ * Class:     android_graphics_BaseCanvas
  * Method:    nDrawDoubleRoundRect
  * Signature: (JFFFFFFFFFFFFJ)V
  */

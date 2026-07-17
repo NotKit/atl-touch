@@ -18,6 +18,8 @@
 #include "include/core/SkShader.h"
 #include "include/core/SkTileMode.h"
 #include "include/core/SkVertices.h"
+#include "include/core/SkPoint3.h"
+#include "include/utils/SkShadowUtils.h"
 #include "include/utils/SkTextUtils.h"
 
 extern "C" {
@@ -310,6 +312,16 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawRoundRect(JNIEnv *e
 {
 	CANVAS(canvas_ptr)->drawRRect(SkRRect::MakeRectXY(SkRect::MakeLTRB(l, t, r, b), rx, ry),
 	                              ((AndroidPaint *)_PTR(paint_ptr))->paint);
+}
+
+JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawShadow(JNIEnv *env, jclass, jlong canvas_ptr, jfloat l, jfloat t, jfloat r, jfloat b, jfloat radius, jfloat elevation, jfloat light_x, jfloat light_y, jfloat light_z, jfloat light_radius, jint ambient_color, jint spot_color)
+{
+	SkPath path;
+	path.addRRect(SkRRect::MakeRectXY(SkRect::MakeLTRB(l, t, r, b), radius, radius));
+	SkShadowUtils::DrawShadow(CANVAS(canvas_ptr), path, SkPoint3::Make(0, 0, elevation),
+	                          SkPoint3::Make(light_x, light_y, light_z), light_radius,
+	                          (SkColor)ambient_color, (SkColor)spot_color,
+	                          SkShadowFlags::kNone_ShadowFlag);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawDoubleRoundRect__JFFFFFFFFFFFFJ(JNIEnv *env, jclass, jlong canvas_ptr, jfloat ol, jfloat ot, jfloat or_, jfloat ob, jfloat orx, jfloat ory, jfloat il, jfloat it, jfloat ir, jfloat ib, jfloat irx, jfloat iry, jlong paint_ptr)

@@ -372,6 +372,19 @@ public abstract class BaseCanvas {
     }
 
     /**
+     * atlas extension (not an Android API): elevation shadow for a round rect,
+     * rendered with SkShadowUtils like hwui does. The view system uses this to
+     * shadow elevated panels (popups, dialogs). Light position is in canvas
+     * device space.
+     */
+    public void drawShadow(float left, float top, float right, float bottom, float radius,
+            float elevation, float lightX, float lightY, float lightZ, float lightRadius,
+            int ambientColor, int spotColor) {
+        nDrawShadow(mNativeCanvasWrapper, left, top, right, bottom, radius, elevation,
+                lightX, lightY, lightZ, lightRadius, ambientColor, spotColor);
+    }
+
+    /**
      * Make lint happy.
      * See {@link Canvas#drawDoubleRoundRect(RectF, float, float, RectF, float, float, Paint)}
      */
@@ -647,6 +660,10 @@ public abstract class BaseCanvas {
 
     private static native void nDrawRoundRect(long nativeCanvas, float left, float top, float right,
             float bottom, float rx, float ry, long nativePaint);
+
+    private static native void nDrawShadow(long nativeCanvas, float left, float top, float right,
+            float bottom, float radius, float elevation, float lightX, float lightY, float lightZ,
+            float lightRadius, int ambientColor, int spotColor);
 
     private static native void nDrawDoubleRoundRect(long nativeCanvas, float outerLeft,
             float outerTop, float outerRight, float outerBottom, float outerRx, float outerRy,

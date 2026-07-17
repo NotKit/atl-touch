@@ -1,6 +1,7 @@
 package android.view;
 
 import android.graphics.Canvas;
+import android.graphics.Outline;
 import android.graphics.Rect;
 
 import java.util.ArrayList;
@@ -207,11 +208,39 @@ public class ViewRootImpl implements ViewParent {
 				continue;
 			if ((panel.params.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0)
 				canvas.drawColor(((int)(panel.params.dimAmount * 255) << 24));
+			drawPanelShadow(canvas, panel.view);
 			canvas.save();
 			canvas.translate(panel.view.getLeft(), panel.view.getTop());
 			panel.view.draw(canvas);
 			canvas.restore();
 		}
+	}
+
+	/* Android default light and shadow parameters (ThreadedRenderer / config.xml) */
+	private static final float LIGHT_Z_DP = 500;
+	private static final float LIGHT_RADIUS_DP = 800;
+	private static final int AMBIENT_SHADOW_COLOR = 0x0A000000; // alpha 0.039
+	private static final int SPOT_SHADOW_COLOR = 0x30000000;    // alpha 0.19
+
+	/** On Android the parent draws the elevation shadow of a child; for panels
+	 *  (popups, dialogs) that parent is the view root. Round-rect outlines only. */
+	private void drawPanelShadow(Canvas canvas, View v) {
+		float elevation = v.getElevation();
+		ViewOutlineProvider provider = v.getOutlineProvider();
+		if (elevation <= 0 || provider == null)
+			return;
+		if (v.getBackground() != null) // BACKGROUND provider queries the drawable's bounds
+			v.getBackground().setBounds(0, 0, v.getWidth(), v.getHeight());
+		Outline outline = new Outline();
+		provider.getOutline(v, outline);
+		if (outline.mMode != Outline.MODE_ROUND_RECT || outline.mRect.isEmpty())
+			return;
+		float density = v.getResources().getDisplayMetrics().density;
+		canvas.drawShadow(v.getLeft() + outline.mRect.left, v.getTop() + outline.mRect.top,
+		                  v.getLeft() + outline.mRect.right, v.getTop() + outline.mRect.bottom,
+		                  Math.max(outline.mRadius, 0), elevation,
+		                  width / 2.f, 0, LIGHT_Z_DP * density, LIGHT_RADIUS_DP * density,
+		                  AMBIENT_SHADOW_COLOR, SPOT_SHADOW_COLOR);
 	}
 
 	/* called from native (ATLSceneWidget event controllers) */

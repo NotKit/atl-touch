@@ -7,6 +7,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_view_ViewRootImpl_LIGHT_Z_DP
+#define android_view_ViewRootImpl_LIGHT_Z_DP 500.0f
+#undef android_view_ViewRootImpl_LIGHT_RADIUS_DP
+#define android_view_ViewRootImpl_LIGHT_RADIUS_DP 800.0f
+#undef android_view_ViewRootImpl_AMBIENT_SHADOW_COLOR
+#define android_view_ViewRootImpl_AMBIENT_SHADOW_COLOR 167772160L
+#undef android_view_ViewRootImpl_SPOT_SHADOW_COLOR
+#define android_view_ViewRootImpl_SPOT_SHADOW_COLOR 805306368L
 /*
  * Class:     android_view_ViewRootImpl
  * Method:    nativeInvalidate

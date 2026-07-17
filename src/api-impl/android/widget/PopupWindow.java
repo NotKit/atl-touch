@@ -25,6 +25,7 @@ public class PopupWindow {
 	private View contentView;
 	private FrameLayout decor; // wraps the content so the popup background doesn't clobber the content's own
 	private Drawable background;
+	private float elevation;
 	private int width = ViewGroup.LayoutParams.WRAP_CONTENT;
 	private int height = ViewGroup.LayoutParams.WRAP_CONTENT;
 	private boolean focusable;
@@ -49,6 +50,13 @@ public class PopupWindow {
 
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		this.context = context;
+		if (context != null) {
+			android.content.res.TypedArray a = context.obtainStyledAttributes(attrs,
+			    com.android.internal.R.styleable.PopupWindow, defStyleAttr, defStyleRes);
+			background = a.getDrawable(com.android.internal.R.styleable.PopupWindow_popupBackground);
+			elevation = a.getDimension(com.android.internal.R.styleable.PopupWindow_popupElevation, 0);
+			a.recycle();
+		}
 	}
 
 	public PopupWindow(Context context) {
@@ -147,6 +155,7 @@ public class PopupWindow {
 
 	private FrameLayout makeDecor() {
 		decor = new FrameLayout(context != null ? context : contentView.getContext());
+		decor.setElevation(elevation);
 		if (background != null)
 			decor.setBackgroundDrawable(background);
 		if (contentView.getParent() instanceof ViewGroup)
@@ -247,7 +256,15 @@ public class PopupWindow {
 
 	public void setAnimationStyle(int animationStyle) {}
 
-	public void setElevation(float elevation) {}
+	public void setElevation(float elevation) {
+		this.elevation = elevation;
+		if (decor != null)
+			decor.setElevation(elevation);
+	}
+
+	public float getElevation() {
+		return elevation;
+	}
 
 	public void update(View anchor, int xoff, int yoff, int width, int height) {
 		if (width != -1 && width != ViewGroup.LayoutParams.WRAP_CONTENT)
