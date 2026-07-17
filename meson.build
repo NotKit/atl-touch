@@ -55,6 +55,15 @@ if maliit_glib_dep.found()
 	extra_jni_srcs += files('src/api-impl-jni/input/input_method_maliit.c')
 endif
 
+# WPE WebKit WebView backend (builtin, weak symbol in the dispatcher):
+# optional so builds that rely on a dlopen'd module (e.g. the Qt one on
+# Ubuntu Touch 24.04-2.x) don't need WPE at all.
+wpe_webkit_dep = dependency('wpe-webkit-2.0', required: false)
+if wpe_webkit_dep.found()
+	extra_deps += [wpe_webkit_dep, dependency('wpebackend-fdo-1.0'), dependency('wpe-1.0'), dependency('wayland-server')]
+	extra_jni_srcs += files('src/api-impl-jni/widgets/webview_wpe.c')
+endif
+
 # Qt WebEngine WebView backend: a dlopen'd module (see webview_backend.h), so
 # Qt never becomes a dependency of the main library. Built only when the Qt 6
 # dev packages are present (Ubuntu Touch 24.04-2.x ships Qt 6.10).
@@ -167,7 +176,6 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/input/input_method.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
                                                                   	'src/api-impl-jni/widgets/android_webkit_WebView.cpp',
-                                                                  	'src/api-impl-jni/widgets/webview_wpe.c',
                                                                   	mpris,
                                                                   	portal_openuri,
                                                                   	portal_email,
@@ -186,7 +194,6 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('glfw3'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),
-                                                                  	dependency('wpe-webkit-2.0'), dependency('wpebackend-fdo-1.0'), dependency('wpe-1.0'), dependency('wayland-server'),
                                                                   	dependency('gstreamer-1.0'),
                                                                         libart_dep, wayland_protos_dep, skia_dep, minikin_dep
                                                                   ],
