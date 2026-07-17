@@ -138,6 +138,10 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotificati
 	const char *action = intent_actionname_from_type(type);
 	if (action)
 		g_notification_set_default_action_and_target_value(notification, action, intent_serialize(env, intent));
+	/* Ongoing notifications (e.g. foreground-service progress) are updated frequently;
+	   low priority maps to urgency-low so desktops don't re-show a popup on every update. */
+	if (ongoing)
+		g_notification_set_priority(notification, G_NOTIFICATION_PRIORITY_LOW);
 	queue_notification(id, notification);
 	if (ongoing)
 		g_hash_table_add(ongoing_notifications, GINT_TO_POINTER(id));
