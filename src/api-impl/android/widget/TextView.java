@@ -40,6 +40,8 @@ public class TextView extends View {
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.TOP | Gravity.START;
+	private boolean single_line = false;
+	private int max_lines = Integer.MAX_VALUE;
 
 	public TextView(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
@@ -96,6 +98,13 @@ public class TextView extends View {
 				setAllCaps(allCaps);
 			}
 
+			if (a.hasValue(com.android.internal.R.styleable.TextView_singleLine))
+				single_line = a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false);
+			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
+				max_lines = a.getInt(com.android.internal.R.styleable.TextView_maxLines, Integer.MAX_VALUE);
+			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
+				max_lines = a.getInt(com.android.internal.R.styleable.TextView_lines, Integer.MAX_VALUE);
+
 			Drawable left = a.getDrawable(com.android.internal.R.styleable.TextView_drawableLeft);
 			Drawable top = a.getDrawable(com.android.internal.R.styleable.TextView_drawableTop);
 			Drawable right = a.getDrawable(com.android.internal.R.styleable.TextView_drawableRight);
@@ -127,16 +136,19 @@ public class TextView extends View {
 
 	private Layout makeLayout(int width) {
 		BoringLayout.Metrics boring = BoringLayout.isBoring(text, paint);
-		if (boring != null && boring.width <= width) {
-			return BoringLayout.make(text, paint, width, getLayoutAlignment(),
+		if (boring != null && (single_line || boring.width <= width)) {
+			return BoringLayout.make(text, paint, Math.max(width, boring.width), getLayoutAlignment(),
 			                         spacing_mult, spacing_add, boring, include_padding);
 		}
+		if (single_line) // don't wrap: lay out at the text's full width
+			width = Math.max(width, (int)Math.ceil(Layout.getDesiredWidth(text, paint)));
 		return StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
 		    .setAlignment(getLayoutAlignment())
 		    .setLineSpacing(spacing_add, spacing_mult)
 		    .setIncludePad(include_padding)
 		    .setBreakStrategy(break_strategy)
 		    .setHyphenationFrequency(hyphenation_frequency)
+		    .setMaxLines(single_line ? 1 : max_lines)
 		    .build();
 	}
 
@@ -155,7 +167,10 @@ public class TextView extends View {
 		else
 			width = Math.max(desiredWidth, getSuggestedMinimumWidth());
 		text_layout = makeLayout(Math.max(0, width - hPadding));
-		int desiredHeight = text_layout.getHeight() + vPadding;
+		/* the layout may hold more lines than are visible (maxLines/singleLine) */
+		int visibleLines = Math.min(text_layout.getLineCount(), single_line ? 1 : max_lines);
+		int desiredHeight = (visibleLines < text_layout.getLineCount()
+		    ? text_layout.getLineTop(visibleLines) : text_layout.getHeight()) + vPadding;
 		/* a left/right drawable may be taller than the text */
 		if (drawableLeft != null)
 			desiredHeight = Math.max(desiredHeight, drawableLeft.getBounds().height() + paddingTop + paddingBottom);
@@ -358,7 +373,10 @@ public class TextView extends View {
 	public void setHintTextColor(int i) {}
 	public void setLinkTextColor(ColorStateList colorStateList) {}
 
-	public void setSingleLine() {}
+	public void setSingleLine() {
+		setSingleLine(true);
+	}
+
 	public void setSelection(int i) {}
 	public void setSelection(int i, int j) {}
 
@@ -396,7 +414,14 @@ public class TextView extends View {
 		}
 	}
 
-	public void setMaxLines(int maxLines) {}
+	public void setMaxLines(int maxLines) {
+		if (max_lines == maxLines)
+			return;
+		max_lines = maxLines;
+		text_layout = null;
+		requestLayout();
+		invalidate();
+	}
 
 	public void setMinWidth(int minWidth) {}
 	public void setMaxWidth(int maxWidth) {}
@@ -563,7 +588,7 @@ public class TextView extends View {
 
 	public InputFilter[] getFilters() { return new InputFilter[0]; }
 
-	public int getMaxLines() { return -1; }
+	public int getMaxLines() { return max_lines; }
 
 	public void setCompoundDrawablesRelative(Drawable start, Drawable top, Drawable end, Drawable bottom) {
 		setCompoundDrawables(start, top, end, bottom);
@@ -613,7 +638,14 @@ public class TextView extends View {
 		return paint.getColor();
 	}
 
-	public void setSingleLine(boolean singleLine) {}
+	public void setSingleLine(boolean singleLine) {
+		if (single_line == singleLine)
+			return;
+		single_line = singleLine;
+		text_layout = null;
+		requestLayout();
+		invalidate();
+	}
 
 	public void setHint(int resId) {
 		setHint(getContext().getResources().getText(resId));
