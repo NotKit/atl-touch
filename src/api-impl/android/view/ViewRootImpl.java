@@ -188,6 +188,35 @@ public class ViewRootImpl implements ViewParent {
 		}
 		for (Panel panel : panels)
 			layoutPanel(panel);
+		if (DUMP_HIERARCHY) {
+			if (view != null)
+				dumpHierarchy(view, "");
+			for (Panel panel : panels)
+				dumpHierarchy(panel.view, "[panel] ");
+		}
+	}
+
+	private static final boolean DUMP_HIERARCHY = System.getenv("ATL_DUMP_HIERARCHY") != null;
+
+	private static void dumpHierarchy(View v, String indent) {
+		ViewGroup.LayoutParams lp = v.getLayoutParams();
+		System.out.println("ATL_DUMP: " + indent + v.getClass().getName()
+		    + " id=0x" + Integer.toHexString(v.getId())
+		    + " bounds=" + v.getLeft() + "," + v.getTop() + "-" + v.getRight() + "," + v.getBottom()
+		    + " measured=" + v.getMeasuredWidth() + "x" + v.getMeasuredHeight()
+		    + " minH=" + v.getMinimumHeight()
+		    + (lp != null ? " lp=" + lp.width + "x" + lp.height : "")
+		    + " vis=" + v.getVisibility()
+		    + " pad=" + v.getPaddingLeft() + "," + v.getPaddingTop() + "," + v.getPaddingRight() + "," + v.getPaddingBottom()
+		    + (v instanceof android.widget.TextView
+		        ? " textSize=" + ((android.widget.TextView)v).getTextSize()
+		            + " text='" + ((android.widget.TextView)v).getText() + "'"
+		        : ""));
+		if (v instanceof ViewGroup) {
+			ViewGroup vg = (ViewGroup)v;
+			for (int i = 0; i < vg.getChildCount(); i++)
+				dumpHierarchy(vg.getChildAt(i), indent + "  ");
+		}
 	}
 
 	/* called from native (ATLSceneWidget snapshot); canvas_ptr is an ATLCanvas* */
