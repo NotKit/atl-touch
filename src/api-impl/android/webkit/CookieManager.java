@@ -18,9 +18,9 @@ public class CookieManager {
 		return new CookieManager();
 	}
 
-	public void removeAllCookies(ValueCallback callback) {}
+	public void removeAllCookies(ValueCallback<Boolean> callback) {}
 
-	public void removeSessionCookies(ValueCallback callback) {}
+	public void removeSessionCookies(ValueCallback<Boolean> callback) {}
 
 	public void removeExpiredCookie() {}
 

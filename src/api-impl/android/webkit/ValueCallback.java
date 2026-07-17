@@ -1,3 +1,5 @@
 package android.webkit;
 
-public class ValueCallback {}
+public interface ValueCallback<T> {
+	void onReceiveValue(T value);
+}

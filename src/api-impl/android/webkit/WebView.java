@@ -155,7 +155,7 @@ public class WebView extends ViewGroup {
 		loadDataWithBaseURL("about:blank", data, mimeType, encoding, "about:blank");
 	}
 
-	public void evaluateJavascript(String script, ValueCallback resultCallback) {}
+	public void evaluateJavascript(String script, ValueCallback<String> resultCallback) {}
 
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
 
