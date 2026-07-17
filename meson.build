@@ -55,6 +55,13 @@ if maliit_glib_dep.found()
 	extra_jni_srcs += files('src/api-impl-jni/input/input_method_maliit.c')
 endif
 
+# Qt WebEngine WebView backend: a dlopen'd module (see webview_backend.h), so
+# Qt never becomes a dependency of the main library. Built only when the Qt 6
+# dev packages are present (Ubuntu Touch 24.04-2.x ships Qt 6.10).
+qt6_webengine_dep = dependency('qt6',
+	modules: ['Core', 'Gui', 'Qml', 'Quick', 'OpenGL', 'WebEngineQuick', 'WebEngineCore'],
+	required: false)
+
 # Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap
 skia_dep = dependency('skia')
 
@@ -194,6 +201,21 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   cpp_args: [
                                                                   	'-fno-rtti',
                                                                   ])
+
+if qt6_webengine_dep.found()
+	qt6 = import('qt6')
+	webview_qt_moc = qt6.compile_moc(
+		headers: 'src/api-impl-jni/widgets/webview_qt_bridge.h',
+		dependencies: qt6_webengine_dep)
+	shared_module('atl_webview_qt', [
+	              	'src/api-impl-jni/widgets/webview_qt.cpp',
+	              	webview_qt_moc,
+	              ],
+	              name_prefix: 'lib',
+	              install: true,
+	              install_dir: get_option('libdir') / 'java/dex/android_translation_layer/natives',
+	              dependencies: [qt6_webengine_dep, dependency('glib-2.0')])
+endif
 
 # atl.gresources.xml
 resources = gnome.compile_resources('com.gitlab.android_translation_layer.android_translation_layer', files('src/main-executable/atl.gresource.xml'))
