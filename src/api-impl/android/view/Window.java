@@ -77,6 +77,11 @@ public class Window {
 				setThemeBackground(ta.getDrawable(0));
 			ta.recycle();
 		}
+		// like PhoneWindow: clip window content to the background outline if the
+		// theme asks for it (material dialog themes do, for rounded corners)
+		TypedArray ta = context.obtainStyledAttributes(new int[] {R.attr.windowClipToOutline});
+		decorView.setClipToOutline(ta.getBoolean(0, false));
+		ta.recycle();
 		decorView.removeAllViews();
 		decorView.addView(view);
 		if (view != null) {

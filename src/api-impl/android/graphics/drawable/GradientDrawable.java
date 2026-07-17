@@ -25,6 +25,7 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.DashPathEffect;
 import android.graphics.LinearGradient;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
@@ -696,6 +697,57 @@ public class GradientDrawable extends Drawable {
 	//@Override
 	public int getOpacity() {
 		return mGradientState.mOpaque ? PixelFormat.OPAQUE : PixelFormat.TRANSLUCENT;
+	}
+
+	@Override
+	public void getOutline(Outline outline) {
+		final GradientState st = mGradientState;
+		final Rect bounds = getBounds();
+		// only report non-zero alpha if shape being drawn has consistent opacity over shape. Must
+		// either not have a stroke, or have same stroke/fill opacity
+		boolean useFillOpacity = st.mOpaque && (st.mStrokeWidth <= 0 || mStrokePaint == null
+				|| mStrokePaint.getAlpha() == mFillPaint.getAlpha());
+		outline.setAlpha(useFillOpacity
+				? modulateAlpha(mFillPaint.getAlpha()) / 255.0f
+				: 0.0f);
+
+		switch (st.mShape) {
+			case RECTANGLE:
+				if (st.mRadiusArray != null) {
+					if (ensureValidRect() && (mPathIsDirty || mRectIsDirty)) {
+						mPath.reset();
+						mPath.addRoundRect(mRect, st.mRadiusArray, Path.Direction.CW);
+						mPathIsDirty = mRectIsDirty = false;
+					}
+					outline.setPath(mPath);
+					return;
+				}
+
+				float rad = 0;
+				if (st.mRadius > 0.0f) {
+					// clamp the radius based on width & height, matching behavior in draw()
+					rad = Math.min(st.mRadius,
+							Math.min(bounds.width(), bounds.height()) * 0.5f);
+				}
+				outline.setRoundRect(bounds, rad);
+				return;
+			case OVAL:
+				outline.setOval(bounds);
+				return;
+			case LINE:
+				// Hairlines (0-width stroke) must have a non-empty outline for
+				// shadows to draw correctly, so we'll use a very small width.
+				final float halfStrokeWidth = mStrokePaint == null ?
+						0.0001f : mStrokePaint.getStrokeWidth() * 0.5f;
+				final float centerY = bounds.centerY();
+				final int top = (int) Math.floor(centerY - halfStrokeWidth);
+				final int bottom = (int) Math.ceil(centerY + halfStrokeWidth);
+
+				outline.setRect(bounds.left, top, bounds.right, bottom);
+				return;
+			default:
+				// TODO: support more complex shapes
+		}
 	}
 
 	@Override

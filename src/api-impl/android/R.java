@@ -11433,6 +11433,10 @@ public final class R {
 		 */
 		public static final int windowBackground = 0x01010054;
 		/**
+	Whether to clip window content to the outline of the window background.
+		 */
+		public static final int windowClipToOutline = 0x010104ab;
+		/**
 	Control whether a container should automatically close itself if
 		     the user touches outside of it.  This only applies to activities
 		     and dialogs.

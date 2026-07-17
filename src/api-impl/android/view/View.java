@@ -13,6 +13,9 @@ import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Outline;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
@@ -963,6 +966,8 @@ public class View implements Drawable.Callback {
 	private boolean pressed = false;
 	private Drawable background;
 	private int backgroundTint = 0;
+	private boolean clipToOutline = false;
+	private ViewOutlineProvider outlineProvider = ViewOutlineProvider.BACKGROUND;
 
 	private int minWidth = 0;
 	private int minHeight = 0;
@@ -1034,6 +1039,7 @@ public class View implements Drawable.Callback {
 		this.id = a.getResourceId(com.android.internal.R.styleable.View_id, View.NO_ID);
 		if (a.hasValue(com.android.internal.R.styleable.View_backgroundTint))
 			backgroundTint = a.getColor(com.android.internal.R.styleable.View_backgroundTint, 0);
+		clipToOutline = a.getBoolean(com.android.internal.R.styleable.View_clipToOutline, false);
 		if (a.hasValue(com.android.internal.R.styleable.View_background)) {
 			try {
 				Drawable background = a.getDrawable(com.android.internal.R.styleable.View_background);
@@ -1164,6 +1170,26 @@ public class View implements Drawable.Callback {
 	}
 
 	public void draw(Canvas canvas) {
+		int outlineSaveCount = -1;
+		if (clipToOutline && outlineProvider != null) {
+			if (background != null)  // BACKGROUND provider queries the drawable's bounds
+				background.setBounds(0, 0, getWidth(), getHeight());
+			Outline outline = new Outline();
+			outlineProvider.getOutline(this, outline);
+			if (outline.mMode == Outline.MODE_ROUND_RECT && !outline.mRect.isEmpty()) {
+				outlineSaveCount = canvas.save();
+				if (outline.mRadius > 0.0f) {
+					Path path = new Path();
+					path.addRoundRect(new RectF(outline.mRect), outline.mRadius, outline.mRadius, Path.Direction.CW);
+					canvas.clipPath(path);
+				} else {
+					canvas.clipRect(outline.mRect);
+				}
+			} else if (outline.mMode == Outline.MODE_PATH && outline.mPath != null) {
+				outlineSaveCount = canvas.save();
+				canvas.clipPath(outline.mPath);
+			}
+		}
 		drawBackground(canvas);
 		onDraw(canvas);
 		// HACK: catch non critical exceptions happening in some composeUI apps
@@ -1172,6 +1198,8 @@ public class View implements Drawable.Callback {
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
+		if (outlineSaveCount >= 0)
+			canvas.restoreToCount(outlineSaveCount);
 	}
 
 	public View(Context context) {
@@ -2242,14 +2270,22 @@ public class View implements Drawable.Callback {
 
 	public boolean isNestedScrollingEnabled() { return false; }
 
-	public void setClipToOutline(boolean clipToOutline) {}
+	public void setClipToOutline(boolean clipToOutline) {
+		this.clipToOutline = clipToOutline;
+		invalidate();
+	}
+
+	public boolean getClipToOutline() { return clipToOutline; }
 
 	public boolean hasTransientState() { return false; }
 
 	public final void cancelPendingInputEvents() {}
 
-	public ViewOutlineProvider getOutlineProvider() { return new ViewOutlineProvider(); }
-	public void setOutlineProvider(ViewOutlineProvider provider) {}
+	public ViewOutlineProvider getOutlineProvider() { return outlineProvider; }
+	public void setOutlineProvider(ViewOutlineProvider provider) {
+		outlineProvider = provider;
+		invalidate();
+	}
 
 	public void setStateListAnimator(StateListAnimator stateListAnimator) {
 		if (stateListAnimator != null && stateListAnimator.enabledAnimator != null) {
@@ -2346,7 +2382,9 @@ public class View implements Drawable.Callback {
 
 	public void setAccessibilityLiveRegion(int mode) {}
 
-	public void invalidateOutline() {}
+	public void invalidateOutline() {
+		invalidate();
+	}
 
 	public int getMeasuredWidthAndState() {
 		return measuredWidth;
@@ -2580,7 +2618,6 @@ public class View implements Drawable.Callback {
 		return true;
 	}
 
-	public boolean getClipToOutline() { return false; }
 
 	public void setLeft(int left) {
 		layout(left, top, right, bottom);
