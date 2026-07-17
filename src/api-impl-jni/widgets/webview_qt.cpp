@@ -20,6 +20,7 @@
  */
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <glib.h>
@@ -331,6 +332,16 @@ static void *qt_backend_create(void *host_peer, int width, int height)
 	}
 	peer->webview->setParentItem(peer->window->contentItem());
 	peer->webview->setSize(QSizeF(peer->width, peer->height));
+
+	/* Android WebViews render CSS pixels at the device density. Lomiri
+	 * communicates the UI scale as GRID_UNIT_PX (8 px = 1 GU at 1x, see
+	 * DisplayMetrics.getDeviceDensity); map it onto Chromium's zoom. */
+	const char *grid_unit_px = getenv("GRID_UNIT_PX");
+	if (grid_unit_px) {
+		double scale = atof(grid_unit_px) / 8.0;
+		if (scale > 0.25 && scale <= 5.0 && scale != 1.0)
+			peer->webview->setProperty("zoomFactor", scale);
+	}
 
 	peer->render_timer = new QTimer();
 	peer->render_timer->setSingleShot(true);
