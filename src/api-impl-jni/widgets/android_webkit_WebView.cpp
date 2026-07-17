@@ -1,46 +1,21 @@
 /*
- * android.webkit.WebView backed by WPE WebKit, rendered offscreen and
- * composited into the Skia scene.
+ * android.webkit.WebView JNI dispatcher.
  *
- * WebKit renders into a WPEBackend-fdo "exportable" view backend, which hands
- * us one EGLImage per produced frame (export_fdo_egl_image). On the GLib main
- * thread (the same thread that runs the Android Looper and the render tick) we
- * bind that EGLImage to a GL texture, read it back into a CPU SkBitmap, and
- * release it. WebView.onDraw() then draws that bitmap into the view's rect via
- * the normal Skia draw pass, so the web content clips, scrolls and z-orders
- * like any other view.
- *
- * A GPU->CPU readback per frame is deliberate: ATL's Skia scene is raster, so
- * this is the simplest correct path. Zero-copy texture compositing would need
- * Skia on a Ganesh/GPU backend and is a later optimization.
- *
- * When there is no GPU (Mesa swrast/llvmpipe, e.g. a headless VPS), the EGLImage
- * path is not just slow but broken: WebKit exports dmabuf-backed wl_buffers that
- * software EGL cannot honour, and WPEBackend-fdo then dereferences a NULL request
- * handler while dispatching a wl_buffer over its nested wl_display -> SIGSEGV. In
- * that case we fall back to WPE's SHM backend (wpe_fdo_initialize_shm): the
- * WebProcess software-paints into wl_shm buffers that we memcpy straight into the
- * raster scene, with no EGLImage, no GL texture and no readback. The buffer path
- * is chosen once, at first WebView creation, from whether a DRM render node
- * (i.e. a usable GPU for dmabuf) is present.
+ * The actual web engine lives behind the pluggable backend interface in
+ * webview_backend.h (WPE WebKit builtin; others, e.g. Qt WebEngine, loaded
+ * from libatl_webview_<name>.so). This file selects the backend at first
+ * WebView creation — honouring ATL_WEBVIEW_MODULE — and provides the host
+ * side: it owns the CPU frame bitmap each backend renders into, blits it into
+ * the raster Skia scene from native_draw, and routes callbacks (load state,
+ * JS results, asset reads) between the backend and the Java WebView.
  */
 
+#include <dlfcn.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-#include <gio/gio.h>
-#include <GL/gl.h>
-#include <EGL/egl.h>
-
-#include <wpe/webkit.h>
-#include <wpe/fdo.h>
-#include <wpe/fdo-egl.h>
-#include <wpe/wpe.h>
-#include <wpe/unstable/fdo-shm.h>
-
-#include <wayland-server-core.h>
-#include <wayland-server-protocol.h>
+#include <glib.h>
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkImage.h"
@@ -50,6 +25,7 @@
 #include "../defines.h"
 #include "../ATLWindow.h"
 #include "../graphics/ATLCanvas.h"
+#include "webview_backend.h"
 
 /* from util.c; declared here to avoid util.h -> handle_cache.h, which uses the
  * C++ keyword `class` as a struct member and won't compile in C++ */
@@ -59,123 +35,83 @@ extern "C" {
 #include "../generated_headers/android_webkit_WebView.h"
 }
 
-#ifndef GL_BGRA
-#define GL_BGRA 0x80E1
-#endif
-
-typedef void (*PFN_glEGLImageTargetTexture2DOES)(GLenum target, void *image);
-typedef void (*PFN_glGenFramebuffers)(GLsizei n, GLuint *framebuffers);
-typedef void (*PFN_glBindFramebuffer)(GLenum target, GLuint framebuffer);
-typedef void (*PFN_glFramebufferTexture2D)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
-
-/* FBO enums are missing from GL/gl.h (GL 1.x); same values in GL and GLES2 */
-#ifndef GL_FRAMEBUFFER
-#define GL_FRAMEBUFFER 0x8D40
-#endif
-#ifndef GL_COLOR_ATTACHMENT0
-#define GL_COLOR_ATTACHMENT0 0x8CE0
-#endif
-
-struct webview_peer {
-	struct wpe_view_backend_exportable_fdo *exportable = nullptr;
-	struct wpe_view_backend *backend = nullptr;
-	WebKitWebView *web_view = nullptr;
-	jobject java_webview = nullptr; // global ref, for load-changed callbacks
-
-	GLuint texture = 0;
-	GLuint fbo = 0; // for reading the EGLImage texture back (GLES has no glGetTexImage)
-	SkBitmap frame; // latest decoded web frame (CPU)
+struct webview_host_peer {
+	void *backend_peer = nullptr;
+	jobject java_webview = nullptr; // global ref, for callbacks into Java
+	SkBitmap frame;                 // latest web frame (CPU), backend-filled
 	bool has_frame = false;
-	int width = 1, height = 1;
 };
 
-static bool wpe_initialized = false;
-/* true once we've decided to ship web frames as CPU wl_shm buffers rather than
- * EGLImages (set in ensure_wpe_initialized, process-wide). */
-static bool use_shm = false;
-static PFN_glEGLImageTargetTexture2DOES image_target_texture_2d = nullptr;
-static PFN_glGenFramebuffers gen_framebuffers = nullptr;
-static PFN_glBindFramebuffer bind_framebuffer = nullptr;
-static PFN_glFramebufferTexture2D framebuffer_texture_2d = nullptr;
+static const struct atl_webview_backend *active_backend;
+static bool backend_selection_done;
 
-/* The EGLImage buffer-sharing path needs a real GPU; without one WebKit hands
- * WPEBackend-fdo dmabuf wl_buffers it cannot back, and fdo crashes on a NULL
- * handler (see file comment). ATL_WEBVIEW_SHM=1/0 forces the SHM/EGL path. */
-static bool webview_should_use_shm(void)
+/* an app AssetManager (global ref), captured from the first WebView created,
+ * so backends can serve android-asset:/// out of the APK */
+static jobject g_asset_manager;
+
+static void *host_acquire_frame(void *host_peer, int width, int height,
+                                enum atl_webview_format format, size_t *stride_out)
 {
-	const char *force = getenv("ATL_WEBVIEW_SHM");
-	if (force)
-		return atoi(force) != 0;
-
-	/* dmabuf buffer sharing (what the EGLImage path relies on) needs a DRM
-	 * render node / GBM. On a machine without one — headless VPS, many
-	 * containers — there is simply no dmabuf path, so ship CPU (wl_shm) frames.
-	 * Real GPU devices (incl. the Ubuntu Touch target) expose renderD128+. */
-	for (int minor = 128; minor < 128 + 16; minor++) {
-		char path[64];
-		snprintf(path, sizeof(path), "/dev/dri/renderD%d", minor);
-		if (access(path, R_OK | W_OK) == 0)
-			return false;
-	}
-	return true;
-}
-/* an app AssetManager (global ref), captured from the first WebView created, so
- * the android-asset:// scheme handler can serve files out of the APK. */
-static jobject g_asset_manager = nullptr;
-
-/* minimal content-type guess: the values that matter for cards are CSS and JS
- * (browsers ignore <link>/<script> resources served with the wrong type). */
-static const char *guess_content_type(const char *path)
-{
-	const char *dot = strrchr(path, '.');
-	if (!dot)
-		return "application/octet-stream";
-	if (!strcmp(dot, ".css"))  return "text/css";
-	if (!strcmp(dot, ".js"))   return "text/javascript";
-	if (!strcmp(dot, ".html") || !strcmp(dot, ".htm")) return "text/html";
-	if (!strcmp(dot, ".json") || !strcmp(dot, ".map")) return "application/json";
-	if (!strcmp(dot, ".svg"))  return "image/svg+xml";
-	if (!strcmp(dot, ".png"))  return "image/png";
-	if (!strcmp(dot, ".jpg") || !strcmp(dot, ".jpeg")) return "image/jpeg";
-	if (!strcmp(dot, ".gif"))  return "image/gif";
-	if (!strcmp(dot, ".webp")) return "image/webp";
-	if (!strcmp(dot, ".woff2")) return "font/woff2";
-	if (!strcmp(dot, ".woff")) return "font/woff";
-	if (!strcmp(dot, ".ttf"))  return "font/ttf";
-	if (!strcmp(dot, ".otf"))  return "font/otf";
-	if (!strcmp(dot, ".mp3"))  return "audio/mpeg";
-	if (!strcmp(dot, ".ogg"))  return "audio/ogg";
-	if (!strcmp(dot, ".wav"))  return "audio/wav";
-	return "application/octet-stream";
+	webview_host_peer *peer = (webview_host_peer *)host_peer;
+	SkColorType color = format == ATL_WEBVIEW_FORMAT_RGBA8888_PREMUL ?
+		kRGBA_8888_SkColorType : kBGRA_8888_SkColorType;
+	SkAlphaType alpha = format == ATL_WEBVIEW_FORMAT_BGRX8888 ?
+		kOpaque_SkAlphaType : kPremul_SkAlphaType;
+	if (peer->frame.width() != width || peer->frame.height() != height ||
+	    peer->frame.colorType() != color || peer->frame.alphaType() != alpha)
+		peer->frame.allocPixels(SkImageInfo::Make(width, height, color, alpha));
+	*stride_out = peer->frame.rowBytes();
+	return peer->frame.getPixels();
 }
 
-/* serve android-asset:///<path> from the app's AssetManager. Registered on the
- * default web context, so it runs on the GLib main thread (a Java thread). It
- * is NOT a JNI entry point, so its local refs must be freed explicitly. */
-static void android_asset_scheme_handler(WebKitURISchemeRequest *request, gpointer user_data)
+static void host_commit_frame(void *host_peer)
 {
-	const char *path = webkit_uri_scheme_request_get_path(request);
-	if (!g_asset_manager || !path) {
-		GError *e = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "no asset manager / path");
-		webkit_uri_scheme_request_finish_error(request, e);
-		g_error_free(e);
-		return;
-	}
-	const char *asset = path[0] == '/' ? path + 1 : path;
+	webview_host_peer *peer = (webview_host_peer *)host_peer;
+	peer->has_frame = true;
+	atl_window_invalidate_all();
+}
+
+static void host_load_changed(void *host_peer, int load_event, const char *url)
+{
+	webview_host_peer *peer = (webview_host_peer *)host_peer;
+	JNIEnv *env = get_jni_env();
+	jclass cls = env->GetObjectClass(peer->java_webview);
+	jmethodID mid = env->GetMethodID(cls, "internalLoadChanged", "(ILjava/lang/String;)V");
+	jstring jurl = url ? env->NewStringUTF(url) : NULL;
+	env->CallVoidMethod(peer->java_webview, mid, (jint)load_event, jurl);
+	if (jurl)
+		env->DeleteLocalRef(jurl);
+	env->DeleteLocalRef(cls);
+}
+
+static void host_js_result(void *host_peer, int64_t callback_id, const char *result_json)
+{
+	webview_host_peer *peer = (webview_host_peer *)host_peer;
+	JNIEnv *env = get_jni_env();
+	jclass cls = env->GetObjectClass(peer->java_webview);
+	jmethodID mid = env->GetMethodID(cls, "internalJsResult", "(JLjava/lang/String;)V");
+	jstring jresult = result_json ? env->NewStringUTF(result_json) : NULL;
+	env->CallVoidMethod(peer->java_webview, mid, (jlong)callback_id, jresult);
+	if (jresult)
+		env->DeleteLocalRef(jresult);
+	env->DeleteLocalRef(cls);
+}
+
+static bool host_read_asset(const char *path, void **data, size_t *size)
+{
+	if (!g_asset_manager || !path)
+		return false;
 
 	JNIEnv *env = get_jni_env();
 	env->PushLocalFrame(8);
 
 	jclass am_cls = env->GetObjectClass(g_asset_manager);
 	jmethodID open = env->GetMethodID(am_cls, "open", "(Ljava/lang/String;)Ljava/io/InputStream;");
-	jobject is = env->CallObjectMethod(g_asset_manager, open, env->NewStringUTF(asset));
+	jobject is = env->CallObjectMethod(g_asset_manager, open, env->NewStringUTF(path));
 	if (env->ExceptionCheck() || !is) {
 		env->ExceptionClear();
 		env->PopLocalFrame(NULL);
-		GError *e = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "asset not found: %s", asset);
-		webkit_uri_scheme_request_finish_error(request, e);
-		g_error_free(e);
-		return;
+		return false;
 	}
 
 	jclass is_cls = env->GetObjectClass(is);
@@ -192,182 +128,78 @@ static void android_asset_scheme_handler(WebKitURISchemeRequest *request, gpoint
 	env->CallVoidMethod(is, close);
 	env->PopLocalFrame(NULL);
 
-	gsize len = out->len;
-	guint8 *data = g_byte_array_free(out, FALSE);
-	GInputStream *stream = g_memory_input_stream_new_from_data(data, len, g_free);
-	webkit_uri_scheme_request_finish(request, stream, (gint64)len, guess_content_type(asset));
-	g_object_unref(stream);
-}
-
-static bool ensure_wpe_initialized(void)
-{
-	if (wpe_initialized)
-		return true;
-	EGLDisplay display = (EGLDisplay)atl_primary_egl_display();
-	if (display == EGL_NO_DISPLAY) {
-		fprintf(stderr, "WebView: no EGLDisplay (is a window open yet?) - cannot init WPE\n");
-		return false;
-	}
-
-	use_shm = webview_should_use_shm();
-	/* The EGLImage path also needs the display to accept WPEBackend-fdo's
-	 * buffer sharing (EGL_WL_bind_wayland_display). Hybris/Android EGL on
-	 * Ubuntu Touch exposes a DRM render node yet lacks the extension, so
-	 * exports would never arrive — fall back to CPU (wl_shm) frames. */
-	if (!use_shm && !getenv("ATL_WEBVIEW_SHM")) {
-		const char *egl_exts = eglQueryString(display, EGL_EXTENSIONS);
-		if (!egl_exts || !strstr(egl_exts, "EGL_WL_bind_wayland_display"))
-			use_shm = true;
-	}
-	atl_primary_make_context_current();
-	const char *gl_renderer = (const char *)glGetString(GL_RENDERER);
-	fprintf(stderr, "WebView: GL renderer='%s' -> %s buffer path\n",
-	        gl_renderer ? gl_renderer : "(null)", use_shm ? "SHM/CPU" : "EGLImage/GPU");
-
-	/* libwpe's loader otherwise dlopen()s the hardcoded default backend name
-	 * "libWPEBackend-default.so", which several distros (e.g. Manjaro) don't
-	 * ship as a symlink — only the real "libWPEBackend-fdo-1.0.so". Missing it,
-	 * libwpe abort()s the whole process (under ART the abort message is
-	 * swallowed, so it looks like a silent exit). Point the loader at fdo
-	 * explicitly; this also propagates to the WPEWebProcess subprocess. */
-	wpe_loader_init("libWPEBackend-fdo-1.0.so");
-
-	if (use_shm) {
-		/* We ship CPU (wl_shm) frames, but the WebProcess still has to paint them.
-		 * With no usable GPU its accelerated (GL) compositor fails to initialize
-		 * (Mesa: "ZINK: failed to choose pdev" / "failed to create dri2 screen")
-		 * and produces no frames at all -> blank WebView. Force non-accelerated,
-		 * CPU-side painting so pages render without a GPU. Set before the first
-		 * WebProcess is spawned; WebKit forwards these to the subprocess. */
-		setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1);
-		setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 1);
-		if (!wpe_fdo_initialize_shm()) {
-			fprintf(stderr, "WebView: wpe_fdo_initialize_shm() failed - WebView unavailable\n");
-			return false;
-		}
-	} else {
-		image_target_texture_2d =
-			(PFN_glEGLImageTargetTexture2DOES)eglGetProcAddress("glEGLImageTargetTexture2DOES");
-		gen_framebuffers = (PFN_glGenFramebuffers)eglGetProcAddress("glGenFramebuffers");
-		bind_framebuffer = (PFN_glBindFramebuffer)eglGetProcAddress("glBindFramebuffer");
-		framebuffer_texture_2d = (PFN_glFramebufferTexture2D)eglGetProcAddress("glFramebufferTexture2D");
-		if (!image_target_texture_2d || !gen_framebuffers || !bind_framebuffer || !framebuffer_texture_2d) {
-			fprintf(stderr, "WebView: EGLImage/FBO entry points unavailable\n");
-			return false;
-		}
-		wpe_fdo_initialize_for_egl_display(display);
-	}
-
-	/* serve the app's assets (card CSS/JS/images linked as file:///android_asset,
-	 * rewritten to android-asset:// in WebView.loadDataWithBaseURL) */
-	WebKitWebContext *ctx = webkit_web_context_get_default();
-	webkit_web_context_register_uri_scheme(ctx, "android-asset", android_asset_scheme_handler, NULL, NULL);
-	WebKitSecurityManager *sm = webkit_web_context_get_security_manager(ctx);
-	webkit_security_manager_register_uri_scheme_as_secure(sm, "android-asset");
-	webkit_security_manager_register_uri_scheme_as_cors_enabled(sm, "android-asset");
-
-	wpe_initialized = true;
+	*size = out->len;
+	*data = g_byte_array_free(out, FALSE);
 	return true;
 }
 
-/* WebKit produced a frame: bind the EGLImage, read it back to peer->frame,
- * release it and let WebKit render the next one. Runs on the GLib main thread. */
-static void on_export_egl_image(void *data, struct wpe_fdo_egl_exported_image *image)
+static const struct atl_webview_host_ops host_ops = {
+	.acquire_frame = host_acquire_frame,
+	.commit_frame = host_commit_frame,
+	.load_changed = host_load_changed,
+	.js_result = host_js_result,
+	.read_asset = host_read_asset,
+};
+
+static const struct atl_webview_backend *const builtin_backends[] = {
+	&atl_webview_backend_wpe,
+};
+
+/* mirrors input_method.c: ATL_WEBVIEW_MODULE forces a backend by name ("none"
+ * disables WebView); otherwise the first available builtin wins. A forced name
+ * with no builtin match is dlopen'd from libatl_webview_<name>.so. */
+static void select_backend(void)
 {
-	webview_peer *peer = (webview_peer *)data;
+	const char *force = getenv("ATL_WEBVIEW_MODULE");
+	if (force && !strcmp(force, "none"))
+		return;
 
-	atl_primary_make_context_current();
-
-	int w = wpe_fdo_egl_exported_image_get_width(image);
-	int h = wpe_fdo_egl_exported_image_get_height(image);
-
-	if (!peer->texture)
-		glGenTextures(1, &peer->texture);
-	glBindTexture(GL_TEXTURE_2D, peer->texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	image_target_texture_2d(GL_TEXTURE_2D, wpe_fdo_egl_exported_image_get_egl_image(image));
-
-	if (peer->frame.width() != w || peer->frame.height() != h)
-		peer->frame.allocPixels(SkImageInfo::Make(w, h, kRGBA_8888_SkColorType, kPremul_SkAlphaType));
-
-	/* read the texture back through an FBO; unlike glGetTexImage this also
-	 * works on GLES2 contexts (Ubuntu Touch / hybris) */
-	if (!peer->fbo)
-		gen_framebuffers(1, &peer->fbo);
-	bind_framebuffer(GL_FRAMEBUFFER, peer->fbo);
-	framebuffer_texture_2d(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, peer->texture, 0);
-	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, peer->frame.getPixels());
-	bind_framebuffer(GL_FRAMEBUFFER, 0);
-	peer->has_frame = true;
-
-	wpe_view_backend_exportable_fdo_egl_dispatch_release_exported_image(peer->exportable, image);
-	wpe_view_backend_exportable_fdo_dispatch_frame_complete(peer->exportable);
-
-	atl_window_invalidate_all();
-}
-
-/* Software path: WebKit software-painted a wl_shm buffer. Copy it into
- * peer->frame (no GL involved) and hand the buffer back. Runs on the GLib main
- * thread. Wayland ARGB8888/XRGB8888 is little-endian B,G,R,A in memory, i.e.
- * Skia's BGRA_8888. */
-static void on_export_shm_buffer(void *data, struct wpe_fdo_shm_exported_buffer *buffer)
-{
-	webview_peer *peer = (webview_peer *)data;
-	struct wl_shm_buffer *shm = wpe_fdo_shm_exported_buffer_get_shm_buffer(buffer);
-	if (shm) {
-		int w = wl_shm_buffer_get_width(shm);
-		int h = wl_shm_buffer_get_height(shm);
-		int32_t stride = wl_shm_buffer_get_stride(shm);
-		uint32_t format = wl_shm_buffer_get_format(shm);
-
-		wl_shm_buffer_begin_access(shm);
-		const uint8_t *src = (const uint8_t *)wl_shm_buffer_get_data(shm);
-		if (src && w > 0 && h > 0 && stride > 0) {
-			SkAlphaType alpha = format == WL_SHM_FORMAT_XRGB8888 ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
-			if (peer->frame.width() != w || peer->frame.height() != h || peer->frame.alphaType() != alpha)
-				peer->frame.allocPixels(SkImageInfo::Make(w, h, kBGRA_8888_SkColorType, alpha));
-
-			uint8_t *dst = (uint8_t *)peer->frame.getPixels();
-			size_t dst_stride = peer->frame.rowBytes();
-			size_t row = (size_t)stride < dst_stride ? (size_t)stride : dst_stride;
-			for (int y = 0; y < h; y++)
-				memcpy(dst + (size_t)y * dst_stride, src + (size_t)y * stride, row);
-			peer->has_frame = true;
+	for (size_t i = 0; i < sizeof(builtin_backends) / sizeof(builtin_backends[0]); i++) {
+		const struct atl_webview_backend *backend = builtin_backends[i];
+		if (!backend) /* weak symbol, backend not compiled in */
+			continue;
+		if (force && strcmp(force, backend->name))
+			continue;
+		if (backend->init(&host_ops)) {
+			fprintf(stderr, "WebView: using '%s' backend\n", backend->name);
+			active_backend = backend;
+			return;
 		}
-		wl_shm_buffer_end_access(shm);
+	}
+	if (!force) {
+		fprintf(stderr, "WebView: no backend available\n");
+		return;
 	}
 
-	wpe_view_backend_exportable_fdo_dispatch_release_shm_exported_buffer(peer->exportable, buffer);
-	wpe_view_backend_exportable_fdo_dispatch_frame_complete(peer->exportable);
-
-	atl_window_invalidate_all();
-}
-
-static void on_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer data)
-{
-	webview_peer *peer = (webview_peer *)data;
-	if (!peer->java_webview)
+	char soname[128];
+	snprintf(soname, sizeof(soname), "libatl_webview_%s.so", force);
+	void *handle = dlopen(soname, RTLD_NOW | RTLD_LOCAL);
+	if (!handle) {
+		fprintf(stderr, "WebView: requested backend '%s' is not available (%s)\n", force, dlerror());
 		return;
-	JNIEnv *env = get_jni_env();
-	jclass cls = env->GetObjectClass(peer->java_webview);
-	jmethodID mid = env->GetMethodID(cls, "internalLoadChanged", "(ILjava/lang/String;)V");
-	const char *uri = webkit_web_view_get_uri(web_view);
-	jstring juri = uri ? env->NewStringUTF(uri) : NULL;
-	env->CallVoidMethod(peer->java_webview, mid, (jint)load_event, juri);
+	}
+	const struct atl_webview_backend *(*entry)(void) =
+		(const struct atl_webview_backend *(*)(void))dlsym(handle, "atl_webview_backend_entry");
+	const struct atl_webview_backend *backend = entry ? entry() : NULL;
+	if (backend && backend->init(&host_ops)) {
+		fprintf(stderr, "WebView: using '%s' backend (%s)\n", backend->name, soname);
+		active_backend = backend;
+	} else {
+		fprintf(stderr, "WebView: backend module %s failed to initialize\n", soname);
+		dlclose(handle);
+	}
 }
 
 JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1create(JNIEnv *env, jobject thiz, jint width, jint height)
 {
-	if (!ensure_wpe_initialized())
+	if (!backend_selection_done) {
+		backend_selection_done = true;
+		select_backend();
+	}
+	if (!active_backend)
 		return 0;
 
-	webview_peer *peer = new webview_peer();
-	peer->width = width > 0 ? width : 1;
-	peer->height = height > 0 ? height : 1;
-	peer->java_webview = env->NewGlobalRef(thiz);
-
-	/* capture an AssetManager for the android-asset:// scheme handler */
+	/* capture an AssetManager for android-asset:/// asset reads */
 	if (!g_asset_manager) {
 		jmethodID get_am = env->GetMethodID(env->GetObjectClass(thiz),
 			"internalGetAssetManager", "()Landroid/content/res/AssetManager;");
@@ -376,78 +208,83 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1create(JNIEnv *env, 
 			g_asset_manager = env->NewGlobalRef(am);
 	}
 
-	if (use_shm) {
-		static const struct wpe_view_backend_exportable_fdo_client shm_client = {
-			.export_buffer_resource = nullptr,
-			.export_dmabuf_resource = nullptr,
-			.export_shm_buffer = on_export_shm_buffer,
-			._wpe_reserved0 = nullptr,
-			._wpe_reserved1 = nullptr,
-		};
-		peer->exportable = wpe_view_backend_exportable_fdo_create(&shm_client, peer, peer->width, peer->height);
-	} else {
-		static const struct wpe_view_backend_exportable_fdo_egl_client egl_client = {
-			.export_egl_image = nullptr,
-			.export_fdo_egl_image = on_export_egl_image,
-			.export_shm_buffer = nullptr,
-			._wpe_reserved0 = nullptr,
-			._wpe_reserved1 = nullptr,
-		};
-		peer->exportable = wpe_view_backend_exportable_fdo_egl_create(&egl_client, peer, peer->width, peer->height);
+	webview_host_peer *peer = new webview_host_peer();
+	peer->java_webview = env->NewGlobalRef(thiz);
+	peer->backend_peer = active_backend->create(peer, width, height);
+	if (!peer->backend_peer) {
+		env->DeleteGlobalRef(peer->java_webview);
+		delete peer;
+		return 0;
 	}
-	peer->backend = wpe_view_backend_exportable_fdo_get_view_backend(peer->exportable);
-
-	WebKitWebViewBackend *view_backend =
-		webkit_web_view_backend_new(peer->backend, NULL, NULL);
-	peer->web_view = webkit_web_view_new(view_backend);
-	g_object_ref_sink(peer->web_view);
-
-	/* WebKit only paints a view it believes is on-screen */
-	wpe_view_backend_add_activity_state(peer->backend,
-		wpe_view_activity_state_visible | wpe_view_activity_state_focused | wpe_view_activity_state_in_window);
-	wpe_view_backend_dispatch_set_size(peer->backend, peer->width, peer->height);
-
-	g_signal_connect(peer->web_view, "load-changed", G_CALLBACK(on_load_changed), peer);
-
 	return _INTPTR(peer);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1destroy(JNIEnv *env, jobject thiz, jlong peer_ptr)
+{
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
+	if (!peer)
+		return;
+	active_backend->destroy(peer->backend_peer);
+	env->DeleteGlobalRef(peer->java_webview);
+	delete peer;
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setSize(JNIEnv *env, jobject thiz, jlong peer_ptr, jint width, jint height)
 {
-	webview_peer *peer = (webview_peer *)_PTR(peer_ptr);
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
 	if (!peer || width <= 0 || height <= 0)
 		return;
-	peer->width = width;
-	peer->height = height;
-	wpe_view_backend_dispatch_set_size(peer->backend, width, height);
+	active_backend->set_size(peer->backend_peer, width, height);
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl(JNIEnv *env, jobject thiz, jlong peer_ptr, jstring url)
 {
-	webview_peer *peer = (webview_peer *)_PTR(peer_ptr);
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
 	if (!peer)
 		return;
 	const char *curl = env->GetStringUTFChars(url, NULL);
-	webkit_web_view_load_uri(peer->web_view, curl);
+	active_backend->load_url(peer->backend_peer, curl);
 	env->ReleaseStringUTFChars(url, curl);
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadHtml(JNIEnv *env, jobject thiz, jlong peer_ptr, jstring html, jstring base_uri)
 {
-	webview_peer *peer = (webview_peer *)_PTR(peer_ptr);
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
 	if (!peer)
 		return;
 	const char *chtml = env->GetStringUTFChars(html, NULL);
 	const char *cbase = base_uri ? env->GetStringUTFChars(base_uri, NULL) : NULL;
-	webkit_web_view_load_html(peer->web_view, chtml, cbase);
+	active_backend->load_html(peer->backend_peer, chtml, cbase);
 	env->ReleaseStringUTFChars(html, chtml);
 	if (cbase)
 		env->ReleaseStringUTFChars(base_uri, cbase);
 }
 
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1motionEvent(JNIEnv *env, jobject thiz, jlong peer_ptr, jint action, jfloat x, jfloat y, jlong time_ms)
+{
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
+	if (!peer || !active_backend->motion_event)
+		return JNI_FALSE;
+	active_backend->motion_event(peer->backend_peer, action, x, y, (uint64_t)time_ms);
+	return JNI_TRUE;
+}
+
+/* returns false when the backend can't run JS; the Java side then completes
+ * the callback with "null" itself */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1runJs(JNIEnv *env, jobject thiz, jlong peer_ptr, jstring script, jlong callback_id)
+{
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
+	if (!peer || !active_backend->run_javascript)
+		return JNI_FALSE;
+	const char *cscript = env->GetStringUTFChars(script, NULL);
+	active_backend->run_javascript(peer->backend_peer, cscript, (int64_t)callback_id);
+	env->ReleaseStringUTFChars(script, cscript);
+	return JNI_TRUE;
+}
+
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1draw(JNIEnv *env, jobject thiz, jlong peer_ptr, jlong canvas_ptr, jint width, jint height)
 {
-	webview_peer *peer = (webview_peer *)_PTR(peer_ptr);
+	webview_host_peer *peer = (webview_host_peer *)_PTR(peer_ptr);
 	ATLCanvas *atl_canvas = (ATLCanvas *)_PTR(canvas_ptr);
 	if (!peer || !atl_canvas || !atl_canvas->canvas || !peer->has_frame)
 		return;

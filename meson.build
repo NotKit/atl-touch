@@ -160,6 +160,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/input/input_method.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
                                                                   	'src/api-impl-jni/widgets/android_webkit_WebView.cpp',
+                                                                  	'src/api-impl-jni/widgets/webview_wpe.c',
                                                                   	mpris,
                                                                   	portal_openuri,
                                                                   	portal_email,

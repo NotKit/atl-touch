@@ -251,6 +251,14 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1create
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_destroy
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1destroy
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_setSize
  * Signature: (JII)V
  */
@@ -272,6 +280,22 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl
  */
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadHtml
   (JNIEnv *, jobject, jlong, jstring, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_motionEvent
+ * Signature: (JIFFJ)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1motionEvent
+  (JNIEnv *, jobject, jlong, jint, jfloat, jfloat, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_runJs
+ * Signature: (JLjava/lang/String;J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1runJs
+  (JNIEnv *, jobject, jlong, jstring, jlong);
 
 /*
  * Class:     android_webkit_WebView

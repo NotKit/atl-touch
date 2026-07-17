@@ -5,15 +5,24 @@ import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.util.Base64;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
 
-	/* native WPE WebKit peer (webview_peer*); created lazily once a window/EGL
-	 * context exists. 0 until then. */
+	/* native backend peer (webview_host_peer*); created lazily once a
+	 * window/EGL context exists. 0 until then. */
 	private long peer;
+	private boolean destroyed = false;
+
+	/* pending evaluateJavascript callbacks by id (id 0 = no callback) */
+	private long nextJsCallbackId = 1;
+	private final Map<Long, ValueCallback<String>> jsCallbacks = new HashMap<>();
 
 	public WebView(Context context) {
 		this(context, null);
@@ -34,7 +43,7 @@ public class WebView extends ViewGroup {
 	private int peerW = -1, peerH = -1;
 
 	private long ensurePeer() {
-		if (peer == 0) {
+		if (peer == 0 && !destroyed) {
 			int w = getWidth() > 0 ? getWidth() : 1;
 			int h = getHeight() > 0 ? getHeight() : 1;
 			peer = native_create(w, h);
@@ -90,6 +99,23 @@ public class WebView extends ViewGroup {
 		}
 	}
 
+	// to be used by native code
+	void internalJsResult(long callbackId, String resultJson) {
+		ValueCallback<String> callback = jsCallbacks.remove(callbackId);
+		if (callback != null) {
+			callback.onReceiveValue(resultJson != null ? resultJson : "null");
+		}
+	}
+
+	@Override
+	public boolean onTouchEvent(MotionEvent event) {
+		long p = ensurePeer();
+		if (p != 0 && native_motionEvent(p, event.getAction(), event.getX(), event.getY(), event.getEventTime())) {
+			return true;
+		}
+		return super.onTouchEvent(event);
+	}
+
 	public void setVerticalScrollBarEnabled(boolean enabled) {}
 	public void setVerticalScrollbarOverlay(boolean overlay) {}
 	public void setInitialScale(int scaleInPercent) {}
@@ -109,7 +135,14 @@ public class WebView extends ViewGroup {
 
 	public void removeAllViews() {}
 
-	public void destroy() {}
+	public void destroy() {
+		destroyed = true;
+		if (peer != 0) {
+			native_destroy(peer);
+			peer = 0;
+		}
+		jsCallbacks.clear();
+	}
 
 	public void loadDataWithBaseURL(String baseUrl, String data, String mimeType, String encoding, String historyUrl) {
 		if ("base64".equals(encoding)) {
@@ -128,10 +161,12 @@ public class WebView extends ViewGroup {
 
 	public void loadUrl(String url) {
 		if (url.startsWith("javascript:")) {
-			System.out.println("loadUrl: " + url + " - not implemented yet");
+			evaluateJavascript(url.substring("javascript:".length()), null);
 			return;
 		}
-		native_loadUrl(ensurePeer(), url);
+		long p = ensurePeer();
+		if (p != 0)
+			native_loadUrl(p, url);
 	}
 
 	public void stopLoading() {}
@@ -155,7 +190,17 @@ public class WebView extends ViewGroup {
 		loadDataWithBaseURL("about:blank", data, mimeType, encoding, "about:blank");
 	}
 
-	public void evaluateJavascript(String script, ValueCallback<String> resultCallback) {}
+	public void evaluateJavascript(String script, ValueCallback<String> resultCallback) {
+		long p = ensurePeer();
+		long callbackId = 0;
+		if (resultCallback != null) {
+			callbackId = nextJsCallbackId++;
+			jsCallbacks.put(callbackId, resultCallback);
+		}
+		if (p == 0 || !native_runJs(p, script, callbackId)) {
+			internalJsResult(callbackId, null);
+		}
+	}
 
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
 
@@ -175,8 +220,11 @@ public class WebView extends ViewGroup {
 	}
 
 	private native long native_create(int width, int height);
+	private native void native_destroy(long peer);
 	private native void native_setSize(long peer, int width, int height);
 	private native void native_loadUrl(long peer, String url);
 	private native void native_loadHtml(long peer, String html, String baseUri);
+	private native boolean native_motionEvent(long peer, int action, float x, float y, long timeMs);
+	private native boolean native_runJs(long peer, String script, long callbackId);
 	private native void native_draw(long peer, long canvasPtr, int width, int height);
 }
