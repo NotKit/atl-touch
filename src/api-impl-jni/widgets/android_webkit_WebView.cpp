@@ -64,6 +64,17 @@ extern "C" {
 #endif
 
 typedef void (*PFN_glEGLImageTargetTexture2DOES)(GLenum target, void *image);
+typedef void (*PFN_glGenFramebuffers)(GLsizei n, GLuint *framebuffers);
+typedef void (*PFN_glBindFramebuffer)(GLenum target, GLuint framebuffer);
+typedef void (*PFN_glFramebufferTexture2D)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+
+/* FBO enums are missing from GL/gl.h (GL 1.x); same values in GL and GLES2 */
+#ifndef GL_FRAMEBUFFER
+#define GL_FRAMEBUFFER 0x8D40
+#endif
+#ifndef GL_COLOR_ATTACHMENT0
+#define GL_COLOR_ATTACHMENT0 0x8CE0
+#endif
 
 struct webview_peer {
 	struct wpe_view_backend_exportable_fdo *exportable = nullptr;
@@ -72,6 +83,7 @@ struct webview_peer {
 	jobject java_webview = nullptr; // global ref, for load-changed callbacks
 
 	GLuint texture = 0;
+	GLuint fbo = 0; // for reading the EGLImage texture back (GLES has no glGetTexImage)
 	SkBitmap frame; // latest decoded web frame (CPU)
 	bool has_frame = false;
 	int width = 1, height = 1;
@@ -82,6 +94,9 @@ static bool wpe_initialized = false;
  * EGLImages (set in ensure_wpe_initialized, process-wide). */
 static bool use_shm = false;
 static PFN_glEGLImageTargetTexture2DOES image_target_texture_2d = nullptr;
+static PFN_glGenFramebuffers gen_framebuffers = nullptr;
+static PFN_glBindFramebuffer bind_framebuffer = nullptr;
+static PFN_glFramebufferTexture2D framebuffer_texture_2d = nullptr;
 
 /* The EGLImage buffer-sharing path needs a real GPU; without one WebKit hands
  * WPEBackend-fdo dmabuf wl_buffers it cannot back, and fdo crashes on a NULL
@@ -195,6 +210,15 @@ static bool ensure_wpe_initialized(void)
 	}
 
 	use_shm = webview_should_use_shm();
+	/* The EGLImage path also needs the display to accept WPEBackend-fdo's
+	 * buffer sharing (EGL_WL_bind_wayland_display). Hybris/Android EGL on
+	 * Ubuntu Touch exposes a DRM render node yet lacks the extension, so
+	 * exports would never arrive — fall back to CPU (wl_shm) frames. */
+	if (!use_shm && !getenv("ATL_WEBVIEW_SHM")) {
+		const char *egl_exts = eglQueryString(display, EGL_EXTENSIONS);
+		if (!egl_exts || !strstr(egl_exts, "EGL_WL_bind_wayland_display"))
+			use_shm = true;
+	}
 	atl_primary_make_context_current();
 	const char *gl_renderer = (const char *)glGetString(GL_RENDERER);
 	fprintf(stderr, "WebView: GL renderer='%s' -> %s buffer path\n",
@@ -224,8 +248,11 @@ static bool ensure_wpe_initialized(void)
 	} else {
 		image_target_texture_2d =
 			(PFN_glEGLImageTargetTexture2DOES)eglGetProcAddress("glEGLImageTargetTexture2DOES");
-		if (!image_target_texture_2d) {
-			fprintf(stderr, "WebView: glEGLImageTargetTexture2DOES unavailable (no GL_OES_EGL_image)\n");
+		gen_framebuffers = (PFN_glGenFramebuffers)eglGetProcAddress("glGenFramebuffers");
+		bind_framebuffer = (PFN_glBindFramebuffer)eglGetProcAddress("glBindFramebuffer");
+		framebuffer_texture_2d = (PFN_glFramebufferTexture2D)eglGetProcAddress("glFramebufferTexture2D");
+		if (!image_target_texture_2d || !gen_framebuffers || !bind_framebuffer || !framebuffer_texture_2d) {
+			fprintf(stderr, "WebView: EGLImage/FBO entry points unavailable\n");
 			return false;
 		}
 		wpe_fdo_initialize_for_egl_display(display);
@@ -264,8 +291,14 @@ static void on_export_egl_image(void *data, struct wpe_fdo_egl_exported_image *i
 	if (peer->frame.width() != w || peer->frame.height() != h)
 		peer->frame.allocPixels(SkImageInfo::Make(w, h, kRGBA_8888_SkColorType, kPremul_SkAlphaType));
 
-	/* desktop GL: pull the whole texture level back to the CPU bitmap */
-	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, peer->frame.getPixels());
+	/* read the texture back through an FBO; unlike glGetTexImage this also
+	 * works on GLES2 contexts (Ubuntu Touch / hybris) */
+	if (!peer->fbo)
+		gen_framebuffers(1, &peer->fbo);
+	bind_framebuffer(GL_FRAMEBUFFER, peer->fbo);
+	framebuffer_texture_2d(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, peer->texture, 0);
+	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, peer->frame.getPixels());
+	bind_framebuffer(GL_FRAMEBUFFER, 0);
 	peer->has_frame = true;
 
 	wpe_view_backend_exportable_fdo_egl_dispatch_release_exported_image(peer->exportable, image);
