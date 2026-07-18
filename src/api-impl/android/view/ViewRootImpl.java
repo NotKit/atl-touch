@@ -313,7 +313,15 @@ public class ViewRootImpl implements ViewParent {
 			return false;
 		if (target != view)
 			event.offsetLocation(-target.getLeft(), -target.getTop());
-		return target.dispatchTouchEvent(event);
+		try {
+			return target.dispatchTouchEvent(event);
+		} catch (Throwable t) {
+			// A throwing input handler would otherwise be swallowed silently at
+			// the native boundary; log it so the failure is visible.
+			System.err.println("exception dispatching touch event:");
+			t.printStackTrace();
+			return true;
+		}
 	}
 
 	protected boolean dispatchKeyEvent(KeyEvent event) {
