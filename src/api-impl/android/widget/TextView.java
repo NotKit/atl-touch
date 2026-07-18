@@ -356,6 +356,14 @@ public class TextView extends View {
 	}
 	public void setFilters(InputFilter[] filters) {}
 	public void setCursorVisible(boolean visible) {}
+
+	private boolean showSoftInputOnFocus = true;
+	public void setShowSoftInputOnFocus(boolean show) {
+		showSoftInputOnFocus = show;
+	}
+	public final boolean getShowSoftInputOnFocus() {
+		return showSoftInputOnFocus;
+	}
 	public void setImeOptions(int imeOptions) {}
 
 	public void setImeHintLocales(android.os.LocaleList hintLocales) {}
