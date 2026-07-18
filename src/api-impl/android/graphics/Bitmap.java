@@ -253,6 +253,12 @@ public final class Bitmap {
 		native_get_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
 	}
 
+	public int getPixel(int x, int y) {
+		int[] pixel = new int[1];
+		native_get_pixels(getTexture(), pixel, 0, 1, x, y, 1, 1);
+		return pixel[0];
+	}
+
 	public void copyPixelsToBuffer(Buffer buffer) {
 		native_copy_to_buffer(getTexture(), buffer, config.android_memory_format, getRowBytes());
 		buffer.position(buffer.position() + getAllocationByteCount());
