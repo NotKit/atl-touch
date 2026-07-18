@@ -93,7 +93,7 @@ public class WebView extends ViewGroup {
 	// to be used by native code
 	void internalLoadChanged(int loadState, String url) {
 		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0 && webViewClient != null) {
-			webViewClient.onPageStarted(this, url);
+			webViewClient.onPageStarted(this, url, null);
 		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3 && webViewClient != null) {
 			webViewClient.onPageFinished(this, url);
 		}
