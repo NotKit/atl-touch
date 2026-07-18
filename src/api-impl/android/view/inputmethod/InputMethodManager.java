@@ -48,6 +48,10 @@ public class InputMethodManager {
 		return activeView == view;
 	}
 
+	public boolean isActive() {
+		return activeView != null;
+	}
+
 	public List<InputMethodInfo> getEnabledInputMethodList() {
 		return input_method_list;
 	}
