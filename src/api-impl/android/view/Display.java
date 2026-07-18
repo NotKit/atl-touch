@@ -44,6 +44,10 @@ public final class Display {
 		return 60; // FIXME
 	}
 
+	public float[] getSupportedRefreshRates() {
+		return new float[] { getRefreshRate() };
+	}
+
 	public long getAppVsyncOffsetNanos() {
 		return 0; // what else would we return here?
 	}
