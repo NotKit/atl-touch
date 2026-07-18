@@ -1877,7 +1877,10 @@ public class View implements Drawable.Callback {
 		return scrollContainer;
 	}
 
-	public boolean removeCallbacks(Runnable action) { return false; }
+	public boolean removeCallbacks(Runnable action) {
+		getHandler().removeCallbacks(action);
+		return true;
+	}
 
 	/** legacy shim (used by Dialog/WindowManagerImpl sizing) */
 	public void internalSetDefaultMeasureSpec(int widthMeasureSpec, int heightMeasureSpec) {
@@ -1925,12 +1928,12 @@ public class View implements Drawable.Callback {
 	}
 
 	public boolean postDelayed(Runnable action, long delayMillis) {
-		new Handler(Looper.getMainLooper()).postDelayed(action, delayMillis);
+		getHandler().postDelayed(action, delayMillis);
 		return true;
 	}
 
 	public boolean post(Runnable action) {
-		new Handler(Looper.getMainLooper()).post(action);
+		getHandler().post(action);
 		return true;
 	}
 
@@ -2596,8 +2599,14 @@ public class View implements Drawable.Callback {
 
 	public void setHorizontalFadingEdgeEnabled(boolean horizontalFadingEdgeEnabled) {}
 
+	// A single stable Handler per View: post() and removeCallbacks() must share
+	// one instance, since MessageQueue matches pending runnables by their target
+	// Handler. A fresh Handler each call would make removeCallbacks() a no-op.
+	private Handler handler;
 	public Handler getHandler() {
-		return new Handler(Looper.getMainLooper());
+		if (handler == null)
+			handler = new Handler(Looper.getMainLooper());
+		return handler;
 	}
 
 	public boolean isHardwareAccelerated() {
