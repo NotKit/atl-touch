@@ -354,4 +354,14 @@ public class EditText extends TextView {
 	public void setSelection(int index) {
 		setSelection(index, index);
 	}
+
+	@Override
+	public int getSelectionStart() {
+		return Math.min(selStart, content().length());
+	}
+
+	@Override
+	public int getSelectionEnd() {
+		return Math.min(selEnd, content().length());
+	}
 }
