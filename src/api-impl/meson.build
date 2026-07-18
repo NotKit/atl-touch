@@ -331,6 +331,7 @@ srcs = [
 	'android/hardware/camera2/CameraManager.java',
 	'android/hardware/display/ColorDisplayManager.java',
 	'android/hardware/display/DisplayManager.java',
+	'android/hardware/fingerprint/FingerprintManager.java',
 	'android/hardware/input/InputManager.java',
 	'android/hardware/usb/UsbManager.java',
 	'android/inputmethodservice/AbstractInputMethodService.java',

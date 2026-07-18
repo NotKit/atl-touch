@@ -473,6 +473,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public boolean isChangingConfigurations() { return false; }
 
+	public boolean isInPictureInPictureMode() { return false; }
+
 	@Override
 	public void onContentChanged() {
 		Slog.i(TAG, "- onContentChanged - yay!");

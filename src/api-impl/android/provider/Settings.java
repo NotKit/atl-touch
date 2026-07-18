@@ -6,6 +6,11 @@ import android.util.AndroidException;
 import android.util.Slog;
 
 public class Settings {
+
+	public static boolean canDrawOverlays(android.content.Context context) {
+		return false;
+	}
+
 	public static class NameValueTable implements BaseColumns {}
 
 	public static final class Secure extends NameValueTable {
