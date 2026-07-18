@@ -550,6 +550,14 @@ static void qt_backend_destroy(void *peer_)
 {
 	qt_webview_peer *peer = (qt_webview_peer *)peer_;
 	peer->render_timer->stop();
+	/* Deleting the WebEngineView drives the render control, which synchronously
+	 * re-emits sceneChanged/renderRequested; those land in the bridge's
+	 * schedule_render()/renderNow(), which touch render_timer and the GL
+	 * objects freed below. Disconnect the bridge from the render signals first
+	 * so teardown can't call back into it. (loadingChanged comes from QML, not
+	 * a QObject connection, so it needs no disconnect.) */
+	QObject::disconnect(peer->render_control, nullptr, peer->bridge, nullptr);
+	QObject::disconnect(peer->render_timer, nullptr, peer->bridge, nullptr);
 	delete peer->render_timer;
 	delete peer->webview;
 	delete peer->qml_context;
