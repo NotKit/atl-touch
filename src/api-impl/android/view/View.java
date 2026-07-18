@@ -2181,8 +2181,19 @@ public class View implements Drawable.Callback {
 	}
 
 	public final boolean isFocusable() { return true; }
-	public boolean isClickable() { return true; }
-	public boolean isLongClickable() { return true; }
+
+	/* AOSP semantics: setOnClickListener() marks the view clickable. Apps use
+	 * this to probe for views that handle clicks themselves (e.g. Telegram's
+	 * RecyclerListView skips the item-click gesture when a child under the
+	 * touch point reports isClickable()), so always returning true here broke
+	 * list item selection. */
+	public boolean isClickable() {
+		return clickable || on_click_listener != null;
+	}
+
+	public boolean isLongClickable() {
+		return longClickable || on_long_click_listener != null;
+	}
 
 	public int getLayoutDirection() { return LAYOUT_DIRECTION_LTR; }
 
