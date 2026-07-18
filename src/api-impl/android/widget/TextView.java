@@ -252,6 +252,22 @@ public class TextView extends View {
 		canvas.restore();
 	}
 
+	/* must mirror the vertical offsets applied in onDraw(); uses the measured
+	 * height because LinearLayout asks for the baseline during its measure pass */
+	@Override
+	public int getBaseline() {
+		if (text_layout == null)
+			return super.getBaseline();
+		int ty = getCompoundPaddingTop();
+		int innerHeight = getMeasuredHeight() - getCompoundPaddingTop() - getCompoundPaddingBottom();
+		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (verticalGravity == Gravity.CENTER_VERTICAL)
+			ty += Math.max(0, (innerHeight - text_layout.getHeight()) / 2);
+		else if (verticalGravity == Gravity.BOTTOM)
+			ty += Math.max(0, innerHeight - text_layout.getHeight());
+		return ty + text_layout.getLineBaseline(0);
+	}
+
 	public void setGravity(int gravity) {
 		this.gravity = gravity;
 		invalidate();
