@@ -3,11 +3,16 @@ package android.webkit;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Canvas;
+import android.net.Uri;
 import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -97,6 +102,61 @@ public class WebView extends ViewGroup {
 		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3 && webViewClient != null) {
 			webViewClient.onPageFinished(this, url);
 		}
+	}
+
+	private static class InterceptedRequest implements WebResourceRequest {
+		private final Uri url;
+		private final String method;
+		private final boolean forMainFrame;
+
+		InterceptedRequest(Uri url, String method, boolean forMainFrame) {
+			this.url = url;
+			this.method = method;
+			this.forMainFrame = forMainFrame;
+		}
+
+		@Override public Uri getUrl() { return url; }
+		@Override public boolean isForMainFrame() { return forMainFrame; }
+		@Override public boolean isRedirect() { return false; }
+		@Override public boolean hasGesture() { return false; }
+		@Override public String getMethod() { return method; }
+		@Override public Map<String, String> getRequestHeaders() { return Collections.emptyMap(); }
+	}
+
+	/* to be used by native code: runs the client's shouldInterceptRequest and
+	 * flattens the response for JNI: {String mime, String encoding, byte[] body,
+	 * String[] headers as name,value pairs}, or null for pass-through */
+	Object[] internalInterceptRequest(String method, String url, boolean forMainFrame) {
+		if (webViewClient == null)
+			return null;
+		WebResourceResponse response = webViewClient.shouldInterceptRequest(this,
+				new InterceptedRequest(Uri.parse(url), method, forMainFrame));
+		if (response == null)
+			return null;
+		ByteArrayOutputStream body = new ByteArrayOutputStream();
+		InputStream in = response.getData();
+		if (in != null) {
+			try {
+				byte[] buf = new byte[65536];
+				int n;
+				while ((n = in.read(buf)) > 0)
+					body.write(buf, 0, n);
+				in.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+				return null;
+			}
+		}
+		Map<String, String> headerMap = response.getResponseHeaders();
+		String[] headers = new String[headerMap != null ? 2 * headerMap.size() : 0];
+		int i = 0;
+		if (headerMap != null) {
+			for (Map.Entry<String, String> header : headerMap.entrySet()) {
+				headers[i++] = header.getKey();
+				headers[i++] = header.getValue();
+			}
+		}
+		return new Object[] {response.getMimeType(), response.getEncoding(), body.toByteArray(), headers};
 	}
 
 	// to be used by native code

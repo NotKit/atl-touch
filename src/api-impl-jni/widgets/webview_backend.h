@@ -36,6 +36,17 @@ enum atl_webview_format {
 #define ATL_WEBVIEW_LOAD_STARTED 0
 #define ATL_WEBVIEW_LOAD_FINISHED 3
 
+/* a response supplied by WebViewClient.shouldInterceptRequest; every field is
+ * owned by the backend afterwards (g_free the strings and data, g_strfreev
+ * headers) */
+struct atl_webview_response {
+	char *mime;     /* may be NULL */
+	char *encoding; /* may be NULL */
+	uint8_t *data;
+	size_t size;
+	char **headers; /* NULL-terminated name,value pairs, may be NULL */
+};
+
 /* services the dispatcher provides to backends; host_peer identifies the
  * WebView the call is about (first argument of create) */
 struct atl_webview_host_ops {
@@ -53,6 +64,10 @@ struct atl_webview_host_ops {
 	/* read an app asset (the android-asset:/// scheme). On success returns
 	 * true and a g_malloc'd buffer the caller frees with g_free. */
 	bool (*read_asset)(const char *path, void **data, size_t *size);
+	/* ask the app's WebViewClient.shouldInterceptRequest to supply the
+	 * response itself; true = intercepted, *response filled in */
+	bool (*intercept_request)(void *host_peer, const char *method, const char *url,
+	                          bool for_main_frame, struct atl_webview_response *response);
 };
 
 struct atl_webview_backend {

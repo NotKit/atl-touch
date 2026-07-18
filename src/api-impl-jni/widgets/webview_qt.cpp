@@ -40,13 +40,21 @@
 #include <QQuickItem>
 #include <QTimer>
 #include <QBuffer>
+#include <QHash>
+#include <QPointer>
+#include <QThread>
 #include <QPointingDevice>
 #include <QTouchEvent>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QtWebEngineQuick/qtwebenginequickglobal.h>
 #include <QtWebEngineQuick/QQuickWebEngineProfile>
 #include <QWebEngineUrlScheme>
 #include <QWebEngineUrlSchemeHandler>
 #include <QWebEngineUrlRequestJob>
+#include <QWebEngineUrlRequestInterceptor>
+#include <QWebEngineUrlRequestInfo>
 
 #include "webview_backend.h"
 #include "webview_qt_bridge.h"
@@ -56,6 +64,11 @@ static const struct atl_webview_host_ops *host;
 static QGuiApplication *qt_app;
 static QQmlEngine *qml_engine;
 static const QPointingDevice *touch_device;
+static QNetworkAccessManager *network_manager;
+static QWebEngineUrlSchemeHandler *asset_scheme_handler;
+
+class AtlUrlInterceptor;
+class AtlInterceptSchemeHandler;
 
 struct qt_webview_peer {
 	void *host_peer = nullptr;
@@ -67,18 +80,33 @@ struct qt_webview_peer {
 	QQuickItem *webview = nullptr;
 	AtlQtBridge *bridge = nullptr;
 	QTimer *render_timer = nullptr;
+	QQuickWebEngineProfile *profile = nullptr;
+	AtlUrlInterceptor *interceptor = nullptr;
+	AtlInterceptSchemeHandler *intercept_handler = nullptr;
+	/* responses already fetched from Java in the interceptor, awaiting the
+	 * redirected request in the scheme handler; key is "METHOD url" */
+	QHash<QByteArray, struct atl_webview_response> stashed;
 	GLuint texture = 0;
 	GLuint readback_fbo = 0;
 	int width = 1, height = 1;
 	bool needs_sync = false;
 };
 
+static void response_clear(struct atl_webview_response *response)
+{
+	g_free(response->mime);
+	g_free(response->encoding);
+	g_free(response->data);
+	g_strfreev(response->headers);
+}
+
 /* WebEngineView with hooks the backend needs: load state reporting and a
  * runJavaScript wrapper (the JS-callback variant is only callable from QML).
- * atlBridge is a per-peer context property. */
+ * atlBridge and atlProfile are per-peer context properties. */
 static const char qml_source[] =
 	"import QtWebEngine\n"
 	"WebEngineView {\n"
+	"    profile: atlProfile\n"
 	"    onLoadingChanged: (loadRequest) => atlBridge.loadingChanged(loadRequest.status, url.toString())\n"
 	"    function atlRunJs(script, id) {\n"
 	"        runJavaScript(script, function(result) {\n"
@@ -134,6 +162,126 @@ private:
 	}
 };
 
+static void reply_with_response(QWebEngineUrlRequestJob *job, const struct atl_webview_response *response)
+{
+	QByteArray content_type = response->mime ? QByteArray(response->mime) : QByteArray("application/octet-stream");
+	if (response->encoding && !content_type.contains(';'))
+		content_type += "; charset=" + QByteArray(response->encoding);
+	QMultiMap<QByteArray, QByteArray> headers;
+	/* pages still on the real http(s) origin fetch intercepted subresources
+	 * cross-origin (the redirect changes the scheme) */
+	headers.insert("Access-Control-Allow-Origin", "*");
+	for (char **header = response->headers; header && header[0] && header[1]; header += 2)
+		headers.insert(header[0], header[1]);
+	job->setAdditionalResponseHeaders(headers);
+	QBuffer *buf = new QBuffer(job);
+	buf->setData((const char *)response->data, (int)response->size);
+	job->reply(content_type, buf);
+}
+
+/* pass a request the app declined to intercept through to the real server.
+ * HTTP error statuses still reply with the body: the job can only convey 200
+ * or a network failure, and the body is the more useful of the two. */
+static void forward_to_network(QWebEngineUrlRequestJob *job, const QUrl &url)
+{
+	QNetworkRequest request(url);
+	const QMap<QByteArray, QByteArray> req_headers = job->requestHeaders();
+	for (auto it = req_headers.begin(); it != req_headers.end(); ++it)
+		request.setRawHeader(it.key(), it.value());
+	QByteArray body;
+	if (job->requestBody())
+		body = job->requestBody()->readAll();
+	QNetworkReply *reply = network_manager->sendCustomRequest(request, job->requestMethod(), body);
+	QObject::connect(job, &QObject::destroyed, reply, &QNetworkReply::abort);
+	QPointer<QWebEngineUrlRequestJob> job_guard(job);
+	QObject::connect(reply, &QNetworkReply::finished, reply, [job_guard, reply]() {
+		reply->deleteLater();
+		QWebEngineUrlRequestJob *job = job_guard.data();
+		if (!job)
+			return;
+		QByteArray data = reply->readAll();
+		if (reply->error() != QNetworkReply::NoError && data.isEmpty()) {
+			job->fail(QWebEngineUrlRequestJob::RequestFailed);
+			return;
+		}
+		QByteArray content_type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
+		QBuffer *buf = new QBuffer(job);
+		buf->setData(data);
+		job->reply(content_type.isEmpty() ? QByteArrayLiteral("application/octet-stream") : content_type, buf);
+	});
+}
+
+/* WebViewClient.shouldInterceptRequest, part 1: an interceptor can only block
+ * or redirect, not supply a body, so http(s) requests the app intercepts are
+ * redirected onto the atl-http(s) scheme and answered by the handler below.
+ * The response Java already produced is stashed for it. */
+class AtlUrlInterceptor : public QWebEngineUrlRequestInterceptor {
+public:
+	explicit AtlUrlInterceptor(qt_webview_peer *peer) : peer(peer) {}
+
+	void interceptRequest(QWebEngineUrlRequestInfo &info) override
+	{
+		QString scheme = info.requestUrl().scheme();
+		if (scheme != "http" && scheme != "https")
+			return;
+		/* JNI is only safe on the GLib main thread the host runs on */
+		if (QThread::currentThread() != qt_app->thread())
+			return;
+		QByteArray url = info.requestUrl().toEncoded();
+		struct atl_webview_response response;
+		if (!host->intercept_request(peer->host_peer, info.requestMethod().constData(), url.constData(),
+		                             info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame,
+		                             &response))
+			return;
+		QByteArray key = info.requestMethod() + ' ' + url;
+		if (peer->stashed.contains(key))
+			response_clear(&peer->stashed[key]);
+		peer->stashed.insert(key, response);
+		QUrl redirect = info.requestUrl();
+		redirect.setScheme(scheme == "https" ? "atl-https" : "atl-http");
+		info.redirect(redirect);
+	}
+
+	qt_webview_peer *peer;
+};
+
+/* WebViewClient.shouldInterceptRequest, part 2: serves atl-http(s)://
+ * requests. The mapping back to http(s) is lossless (HostAndPort syntax keeps
+ * host:port), so the app's client sees the URLs it expects, and relative URLs
+ * on an intercepted page - which land on this scheme, since the redirect made
+ * it the document origin - keep resolving. Requests the app doesn't intercept,
+ * e.g. AnkiDroid's POST data calls to its localhost server, are forwarded to
+ * the real network. */
+class AtlInterceptSchemeHandler : public QWebEngineUrlSchemeHandler {
+public:
+	explicit AtlInterceptSchemeHandler(qt_webview_peer *peer) : peer(peer) {}
+
+	void requestStarted(QWebEngineUrlRequestJob *job) override
+	{
+		QUrl http_url = job->requestUrl();
+		http_url.setScheme(http_url.scheme() == "atl-https" ? "https" : "http");
+		QByteArray url = http_url.toEncoded();
+		QByteArray key = job->requestMethod() + ' ' + url;
+		struct atl_webview_response response;
+		bool intercepted;
+		if (peer->stashed.contains(key)) {
+			response = peer->stashed.take(key);
+			intercepted = true;
+		} else {
+			intercepted = host->intercept_request(peer->host_peer, job->requestMethod().constData(),
+			                                      url.constData(), false, &response);
+		}
+		if (intercepted) {
+			reply_with_response(job, &response);
+			response_clear(&response);
+		} else {
+			forward_to_network(job, http_url);
+		}
+	}
+
+	qt_webview_peer *peer;
+};
+
 static bool ensure_qt_initialized(void)
 {
 	if (qt_app)
@@ -148,6 +296,16 @@ static bool ensure_qt_initialized(void)
 	scheme.setSyntax(QWebEngineUrlScheme::Syntax::Path);
 	scheme.setFlags(QWebEngineUrlScheme::SecureScheme | QWebEngineUrlScheme::CorsEnabled);
 	QWebEngineUrlScheme::registerScheme(scheme);
+
+	/* intercepted http(s) requests get redirected onto these (AtlUrlInterceptor) */
+	for (const char *name : {"atl-http", "atl-https"}) {
+		QWebEngineUrlScheme intercept_scheme(name);
+		intercept_scheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
+		intercept_scheme.setDefaultPort(strcmp(name, "atl-http") == 0 ? 80 : 443);
+		intercept_scheme.setFlags(QWebEngineUrlScheme::SecureScheme |
+			QWebEngineUrlScheme::CorsEnabled | QWebEngineUrlScheme::FetchApiAllowed);
+		QWebEngineUrlScheme::registerScheme(intercept_scheme);
+	}
 
 	QtWebEngineQuick::initialize();
 	QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
@@ -181,7 +339,8 @@ static bool ensure_qt_initialized(void)
 		return false;
 	}
 
-	QQuickWebEngineProfile::defaultProfile()->installUrlSchemeHandler("android-asset", new AssetSchemeHandler());
+	asset_scheme_handler = new AssetSchemeHandler();
+	network_manager = new QNetworkAccessManager(qt_app);
 
 	qml_engine = new QQmlEngine();
 	touch_device = new QPointingDevice("atl-webview-touch", 1,
@@ -311,8 +470,20 @@ static void *qt_backend_create(void *host_peer, int width, int height)
 	peer->window->setColor(Qt::white);
 
 	peer->bridge = new AtlQtBridge(peer);
+
+	/* per-WebView profile, so request interception can be routed to the right
+	 * WebView's client (Qt WebEngine only has profile-level hooks) */
+	peer->profile = new QQuickWebEngineProfile();
+	peer->profile->installUrlSchemeHandler("android-asset", asset_scheme_handler);
+	peer->intercept_handler = new AtlInterceptSchemeHandler(peer);
+	peer->profile->installUrlSchemeHandler("atl-http", peer->intercept_handler);
+	peer->profile->installUrlSchemeHandler("atl-https", peer->intercept_handler);
+	peer->interceptor = new AtlUrlInterceptor(peer);
+	peer->profile->setUrlRequestInterceptor(peer->interceptor);
+
 	peer->qml_context = new QQmlContext(qml_engine->rootContext());
 	peer->qml_context->setContextProperty("atlBridge", peer->bridge);
+	peer->qml_context->setContextProperty("atlProfile", peer->profile);
 
 	QQmlComponent component(qml_engine);
 	component.setData(QByteArray(qml_source), QUrl("qrc:/atl/webview.qml"));
@@ -322,6 +493,9 @@ static void *qt_backend_create(void *host_peer, int width, int height)
 		fprintf(stderr, "WebView/qt: QML error: %s\n", qPrintable(component.errorString()));
 		delete root;
 		delete peer->qml_context;
+		delete peer->profile;
+		delete peer->interceptor;
+		delete peer->intercept_handler;
 		delete peer->bridge;
 		delete peer->window;
 		delete peer->render_control;
@@ -356,6 +530,9 @@ static void *qt_backend_create(void *host_peer, int width, int height)
 		fprintf(stderr, "WebView/qt: QQuickRenderControl::initialize failed\n");
 		delete peer->webview;
 		delete peer->qml_context;
+		delete peer->profile;
+		delete peer->interceptor;
+		delete peer->intercept_handler;
 		delete peer->render_timer;
 		delete peer->bridge;
 		delete peer->window;
@@ -376,6 +553,11 @@ static void qt_backend_destroy(void *peer_)
 	delete peer->render_timer;
 	delete peer->webview;
 	delete peer->qml_context;
+	delete peer->profile;
+	delete peer->interceptor;
+	delete peer->intercept_handler;
+	for (auto it = peer->stashed.begin(); it != peer->stashed.end(); ++it)
+		response_clear(&it.value());
 	delete peer->bridge;
 	peer->render_control->invalidate();
 	if (peer->texture && peer->gl->makeCurrent(peer->surface)) {

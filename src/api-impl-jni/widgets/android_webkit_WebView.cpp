@@ -133,12 +133,68 @@ static bool host_read_asset(const char *path, void **data, size_t *size)
 	return true;
 }
 
+static bool host_intercept_request(void *host_peer, const char *method, const char *url,
+                                   bool for_main_frame, struct atl_webview_response *response)
+{
+	webview_host_peer *peer = (webview_host_peer *)host_peer;
+	JNIEnv *env = get_jni_env();
+	env->PushLocalFrame(16);
+
+	jclass cls = env->GetObjectClass(peer->java_webview);
+	jmethodID mid = env->GetMethodID(cls, "internalInterceptRequest",
+		"(Ljava/lang/String;Ljava/lang/String;Z)[Ljava/lang/Object;");
+	jobjectArray result = (jobjectArray)env->CallObjectMethod(peer->java_webview, mid,
+		env->NewStringUTF(method), env->NewStringUTF(url), (jboolean)for_main_frame);
+	if (env->ExceptionCheck()) {
+		env->ExceptionDescribe();
+		env->ExceptionClear();
+		result = NULL;
+	}
+	if (!result) {
+		env->PopLocalFrame(NULL);
+		return false;
+	}
+
+	memset(response, 0, sizeof(*response));
+	jstring jmime = (jstring)env->GetObjectArrayElement(result, 0);
+	jstring jencoding = (jstring)env->GetObjectArrayElement(result, 1);
+	jbyteArray jbody = (jbyteArray)env->GetObjectArrayElement(result, 2);
+	jobjectArray jheaders = (jobjectArray)env->GetObjectArrayElement(result, 3);
+	if (jmime) {
+		const char *mime = env->GetStringUTFChars(jmime, NULL);
+		response->mime = g_strdup(mime);
+		env->ReleaseStringUTFChars(jmime, mime);
+	}
+	if (jencoding) {
+		const char *encoding = env->GetStringUTFChars(jencoding, NULL);
+		response->encoding = g_strdup(encoding);
+		env->ReleaseStringUTFChars(jencoding, encoding);
+	}
+	jsize body_len = env->GetArrayLength(jbody);
+	response->data = (uint8_t *)g_malloc(body_len > 0 ? body_len : 1);
+	env->GetByteArrayRegion(jbody, 0, body_len, (jbyte *)response->data);
+	response->size = body_len;
+	jsize num_headers = env->GetArrayLength(jheaders);
+	response->headers = g_new0(char *, num_headers + 1);
+	for (jsize i = 0; i < num_headers; i++) {
+		jstring jheader = (jstring)env->GetObjectArrayElement(jheaders, i);
+		const char *header = env->GetStringUTFChars(jheader, NULL);
+		response->headers[i] = g_strdup(header);
+		env->ReleaseStringUTFChars(jheader, header);
+		env->DeleteLocalRef(jheader);
+	}
+
+	env->PopLocalFrame(NULL);
+	return true;
+}
+
 static const struct atl_webview_host_ops host_ops = {
 	.acquire_frame = host_acquire_frame,
 	.commit_frame = host_commit_frame,
 	.load_changed = host_load_changed,
 	.js_result = host_js_result,
 	.read_asset = host_read_asset,
+	.intercept_request = host_intercept_request,
 };
 
 static const struct atl_webview_backend *const builtin_backends[] = {

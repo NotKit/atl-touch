@@ -68,7 +68,7 @@ endif
 # Qt never becomes a dependency of the main library. Built only when the Qt 6
 # dev packages are present (Ubuntu Touch 24.04-2.x ships Qt 6.10).
 qt6_webengine_dep = dependency('qt6',
-	modules: ['Core', 'Gui', 'Qml', 'Quick', 'OpenGL', 'WebEngineQuick', 'WebEngineCore'],
+	modules: ['Core', 'Gui', 'Network', 'Qml', 'Quick', 'OpenGL', 'WebEngineQuick', 'WebEngineCore'],
 	required: false)
 
 # Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap
