@@ -315,6 +315,12 @@ public class TextView extends View {
 			paint.setFakeBoldText((need & Typeface.BOLD) != 0);
 			paint.setTextSkewX((need & Typeface.ITALIC) != 0 ? -0.25f : 0);
 		} else {
+			// style == NORMAL: derive the normal face of the family so a
+			// previously bold/italic typeface is reset, not kept as-is.
+			// Material's NavigationMenuItemView unchecks items with
+			// setTypeface(getTypeface(), NORMAL), passing the now-bold face.
+			if (tf != null)
+				tf = Typeface.create(tf, Typeface.NORMAL);
 			paint.setFakeBoldText(false);
 			paint.setTextSkewX(0);
 			setTypeface(tf);
