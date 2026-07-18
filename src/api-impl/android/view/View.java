@@ -1147,12 +1147,24 @@ public class View implements Drawable.Callback {
 		onCreateDrawableState(0);
 	}
 
+	/* AOSP contract: the returned array has extraSpace zeroed slots at the end
+	 * which subclasses fill in (directly or via mergeDrawableStates). Apps rely
+	 * on this, e.g. state[state.length - 1] = state_pressed. */
 	protected int[] onCreateDrawableState(int extraSpace) {
-		return new int[0];
+		int[] state = new int[2 + extraSpace];
+		state[0] = R.attr.state_enabled;
+		if (pressed) {
+			state[1] = R.attr.state_pressed;
+		}
+		return state;
 	}
 
 	protected static int[] mergeDrawableStates(int[] curState, int[] newState) {
-		return new int[0];
+		int i = curState.length - 1;
+		while (i >= 0 && curState[i] == 0)
+			i--;
+		System.arraycopy(newState, 0, curState, i + 1, newState.length);
+		return curState;
 	}
 
 	public View findViewById(int id) {
@@ -1989,12 +2001,7 @@ public class View implements Drawable.Callback {
 
 
 	public final int[] getDrawableState() {
-		int[] state = new int[2];
-		state[0] = R.attr.state_enabled;
-		if (pressed) {
-			state[1] = R.attr.state_pressed;
-		}
-		return state;
+		return onCreateDrawableState(0);
 	}
 
 	public float getRotation() { return 0.f; }

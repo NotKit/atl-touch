@@ -43,6 +43,10 @@ public class ViewConfiguration {
 		return 300;
 	}
 
+	public static int getPressedStateDuration() {
+		return 64;
+	}
+
 	public int getScaledDoubleTapSlop() {
 		return 100;
 	}
