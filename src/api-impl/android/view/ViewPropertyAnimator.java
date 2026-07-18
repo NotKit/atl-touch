@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.animation.TimeInterpolator;
+import android.animation.ValueAnimator;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +16,7 @@ public class ViewPropertyAnimator {
 	private long duration = 300;
 	private Runnable startAction;
 	private Runnable endAction;
+	private ValueAnimator.AnimatorUpdateListener updateListener;
 	private TimeInterpolator interpolator;
 	private List<PropertyValuesHolder> values = new ArrayList<>();
 	private ObjectAnimator animator;
@@ -50,6 +52,11 @@ public class ViewPropertyAnimator {
 
 	public ViewPropertyAnimator setListener(Animator.AnimatorListener listener) {
 		this.listener = listener;
+		return this;
+	}
+
+	public ViewPropertyAnimator setUpdateListener(ValueAnimator.AnimatorUpdateListener listener) {
+		this.updateListener = listener;
 		return this;
 	}
 
@@ -131,6 +138,8 @@ public class ViewPropertyAnimator {
 		values.clear();
 		if (listener != null)
 			animator.addListener(listener);
+		if (updateListener != null)
+			animator.addUpdateListener(updateListener);
 		if (startAction != null || endAction != null) {
 			animator.addListener(new Animator.AnimatorListener() {
 				@Override

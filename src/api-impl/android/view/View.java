@@ -137,6 +137,10 @@ public class View implements Drawable.Callback {
 	 */
 	public static final int GONE = 0x00000008;
 
+	public static final int LAYER_TYPE_NONE = 0;
+	public static final int LAYER_TYPE_SOFTWARE = 1;
+	public static final int LAYER_TYPE_HARDWARE = 2;
+
 	/**
 	 * Mask for use with setFlags indicating bits used for visibility.
 	 * {@hide}
@@ -2357,7 +2361,15 @@ public class View implements Drawable.Callback {
 		}
 	}
 
-	public void setLayerType(int layerType, Paint paint) {}
+	private int mLayerType = LAYER_TYPE_NONE;
+
+	public void setLayerType(int layerType, Paint paint) {
+		mLayerType = layerType;
+	}
+
+	public int getLayerType() {
+		return mLayerType;
+	}
 
 	public float getZ() {
 		return elevation;
