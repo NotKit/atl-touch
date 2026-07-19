@@ -67,6 +67,15 @@ public interface WindowManager {
 		public String packageName;
 		public CharSequence title;
 
+		/* Floating-dialog width, resolved lazily at layout time (see
+		 * ViewRootImpl.layoutPanel). When > 0 and width is WRAP_CONTENT the panel
+		 * takes this fraction of the live window width (major = landscape window,
+		 * minor = portrait), capped at Material's 560dp. Resolving at layout time
+		 * instead of at show() time avoids baking a 0 width when a dialog is shown
+		 * before the window has been measured. */
+		public float floatingWidthMajor;
+		public float floatingWidthMinor;
+
 		public LayoutParams(int w, int h, int type, int flags, int format) {
 			super(w, h);
 			this.type = type;
@@ -123,6 +132,8 @@ public interface WindowManager {
 			this.windowAnimations = o.windowAnimations;
 			this.packageName = o.packageName;
 			this.title = o.title;
+			this.floatingWidthMajor = o.floatingWidthMajor;
+			this.floatingWidthMinor = o.floatingWidthMinor;
 			return 0;
 		}
 	}

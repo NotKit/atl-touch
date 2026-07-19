@@ -144,18 +144,18 @@ public class Dialog implements Window.Callback, DialogInterface {
 
 				// Floating dialogs get the windowMinWidth* fraction of the window as a
 				// fixed width (capped at Material's 560dp max); their height wraps the
-				// content. Non-floating dialogs are technically dialogs but behave like
-				// full-size activities: their (typically MATCH_PARENT) params stand.
+				// content. The fraction is resolved lazily in ViewRootImpl.layoutPanel
+				// against the live window size — a dialog shown before the window is
+				// measured (e.g. on launch) would otherwise bake a 0 width here.
+				// Non-floating dialogs are technically dialogs but behave like full-size
+				// activities: their (typically MATCH_PARENT) params stand.
 				TypedArray a = context.obtainStyledAttributes(R.styleable.Window);
 				boolean floating = a.getBoolean(R.styleable.Window_windowIsFloating, false);
 				LayoutParams lp = getWindow().getAttributes();
 				if (floating) {
 					if (lp.width < 0) {
-						float fraction = root.getWidth() > root.getHeight()
-						    ? a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1)
-						    : a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
-						int maxWidth = (int)(560 * context.getResources().getDisplayMetrics().density);
-						lp.width = Math.min((int)(root.getWidth() * fraction), maxWidth);
+						lp.floatingWidthMajor = a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1);
+						lp.floatingWidthMinor = a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
 					}
 					if (lp.gravity == 0)
 						lp.gravity = Gravity.CENTER;

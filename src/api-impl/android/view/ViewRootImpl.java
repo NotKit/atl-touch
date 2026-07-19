@@ -148,9 +148,19 @@ public class ViewRootImpl implements ViewParent {
 	/** measure the panel against the window per its LayoutParams and position it by gravity */
 	private void layoutPanel(Panel panel) {
 		WindowManager.LayoutParams lp = panel.params;
-		int widthSpec = lp.width >= 0
-		    ? View.MeasureSpec.makeMeasureSpec(Math.min(lp.width, width), View.MeasureSpec.EXACTLY)
-		    : lp.width == WindowManager.LayoutParams.MATCH_PARENT
+		// floating dialog: resolve its width from the live window size now, not from
+		// the (possibly still-zero) size the window had when the dialog was shown
+		int lpWidth = lp.width;
+		if (lpWidth < 0 && (lp.floatingWidthMajor > 0 || lp.floatingWidthMinor > 0)) {
+			float fraction = width > height ? lp.floatingWidthMajor : lp.floatingWidthMinor;
+			if (fraction > 0) {
+				float density = panel.view.getResources().getDisplayMetrics().density;
+				lpWidth = Math.min((int)(width * fraction), (int)(560 * density));
+			}
+		}
+		int widthSpec = lpWidth >= 0
+		    ? View.MeasureSpec.makeMeasureSpec(Math.min(lpWidth, width), View.MeasureSpec.EXACTLY)
+		    : lpWidth == WindowManager.LayoutParams.MATCH_PARENT
 		        ? View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
 		        : View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.AT_MOST);
 		int heightSpec = lp.height >= 0
