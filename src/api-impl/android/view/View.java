@@ -1029,6 +1029,72 @@ public class View implements Drawable.Callback {
 		}
 	};
 
+	public static final Property<View, Float> ROTATION = new Property<View, Float>(Float.class, "rotation") {
+		@Override
+		public Float get(View view) {
+			return view.getRotation();
+		}
+		@Override
+		public void set(View view, Float value) {
+			view.setRotation(value);
+		}
+	};
+
+	public static final Property<View, Float> ROTATION_X = new Property<View, Float>(Float.class, "rotationX") {
+		@Override
+		public Float get(View view) {
+			return view.getRotationX();
+		}
+		@Override
+		public void set(View view, Float value) {
+			view.setRotationX(value);
+		}
+	};
+
+	public static final Property<View, Float> ROTATION_Y = new Property<View, Float>(Float.class, "rotationY") {
+		@Override
+		public Float get(View view) {
+			return view.getRotationY();
+		}
+		@Override
+		public void set(View view, Float value) {
+			view.setRotationY(value);
+		}
+	};
+
+	public static final Property<View, Float> X = new Property<View, Float>(Float.class, "x") {
+		@Override
+		public Float get(View view) {
+			return view.getX();
+		}
+		@Override
+		public void set(View view, Float value) {
+			view.setX(value);
+		}
+	};
+
+	public static final Property<View, Float> Y = new Property<View, Float>(Float.class, "y") {
+		@Override
+		public Float get(View view) {
+			return view.getY();
+		}
+		@Override
+		public void set(View view, Float value) {
+			view.setY(value);
+		}
+	};
+
+	public static final Property<View, Float> Z = new Property<View, Float>(Float.class, "z") {
+		@Override
+		public Float get(View view) {
+			return view.getZ();
+		}
+		@Override
+		public void set(View view, Float value) {
+			view.setZ(value);
+		}
+	};
+
 	public View(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
 	}
