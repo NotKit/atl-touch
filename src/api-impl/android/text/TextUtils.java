@@ -465,6 +465,35 @@ public class TextUtils {
 	}
 
 	/**
+	 * Return a new CharSequence in which each of the source strings is
+	 * replaced by the corresponding element of the destinations.
+	 */
+	public static CharSequence replace(CharSequence template,
+	                                   String[] sources,
+	                                   CharSequence[] destinations) {
+		SpannableStringBuilder tb = new SpannableStringBuilder(template);
+
+		for (int i = 0; i < sources.length; i++) {
+			int where = indexOf(tb, sources[i]);
+
+			if (where >= 0)
+				tb.setSpan(sources[i], where, where + sources[i].length(),
+				           Spanned.SPAN_POINT_POINT);
+		}
+
+		for (int i = 0; i < sources.length; i++) {
+			int start = tb.getSpanStart(sources[i]);
+			int end = tb.getSpanEnd(sources[i]);
+
+			if (start >= 0) {
+				tb.replace(start, end, destinations[i]);
+			}
+		}
+
+		return tb;
+	}
+
+	/**
 	 * Copies the spans from the region <code>start...end</code> in
 	 * <code>source</code> to the region
 	 * <code>destoff...destoff+end-start</code> in <code>dest</code>.
