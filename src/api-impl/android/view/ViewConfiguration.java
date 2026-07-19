@@ -15,6 +15,18 @@ public class ViewConfiguration {
 		return 8;
 	}
 
+	public static int getTouchSlop() {
+		return 8;
+	}
+
+	public static int getMinimumFlingVelocity() {
+		return 50;
+	}
+
+	public static int getMaximumFlingVelocity() {
+		return 8000;
+	}
+
 	public int getScaledMaximumFlingVelocity() {
 		return 8000;
 	}

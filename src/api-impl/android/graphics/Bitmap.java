@@ -156,9 +156,18 @@ public final class Bitmap {
 		return getTexture();
 	}
 
+	private static int next_generation_id = 1;
+	private int generation_id = next_generation_id++;
+
+	/* AOSP: changes whenever the bitmap's pixels are modified */
+	public int getGenerationId() {
+		return generation_id;
+	}
+
 	public void eraseColor(int color) {
 		getSnapshot();
 		native_erase_color(getTexture(), color);
+		generation_id = next_generation_id++;
 	}
 
 	public void recycle() {
