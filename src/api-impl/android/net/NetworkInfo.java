@@ -10,7 +10,21 @@ public class NetworkInfo {
 		UNKNOWN
 	}
 
-	public enum DetailedState {}
+	public enum DetailedState {
+		IDLE,
+		SCANNING,
+		CONNECTING,
+		AUTHENTICATING,
+		OBTAINING_IPADDR,
+		CONNECTED,
+		SUSPENDED,
+		DISCONNECTING,
+		DISCONNECTED,
+		FAILED,
+		BLOCKED,
+		VERIFYING_POOR_LINK,
+		CAPTIVE_PORTAL_CHECK
+	}
 
 	private State state = State.DISCONNECTED;
 
@@ -31,7 +45,7 @@ public class NetworkInfo {
 	}
 
 	public boolean isConnectedOrConnecting() {
-		return false;
+		return state == State.CONNECTED || state == State.CONNECTING;
 	}
 
 	public int getSubtype() {
@@ -51,11 +65,11 @@ public class NetworkInfo {
 	}
 
 	public boolean isAvailable() {
-		return false;
+		return state == State.CONNECTED;
 	}
 
 	public DetailedState getDetailedState() {
-		return null;
+		return state == State.CONNECTED ? DetailedState.CONNECTED : DetailedState.DISCONNECTED;
 	}
 
 	public String getExtraInfo() {
