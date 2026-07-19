@@ -680,6 +680,7 @@ srcs = [
 	'android/view/animation/AnimationSet.java',
 	'android/view/animation/AnimationUtils.java',
 	'android/view/animation/AnticipateInterpolator.java',
+	'android/view/animation/AnticipateOvershootInterpolator.java',
 	'android/view/animation/BaseInterpolator.java',
 	'android/view/animation/DecelerateInterpolator.java',
 	'android/view/animation/Interpolator.java',
