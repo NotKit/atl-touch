@@ -223,6 +223,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawNinePatch(JNIEnv *env, 
 	canvas->save();
 	canvas->translate(dst_left, dst_top);
 
+	int num_cols = chunk->numXDivs + 1;
 	float rect_y = 0, rect_height = 0;
 	for (int j = 0; j < chunk->numYDivs + 1; j++, rect_y += rect_height) {
 		int ydiv_start = j ? yDivs[j - 1] : 0;
@@ -232,15 +233,19 @@ JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawNinePatch(JNIEnv *env, 
 		if (!rect_height) // skip empty sections
 			continue;
 		float rect_x = 0, rect_width = 0;
-		for (int i = 0; i < chunk->numXDivs + 1; i++, rect_x += rect_width) {
+		for (int i = 0; i < num_cols; i++, rect_x += rect_width) {
 			int xdiv_start = i ? xDivs[i - 1] : 0;
 			int xdiv_end = (i == chunk->numXDivs) ? width : xDivs[i];
 			float actual_stretch_factor_width = (i % 2) ? strech_factor_width : 1;
 			rect_width = (xdiv_end - xdiv_start) * actual_stretch_factor_width;
 			if (!rect_width) // skip empty sections
 				continue;
+			/* index the colors grid by cell position: a zero-sized row or
+			 * column must not shift the mapping of the cells that follow */
+			int cell = j * num_cols + i;
+			int32_t cell_color = cell < chunk->numColors ? color[cell] : NO_COLOR;
 			SkRect rect = SkRect::MakeXYWH(rect_x, rect_y, rect_width, rect_height);
-			if (*color == NO_COLOR) {
+			if (cell_color == NO_COLOR) {
 				SkRect texture_bounds = SkRect::MakeXYWH(rect_x - xdiv_start * actual_stretch_factor_width,
 				                                         rect_y - ydiv_start * actual_stretch_factor_height,
 				                                         width * actual_stretch_factor_width,
@@ -249,13 +254,12 @@ JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawNinePatch(JNIEnv *env, 
 				canvas->clipRect(rect);
 				canvas->drawImageRect(image, texture_bounds, sampling, &paint);
 				canvas->restore();
-			} else if (*color != TRANSPARENT_COLOR) {
+			} else if (cell_color != TRANSPARENT_COLOR) {
 				SkPaint color_paint(paint);
 				color_paint.setShader(nullptr);
-				color_paint.setColor((SkColor)(uint32_t)*color);
+				color_paint.setColor((SkColor)(uint32_t)cell_color);
 				canvas->drawRect(rect, color_paint);
 			}
-			color++;
 		}
 	}
 
