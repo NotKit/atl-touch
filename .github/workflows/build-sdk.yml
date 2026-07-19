@@ -1,0 +1,123 @@
+name: Build ATL SDK
+
+# Compiles atlas + its whole native dependency chain once and publishes the
+# result as a tarball release asset. Click-packaging repos unpack it to skip
+# the multi-hour art_standalone / skia / deps build. Versioned by atl-touch
+# commit (tag sdk-<sha>).
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Don't cancel an in-flight SDK build (art_standalone is expensive); let it
+# finish and publish.
+concurrency:
+  group: atl-sdk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+            image: docker.io/clickable/arm64-ut24.04-2.x-arm64
+          - arch: amd64
+            runs-on: ubuntu-24.04
+            image: docker.io/clickable/amd64-ut24.04-2.x-amd64
+    runs-on: ${{ matrix.runs-on }}
+    # Native runners (no qemu), but the self-hosted art build is still long.
+    timeout-minutes: 350
+    permissions:
+      contents: write   # for the release step
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/.ghcup /usr/local/share/boost || true
+          df -h /
+
+      # The dependency chain is staged under build/<arch> and skipped via
+      # stamps on later runs. Keyed by run id so every run saves its progress
+      # (even on failure/timeout); restore-keys picks up the newest prior one.
+      - name: Restore build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/${{ matrix.arch }}/stage
+            build/${{ matrix.arch }}/stamps
+            build/${{ matrix.arch }}/downloads
+            build/${{ matrix.arch }}/src
+            build/${{ matrix.arch }}/atlas-src/subprojects/skia
+          key: atl-sdk-${{ matrix.arch }}-${{ github.run_id }}
+          restore-keys: |
+            atl-sdk-${{ matrix.arch }}-
+
+      # Build inside the clickable UT container (native for this arch). Run via
+      # docker run rather than a job container so the disk-cleanup step above
+      # runs on the host first.
+      - name: Build SDK
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            -e ARCH=${{ matrix.arch }} \
+            -e NUM_PROCS="$(nproc)" \
+            "${{ matrix.image }}" \
+            bash -eux -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              grep -vE "^[[:space:]]*(#|$)" ci/apt-deps.txt | xargs apt-get install -y --no-install-recommends
+              ci/build-sdk.sh
+            '
+
+      # Container writes as root; hand the tree back so cache/upload can read it.
+      - name: Fix ownership
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" build || true
+
+      - name: Save build cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/${{ matrix.arch }}/stage
+            build/${{ matrix.arch }}/stamps
+            build/${{ matrix.arch }}/downloads
+            build/${{ matrix.arch }}/src
+            build/${{ matrix.arch }}/atlas-src/subprojects/skia
+          key: atl-sdk-${{ matrix.arch }}-${{ github.run_id }}
+
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atl-sdk-${{ matrix.arch }}
+          path: |
+            build/${{ matrix.arch }}/artifacts/atl-sdk-${{ matrix.arch }}.tar.zst
+            build/${{ matrix.arch }}/artifacts/atl-sdk-${{ matrix.arch }}.tar.zst.sha256
+          if-no-files-found: error
+
+      # Publish so other repos can curl it without a login (Actions artifacts
+      # are login-only). Both arch jobs push to the same sdk-<sha> tag; the
+      # asset filenames differ, so they don't clobber each other.
+      - name: Publish to GitHub release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          tag="sdk-${sha}"
+          dir="build/${{ matrix.arch }}/artifacts"
+          gh release create "$tag" \
+            --title "ATL SDK ($sha)" \
+            --prerelease \
+            --notes "Prebuilt Android Translation Layer SDK (atlas + native deps) for Ubuntu Touch 24.04-2.x, built from atl-touch \`$sha\`. Unpack into a click-packaging build stage to skip the art_standalone / skia / dependency compile. See ci/README.md." \
+            || true
+          gh release upload "$tag" \
+            "$dir/atl-sdk-${{ matrix.arch }}.tar.zst" \
+            "$dir/atl-sdk-${{ matrix.arch }}.tar.zst.sha256" \
+            --clobber

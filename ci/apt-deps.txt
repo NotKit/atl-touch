@@ -1,0 +1,84 @@
+# Build dependencies for the ATL SDK, installed into the clickable UT
+# 24.04-2.x container by the CI job. Mirrors the dependencies_host /
+# dependencies_target lists the click-packaging repos feed to clickable.
+# One package per line; blank lines and # comments ignored.
+
+# --- host toolchain ---
+autoconf
+automake
+bison
+ca-certificates-java
+clang
+cmake
+curl
+flex
+generate-ninja
+git
+gperf
+libtool
+lld
+meson
+ninja-build
+openjdk-17-jdk-headless
+patch
+pkg-config
+python-is-python3
+python3
+rsync
+ruby
+unifdef
+unzip
+xz-utils
+zip
+zstd
+
+# --- atlas / android_translation_layer ---
+libasound2-dev
+libavcodec-dev
+libswscale-dev
+libdrm-dev
+libegl-dev
+libgl-dev
+libgles-dev
+libglib2.0-dev
+libgraphene-1.0-dev
+libgstreamer1.0-dev
+libgstreamer-plugins-base1.0-dev
+libgudev-1.0-dev
+libopenxr-dev
+libportal-dev
+libsqlite3-dev
+libvulkan-dev
+libwayland-dev
+wayland-protocols
+libfontconfig-dev
+libmaliit-glib-dev
+libxkbcommon-dev
+libgbm-dev
+
+# --- skia subproject (see subprojects/packagefiles/skia) ---
+libexpat1-dev
+libfreetype-dev
+libharfbuzz-dev
+libjpeg-dev
+libpng-dev
+libwebp-dev
+zlib1g-dev
+
+# --- art_standalone ---
+libbsd-dev
+libmd-dev
+libcap-dev
+libelf-dev
+libicu-dev
+liblz4-dev
+liblzma-dev
+libssl-dev
+libunwind-dev
+
+# --- Qt WebEngine WebView backend (libatl_webview_qt.so) ---
+qt6-base-dev
+qt6-base-dev-tools
+qt6-declarative-dev
+qt6-webengine-dev
+qt6-wayland
