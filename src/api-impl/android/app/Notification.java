@@ -236,7 +236,31 @@ public class Notification implements Parcelable {
 		}
 	}
 
-	public static abstract class Style {}
+	public static abstract class Style {
+		public void setBuilder(Builder builder) {}
+	}
+
+	public static class MessagingStyle extends Style {
+
+		public MessagingStyle(CharSequence userDisplayName) {}
+
+		public MessagingStyle setConversationTitle(CharSequence conversationTitle) { return this; }
+
+		public MessagingStyle setGroupConversation(boolean isGroupConversation) { return this; }
+
+		public MessagingStyle addMessage(CharSequence text, long timestamp, CharSequence sender) { return this; }
+
+		public MessagingStyle addMessage(Message message) { return this; }
+
+		public MessagingStyle addHistoricMessage(Message message) { return this; }
+
+		public static class Message {
+
+			public Message(CharSequence text, long timestamp, CharSequence sender) {}
+
+			public Message setData(String dataMimeType, android.net.Uri dataUri) { return this; }
+		}
+	}
 
 	public static class MediaStyle extends Style {
 
