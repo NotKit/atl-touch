@@ -714,14 +714,20 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwMakeContextCurrent(window->glfw_window);
 	glfwSwapInterval(0); // frame pacing comes from the render tick, don't block on vsync
 
-	/* Commit an initial frame immediately. On Wayland a surface is not mapped
-	 * until its first buffer is committed; without this the window would stay
-	 * invisible until the app's first real frame (which only happens once a
-	 * ViewRootImpl attaches, several seconds into startup) — or never, if the
-	 * app never draws. On X11 the window maps regardless, so this is harmless. */
-	glClearColor(1, 1, 1, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glfwSwapBuffers(window->glfw_window);
+	/* On Wayland a surface is not mapped until its first buffer is committed,
+	 * so hold off committing anything here: the compositor keeps showing its
+	 * own splash (e.g. Lomiri's QML splash) until the app draws its first real
+	 * frame, instead of us flashing a blank white window at the pre-configure
+	 * size for the few seconds before a ViewRootImpl attaches.
+	 *
+	 * On X11 the window maps as soon as it is created regardless of drawing, so
+	 * commit one clear frame there to avoid showing uninitialised garbage until
+	 * the first real frame arrives. */
+	if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
+		glClearColor(1, 1, 1, 1);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glfwSwapBuffers(window->glfw_window);
+	}
 	glfwPollEvents();
 
 	window->next = windows;
