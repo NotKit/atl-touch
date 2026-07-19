@@ -235,6 +235,8 @@ public class Window {
 
 	public void setGravity(int gravity) {}
 
+	public void setWindowAnimations(int resId) {}
+
 	public void setDecorFitsSystemWindows(boolean fits) {}
 
 	public WindowInsetsController getInsetsController() {
