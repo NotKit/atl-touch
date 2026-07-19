@@ -171,7 +171,9 @@ public class ImageView extends View {
 		ScaleType.CENTER_INSIDE,
 	};
 
-	public final void setColorFilter(int color, PorterDuff.Mode mode) {}
+	public final void setColorFilter(int color, PorterDuff.Mode mode) {
+		setColorFilter(new PorterDuffColorFilter(color, mode));
+	}
 
 	public void setImageTintList(ColorStateList tint) {
 		if (tint == null)
@@ -201,9 +203,22 @@ public class ImageView extends View {
 
 	public void setCropToPadding(boolean crop) {}
 
-	public void setColorFilter(int color) {}
+	public void setColorFilter(int color) {
+		setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
+	}
 
-	public void setColorFilter(ColorFilter cf) {}
+	public final void clearColorFilter() {
+		setColorFilter((ColorFilter)null);
+	}
+
+	public void setColorFilter(ColorFilter cf) {
+		if (colorFilter == cf)
+			return;
+		colorFilter = cf;
+		if (drawable != null)
+			drawable.setColorFilter(cf);
+		invalidate();
+	}
 
 	public Matrix getImageMatrix() {
 		return Matrix.IDENTITY_MATRIX;
@@ -273,8 +288,13 @@ public class ImageView extends View {
 		canvas.save();
 		canvas.clipRect(paddingLeft, paddingTop, paddingLeft + innerWidth, paddingTop + innerHeight);
 		if (bitmap != null) {
+			android.graphics.Paint paint = null;
+			if (colorFilter != null) {
+				paint = new android.graphics.Paint();
+				paint.setColorFilter(colorFilter);
+			}
 			canvas.drawBitmap(bitmap, new android.graphics.Rect(0, 0, contentWidth, contentHeight),
-			                  new android.graphics.Rect(x, y, x + drawWidth, y + drawHeight), null);
+			                  new android.graphics.Rect(x, y, x + drawWidth, y + drawHeight), paint);
 		} else if (drawable != null) {
 			// Match AOSP ImageView: the drawable's bounds are always its intrinsic size
 			// anchored at the origin, and positioning/scaling is applied to the canvas.
