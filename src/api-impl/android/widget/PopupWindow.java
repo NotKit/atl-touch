@@ -79,6 +79,10 @@ public class PopupWindow {
 		this(contentView, width, height, true);
 	}
 
+	public PopupWindow(View contentView) {
+		this(contentView, 0, 0, false);
+	}
+
 	public interface OnDismissListener {
 		public void onDismiss();
 	}

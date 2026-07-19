@@ -797,4 +797,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void scheduleLayoutAnimation() {}
+
+	public void setLayoutAnimation(android.view.animation.LayoutAnimationController controller) {
+		mLayoutAnimationController = controller;
+	}
+
+	public android.view.animation.LayoutAnimationController getLayoutAnimation() {
+		return mLayoutAnimationController;
+	}
+
+	private android.view.animation.LayoutAnimationController mLayoutAnimationController;
 }
