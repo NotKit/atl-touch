@@ -55,6 +55,17 @@ public class ScrollView extends ViewGroup {
 		}
 	}
 
+	/* AOSP ScrollView extends FrameLayout, so children get MarginLayoutParams */
+	@Override
+	public ViewGroup.LayoutParams generateLayoutParams(AttributeSet attrs) {
+		return new FrameLayout.LayoutParams(getContext(), attrs);
+	}
+
+	@Override
+	protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
+		return new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+	}
+
 	public void setFillViewport(boolean fillViewport) {
 		if (this.fillViewport != fillViewport) {
 			this.fillViewport = fillViewport;
