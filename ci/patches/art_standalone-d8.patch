@@ -1,0 +1,64 @@
+From 98bec995502737996365c439dd5a7afe7c4b5abf Mon Sep 17 00:00:00 2001
+From: TheKit <thekit@disroot.org>
+Date: Sat, 18 Jul 2026 17:31:25 +0300
+Subject: [PATCH] build: optional D8= to dex with d8 and desugar lambdas
+
+dx does not desugar: javac's invokedynamic lambdas pass through as
+invoke-custom call sites (339 in core-oj), and their LambdaMetafactory
+bootstrap is a null-returning stub in core-oj at runtime, so any use of
+them throws BootstrapMethodError (e.g. java.util.stream Collectors).
+Upstream never hits this because it desugars everything with d8 at build
+time. Pass D8=/path/to/d8 (Android SDK build-tools) to do the same here;
+default remains dx.
+---
+ README.md                 |  1 +
+ build/core/definitions.mk | 10 ++++++++--
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/README.md b/README.md
+index 4e86b084..2aba1a8a 100644
+--- a/README.md
++++ b/README.md
+@@ -9,6 +9,7 @@ The libwolfssl needs to be installed from source with the --enable-jni configura
+ 
+ `make` or `make ____LIBDIR=[XXX]` for custom install location (see Makefile for documentation on other options which you might want to override)
+ `ARCH=x86` may be needed to build for 32-bit x86, since the automatic architecture detection uses `uname`
++`D8=[path to d8]` (e.g. from Android SDK build-tools) dexes with d8 instead of dx, desugaring lambdas like upstream does; without it, invoke-custom call sites survive into the boot jars and crash at runtime on core-oj's stub LambdaMetafactory (see build/core/definitions.mk)
+ 
+ after compilation, the output is in `out/host/linux-x86/`; `out/host/linux-x86/{gen,obj}` can and should be discarded, as it only contains intermediates  
+ aarch64 build currently also places the build output in `out/host/linux-x86/`;
+diff --git a/build/core/definitions.mk b/build/core/definitions.mk
+index f81e8a40..49bd4c55 100644
+--- a/build/core/definitions.mk
++++ b/build/core/definitions.mk
+@@ -2159,11 +2159,17 @@ endef
+ #TODO: use a smaller -Xmx value for most libraries;
+ #      only core.jar and framework.jar need a heap this big.
+ # Avoid the memory arguments on Windows, dx fails to load for some reason with them.
++# dx does NOT desugar: javac's invokedynamic lambdas pass through as invoke-custom,
++# whose LambdaMetafactory bootstrap is a null-returning stub in core-oj at runtime
++# (upstream desugars everything with d8, so the stub is never reached there).
++# Set D8 to a d8 launcher (e.g. from Android SDK build-tools) to desugar like upstream.
+ define transform-classes.jar-to-dex
+ @echo "target Dex: $(PRIVATE_MODULE)"
+ @mkdir -p $(dir $@)
+ $(hide) rm -f $(dir $@)classes*.dex
+-$(hide) $(DX) \
++$(hide) $(if $(D8), \
++    $(D8) --min-api 27 --output $(dir $@) $<, \
++    $(DX) \
+     $(if $(findstring windows,$(HOST_OS)),,-JXms16M -JXmx1024M) \
+     --dex --output=$(dir $@) \
+     --min-sdk-version=27 \
+@@ -2174,7 +2180,7 @@ $(hide) $(DX) \
+ 	    --dump-to=$(@:.dex=.lst) \
+ 	    --dump-width=1000) \
+     $(PRIVATE_DX_FLAGS) \
+-    $<
++    $<)
+ endef
+ 
+ # Create a mostly-empty .jar file that we'll add to later.
+-- 
+2.53.0
+

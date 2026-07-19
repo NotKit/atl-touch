@@ -26,7 +26,7 @@ SDK_PREFIX="${SDK_BASE}/usr"
 
 # --- pinned dependency sources (override via env for a bump) --------------
 ART_URL="${ART_URL:-https://gitlab.com/android_translation_layer/art_standalone.git}"
-ART_REF="${ART_REF:-98bec995502737996365c439dd5a7afe7c4b5abf}"   # honors D8=<launcher>
+ART_REF="${ART_REF:-e78bf68917bcaaf58fef3960cd88793b3b7f39cc}"   # + D8= patch below
 
 BIONIC_URL="${BIONIC_URL:-https://gitlab.com/android_translation_layer/bionic_translation.git}"
 BIONIC_REF="${BIONIC_REF:-ee37eb21c91409fe0eed833d0a5a0aa6b931bb7b}"
@@ -110,7 +110,7 @@ clone() { # clone <url> <ref> <dir>
 # Stamps carry the pinned ref (and, for bionic, the patch hash) so a stale
 # cache can never mask a bump — the renamed stamp just doesn't exist.
 BIONIC_STAMP="${BIONIC_REF:0:12}-$(sha256sum "${PATCHES}/bionic_translation-ut.patch" | cut -c1-8)"
-ART_STAMP="${ART_REF:0:12}-d8${R8_VERSION}"
+ART_STAMP="${ART_REF:0:12}-$(sha256sum "${PATCHES}/art_standalone-d8.patch" | cut -c1-8)-d8${R8_VERSION}"
 
 # --- 1. GLFW 3.4 (noble ships 3.3, atlas needs the libdecor init hint) ---
 
@@ -226,6 +226,7 @@ if ! stamp "art_standalone-${ART_STAMP}"; then
     log "building art_standalone (self-hosted, d8-desugared boot jars)"
     clone "${ART_URL}" "${ART_REF}" art_standalone
     rsync -a --delete --exclude=.git "${SRC}/art_standalone/" "${BUILD_DIR}/art_standalone/"
+    patch -d "${BUILD_DIR}/art_standalone" -p1 < "${PATCHES}/art_standalone-d8.patch"
     # art's envsetup.mk expects uname-style ARCH (aarch64) and reads 'arm64' as
     # 32-bit arm — override explicitly.
     make -C "${BUILD_DIR}/art_standalone" -j"${JOBS}" \
