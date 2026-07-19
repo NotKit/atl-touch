@@ -6,7 +6,8 @@ public class BitmapShader extends Shader {
 
 	public BitmapShader(Bitmap bitmap, TileMode tileX, TileMode tileY) {
 		this.bitmap = bitmap;
+		init(native_create(bitmap.getTexture(), tileX.ordinal(), tileY.ordinal()));
 	}
 
-	public void setLocalMatrix(Matrix matrix) {}
+	private static native long native_create(long bitmap, int tileX, int tileY);
 }

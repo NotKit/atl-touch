@@ -3,6 +3,7 @@
 #include "../defines.h"
 #include "ATLShader.h"
 
+#include "include/core/SkBitmap.h"
 #include "include/core/SkColor.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkTileMode.h"
@@ -69,6 +70,15 @@ JNIEXPORT jlong JNICALL Java_android_graphics_LinearGradient_native_1create(JNIE
 	shader->base = SkGradientShader::MakeLinear(pts, colors.data(),
 	                                            pos.empty() ? nullptr : pos.data(),
 	                                            (int)colors.size(), tile_mode(tile));
+	return _INTPTR(shader);
+}
+
+JNIEXPORT jlong JNICALL Java_android_graphics_BitmapShader_native_1create(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jint tile_x, jint tile_y)
+{
+	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
+	ATLShader *shader = new ATLShader();
+	shader->base = bitmap->makeShader(tile_mode(tile_x), tile_mode(tile_y),
+	                                  SkSamplingOptions(SkFilterMode::kLinear));
 	return _INTPTR(shader);
 }
 

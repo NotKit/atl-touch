@@ -730,7 +730,9 @@ public class Paint {
     public synchronized long getNativeInstance() {
         boolean filter = isFilterBitmap();
         long newNativeShader = mShader == null ? 0 : mShader.getNativeInstance(filter);
-        if (newNativeShader != mNativeShader) {
+        // no change-guard for non-null shaders: the native paint snapshots the
+        // shader's local matrix, which may have changed since the last draw
+        if (newNativeShader != mNativeShader || newNativeShader != 0) {
             mNativeShader = newNativeShader;
             nSetShader(mNativePaint, mNativeShader);
         }
