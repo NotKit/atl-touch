@@ -729,7 +729,8 @@ public class View implements Drawable.Callback {
 	}
 
 	public interface OnLayoutChangeListener {
-		// TODO
+		void onLayoutChange(View v, int left, int top, int right, int bottom,
+				int oldLeft, int oldTop, int oldRight, int oldBottom);
 	}
 
 	public interface OnUnhandledKeyEventListener {
@@ -1810,6 +1811,10 @@ public class View implements Drawable.Callback {
 	protected void onLayout(boolean changed, int l, int t, int r, int b) {}
 
 	public void layout(int l, int t, int r, int b) {
+		int oldL = this.left;
+		int oldT = this.top;
+		int oldR = this.right;
+		int oldB = this.bottom;
 		this.left = l;
 		this.top = t;
 		this.right = r;
@@ -1823,6 +1828,11 @@ public class View implements Drawable.Callback {
 		oldHeight = height;
 		onLayout(changed, l, t, r, b);
 		layoutRequested = false;
+		if (layout_change_listeners != null && !layout_change_listeners.isEmpty()) {
+			java.util.ArrayList<OnLayoutChangeListener> listeners = new java.util.ArrayList<>(layout_change_listeners);
+			for (OnLayoutChangeListener listener : listeners)
+				listener.onLayoutChange(this, l, t, r, b, oldL, oldT, oldR, oldB);
+		}
 	}
 
 	public int getLeft() {
@@ -1969,8 +1979,19 @@ public class View implements Drawable.Callback {
 		return tag;
 	}
 
-	public void addOnLayoutChangeListener(OnLayoutChangeListener listener) {}
-	public void removeOnLayoutChangeListener(OnLayoutChangeListener listener) {}
+	private java.util.ArrayList<OnLayoutChangeListener> layout_change_listeners = null;
+
+	public void addOnLayoutChangeListener(OnLayoutChangeListener listener) {
+		if (layout_change_listeners == null)
+			layout_change_listeners = new java.util.ArrayList<>();
+		if (!layout_change_listeners.contains(listener))
+			layout_change_listeners.add(listener);
+	}
+
+	public void removeOnLayoutChangeListener(OnLayoutChangeListener listener) {
+		if (layout_change_listeners != null)
+			layout_change_listeners.remove(listener);
+	}
 
 	public boolean isSelected() { return selected; }
 
