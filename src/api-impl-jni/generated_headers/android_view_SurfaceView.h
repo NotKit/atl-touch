@@ -23,6 +23,12 @@ extern "C" {
 #define android_view_SurfaceView_INVISIBLE 4L
 #undef android_view_SurfaceView_GONE
 #define android_view_SurfaceView_GONE 8L
+#undef android_view_SurfaceView_LAYER_TYPE_NONE
+#define android_view_SurfaceView_LAYER_TYPE_NONE 0L
+#undef android_view_SurfaceView_LAYER_TYPE_SOFTWARE
+#define android_view_SurfaceView_LAYER_TYPE_SOFTWARE 1L
+#undef android_view_SurfaceView_LAYER_TYPE_HARDWARE
+#define android_view_SurfaceView_LAYER_TYPE_HARDWARE 2L
 #undef android_view_SurfaceView_VISIBILITY_MASK
 #define android_view_SurfaceView_VISIBILITY_MASK 12L
 #undef android_view_SurfaceView_ENABLED

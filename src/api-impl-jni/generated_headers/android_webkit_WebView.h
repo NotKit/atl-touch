@@ -23,6 +23,12 @@ extern "C" {
 #define android_webkit_WebView_INVISIBLE 4L
 #undef android_webkit_WebView_GONE
 #define android_webkit_WebView_GONE 8L
+#undef android_webkit_WebView_LAYER_TYPE_NONE
+#define android_webkit_WebView_LAYER_TYPE_NONE 0L
+#undef android_webkit_WebView_LAYER_TYPE_SOFTWARE
+#define android_webkit_WebView_LAYER_TYPE_SOFTWARE 1L
+#undef android_webkit_WebView_LAYER_TYPE_HARDWARE
+#define android_webkit_WebView_LAYER_TYPE_HARDWARE 2L
 #undef android_webkit_WebView_VISIBILITY_MASK
 #define android_webkit_WebView_VISIBILITY_MASK 12L
 #undef android_webkit_WebView_ENABLED
