@@ -182,6 +182,9 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(J
 		_SET_INT_FIELD(outValue, "data", value.data);
 		_SET_INT_FIELD(outValue, "resourceId", resId);
 		_SET_INT_FIELD(outValue, "assetCookie", JAVA_COOKIE(cookie));
+		/* Density of the selected config bucket, so bitmaps decoded from
+		 * e.g. drawable-xxhdpi aren't treated as mdpi and upscaled. */
+		_SET_INT_FIELD(outValue, "density", outConfig.density);
 		if (value.dataType == TYPE_STRING) {
 			const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
 			size_t len;
