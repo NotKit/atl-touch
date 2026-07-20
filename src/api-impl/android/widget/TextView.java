@@ -77,7 +77,7 @@ public class TextView extends View {
 					setTextColor(aa.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor));
 				}
 				if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textSize)) {
-					setTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
+					setRawTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
 				}
 				aa.recycle();
 			}
@@ -85,7 +85,7 @@ public class TextView extends View {
 				setTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColor));
 			}
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textSize)) {
-				setTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10));
+				setRawTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10));
 			}
 
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textStyle)) {
@@ -294,12 +294,15 @@ public class TextView extends View {
 	}
 
 
-	public void setTextSize(int unit, float size) {
-		if (unit != TypedValue.COMPLEX_UNIT_SP)
-			System.out.println("setTextSize called with non-SP unit (" + unit + "), we don't currently handle that");
-		setTextSize(size);
-	}
 	public void setTextSize(float size) {
+		setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
+	}
+	public void setTextSize(int unit, float size) {
+		setRawTextSize(TypedValue.applyDimension(unit, size, getResources().getDisplayMetrics()));
+	}
+	private void setRawTextSize(float size) {
+		if (size == paint.getTextSize())
+			return;
 		paint.setTextSize(size);
 		text_layout = null;
 		requestLayout();
@@ -432,7 +435,7 @@ public class TextView extends View {
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textColor))
 				setTextColor(aa.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor));
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textSize))
-				setTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
+				setRawTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textStyle))
 				setTypeface(getTypeface(), aa.getInt(com.android.internal.R.styleable.TextAppearance_textStyle, 0));
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textAllCaps))
