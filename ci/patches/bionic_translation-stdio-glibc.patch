@@ -1,0 +1,101 @@
+Build the fputs/fputc/fprintf/vfprintf FILE* wrappers on glibc too
+
+They lived only under #ifndef __GLIBC__ in libc-musl.c, so on glibc a bionic
+app calling one directly on a bionic std stream (e.g. FFmpeg's av_log doing
+fputs(line, stderr)) had the symbol resolved to the host glibc function, which
+read the bionic FILE at glibc offsets and crashed. The IO_file_xsputn wrap does
+not catch these direct calls. Move them next to the fwrite/putc/fflush wraps in
+libc-stdio.c, which is built on both libcs.
+
+--- a/libc/libc-musl.c
++++ b/libc/libc-musl.c
+@@ -409,20 +409,8 @@ int bionic_fclose(FILE *stream)
+ 	return fclose(bionic_file_to_glibc_file(stream));
+ }
+ 
+-int bionic_fprintf(FILE *restrict f, const char *restrict fmt, ...)
+-{
+-	int ret;
+-	va_list ap;
+-	va_start(ap, fmt);
+-	ret = vfprintf(bionic_file_to_glibc_file(f), fmt, ap);
+-	va_end(ap);
+-	return ret;
+-}
+-
+-int bionic_vfprintf(FILE *stream, const char *template, va_list ap)
+-{
+-	return vfprintf(bionic_file_to_glibc_file(stream), template, ap);
+-}
++// bionic_fprintf / bionic_vfprintf moved to libc-stdio.c so they are also
++// built on glibc (apps call them directly on the bionic std streams).
+ 
+ int bionic_vfwprintf(FILE *stream, const wchar_t *template, va_list ap)
+ {
+@@ -534,10 +522,7 @@ int bionic_ferror_unlocked(FILE *stream)
+ 	return ferror_unlocked(bionic_file_to_glibc_file(stream));
+ }
+ 
+-int bionic_fputc(int c, FILE *stream)
+-{
+-	return fputc(c, bionic_file_to_glibc_file(stream));
+-}
++// bionic_fputc moved to libc-stdio.c (built on both libcs).
+ 
+ wint_t bionic_fputwc(wchar_t wc, FILE *stream)
+ {
+@@ -569,10 +554,7 @@ wint_t bionic_putwc_unlocked(wchar_t wc, FILE *stream)
+ 	return putwc_unlocked(wc, bionic_file_to_glibc_file(stream));
+ }
+ 
+-int bionic_fputs(const char *s, FILE *stream)
+-{
+-	return fputs(s, bionic_file_to_glibc_file(stream));
+-}
++// bionic_fputs moved to libc-stdio.c (built on both libcs).
+ 
+ int bionic_fputws(const wchar_t *ws, FILE *stream)
+ {
+--- a/libc/libc-stdio.c
++++ b/libc/libc-stdio.c
+@@ -1,4 +1,5 @@
+ #include <stdio.h>
++#include <stdarg.h>
+ 
+ #include "libc-stdio.h"
+ 
+@@ -40,6 +41,34 @@ int bionic_putc(int ch, FILE *f)
+ 	return putc(ch, bionic_file_to_glibc_file(f));
+ }
+ 
++// Same reasoning: apps (e.g. FFmpeg's av_log) call these directly on the
++// bionic std streams, and the IO_file_xsputn wrap doesn't catch them.
++
++int bionic_fputs(const char *s, FILE *f)
++{
++	return fputs(s, bionic_file_to_glibc_file(f));
++}
++
++int bionic_fputc(int ch, FILE *f)
++{
++	return fputc(ch, bionic_file_to_glibc_file(f));
++}
++
++int bionic_fprintf(FILE *f, const char *fmt, ...)
++{
++	int ret;
++	va_list ap;
++	va_start(ap, fmt);
++	ret = vfprintf(bionic_file_to_glibc_file(f), fmt, ap);
++	va_end(ap);
++	return ret;
++}
++
++int bionic_vfprintf(FILE *f, const char *fmt, va_list ap)
++{
++	return vfprintf(bionic_file_to_glibc_file(f), fmt, ap);
++}
++
+ #ifdef __GLIBC__
+ 
+ // Wrapping internal glibc VTABLE functions to handle bionic's pre-M crap
