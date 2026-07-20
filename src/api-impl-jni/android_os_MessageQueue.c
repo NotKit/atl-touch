@@ -28,8 +28,13 @@ static gboolean dispatch_func(GSource *source, GSourceFunc callback, gpointer us
 	(*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
 	g_source_set_ready_time(source, -1); // clear previous timeout
 	(*env)->CallStaticVoidMethod(env, handle_cache.looper.class, handle_cache.looper.loop);
-	if ((*env)->ExceptionCheck(env))
+	// An exception escaping a message callback must be cleared here: left
+	// pending it poisons the next JNI call (e.g. a MotionEvent NewObject then
+	// returns null), which aborts the runtime. Print it and drop the frame.
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	return G_SOURCE_CONTINUE;
 }
@@ -43,8 +48,10 @@ void prepare_main_looper(JNIEnv *env)
 	main_thread_id = g_thread_self();
 
 	(*env)->CallStaticVoidMethod(env, handle_cache.looper.class, handle_cache.looper.prepareMainLooper);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	source = g_source_new(&source_funcs, sizeof(GSource));
 	JavaVM *jvm;
 	(*env)->GetJavaVM(env, &jvm);

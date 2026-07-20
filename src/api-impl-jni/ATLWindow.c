@@ -543,8 +543,11 @@ static void atl_window_render(ATLWindow *window)
 		int layout_height = height > ime_inset ? height - ime_inset : height;
 		jlong t = debug_render() ? atl_uptime_millis() : 0;
 		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, layout_height);
-		if ((*env)->ExceptionCheck(env))
+		// clear, don't just describe: a pending exception would break the next JNI call
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		if (debug_render())
 			layout_ms = atl_uptime_millis() - t;
 	}
@@ -552,8 +555,10 @@ static void atl_window_render(ATLWindow *window)
 	jlong t_draw = debug_render() ? atl_uptime_millis() : 0;
 	void *canvas = atl_canvas_new_raster(width, height);
 	(*env)->CallVoidMethod(env, window->view_root, window->perform_draw, _INTPTR(canvas), width, height);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	jlong draw_ms = debug_render() ? atl_uptime_millis() - t_draw : 0;
 
 	int pixel_width, pixel_height, stride;

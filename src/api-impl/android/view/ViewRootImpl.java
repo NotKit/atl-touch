@@ -284,6 +284,8 @@ public class ViewRootImpl implements ViewParent {
 
 	/* called from native (ATLSceneWidget event controllers) */
 	protected boolean dispatchTouchEvent(MotionEvent event) {
+		if (event == null)
+			return false;
 		int action = event.getAction();
 		if (action == MotionEvent.ACTION_DOWN) {
 			touchTarget = null;
