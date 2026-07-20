@@ -295,13 +295,18 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	void dispatchAttachedToWindow() {
 		super.dispatchAttachedToWindow();
-		for (View child : children)
-			child.dispatchAttachedToWindow();
+		// a child's onAttachedToWindow may add or remove views here (e.g. a
+		// RecyclerView binding rows), so iterate a snapshot to avoid a
+		// ConcurrentModificationException. Newly added views attach themselves
+		// via addViewInternal; skip any child no longer ours.
+		for (View child : children.toArray(new View[0]))
+			if (child.parent == this)
+				child.dispatchAttachedToWindow();
 	}
 
 	@Override
 	void dispatchDetachedFromWindow() {
-		for (View child : children)
+		for (View child : children.toArray(new View[0]))
 			child.dispatchDetachedFromWindow();
 		super.dispatchDetachedFromWindow();
 	}
