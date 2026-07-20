@@ -68,14 +68,17 @@ Then the consumer only does the app-specific work: fetch the APK, bundle
 non-rootfs runtime libs, AOT-compile (`dex2oat` is in the tree), and pack the
 click.
 
-### Caveat: atlas data dir
+### atlas data dir
 
-atlas bakes `INSTALL_DATADIR` (its `fonts.xml` etc.) at `/opt/atl-sdk/current`.
-Everything runs after relocation, but an app that opens Android's
-`/system/etc/fonts.xml` directly won't get the redirect from a different click
-prefix. Most apps bundle their own fonts or use fontconfig, so this is cosmetic.
-If you need it exact, rebuild only atlas with your click prefix — the expensive
-deps still come from the SDK stamps.
+atlas bakes `INSTALL_DATADIR` (its `fonts.xml` etc.) at `/opt/atl-sdk/current`,
+but resolves `fonts.xml` relative to its own executable at runtime (like it does
+the dex dir via `dladdr`), so a tree unpacked at a different click prefix still
+finds it. The baked path is only a fallback. So the drop-in tree needs no atlas
+rebuild.
+
+(Older SDK tarballs, built before the relative-`fonts.xml` fix, fall back to the
+baked `/opt/atl-sdk/current` path — cosmetic, since glyph loading goes through
+fontconfig/`SkFontMgr`, not `fonts.xml`.)
 
 ## Running it
 

@@ -244,7 +244,8 @@ executable('android-translation-layer', [
                                         install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
                                                        get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives',
                                         c_args: [
-						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"'
+						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"',
+					'-DINSTALL_DATADIR_NAME="'+get_option('datadir')+'"'
                                         ])
 
 # hax.jar

@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,6 +82,31 @@ static char *fonts_overrides[] = {
 	NULL,
 };
 
+/* fonts.xml resolved relative to this executable, so a runtime tree unpacked
+ * at a different prefix than it was configured with (e.g. the prebuilt ATL SDK
+ * dropped into a click) still finds it. The executable lives at <prefix>/bin,
+ * fonts.xml at <prefix>/<datadir>/atl/system/etc. */
+static char *fonts_relocated(void)
+{
+	static char buf[PATH_MAX + 64];
+	static int computed = 0;
+
+	if (!computed) {
+		computed = 1;
+		char exe[PATH_MAX];
+		ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+		if (n <= 0)
+			return NULL;
+		exe[n] = '\0';
+		char *slash = strrchr(exe, '/'); /* strip the executable name */
+		if (!slash)
+			return NULL;
+		*slash = '\0'; /* now <prefix>/bin */
+		snprintf(buf, sizeof(buf), "%s/../" INSTALL_DATADIR_NAME "/atl/system/etc/fonts.xml", exe);
+	}
+	return buf[0] ? buf : NULL;
+}
+
 bool apply_path_overrides(char **path)
 {
 	bool free_path = false;
@@ -88,10 +114,15 @@ bool apply_path_overrides(char **path)
 	/* TODO: read the overrides from a config file */
 	/* TODO: compare with canonicalized path */
 	if (!strcmp(*path, "/system/etc/fonts.xml")) {
-		for (char **override = fonts_overrides; *override; override++) {
-			if (file_exists(*override)) {
-				*path = *override;
-				break;
+		char *relocated = fonts_relocated();
+		if (relocated && file_exists(relocated)) {
+			*path = relocated;
+		} else {
+			for (char **override = fonts_overrides; *override; override++) {
+				if (file_exists(*override)) {
+					*path = *override;
+					break;
+				}
 			}
 		}
 	}
