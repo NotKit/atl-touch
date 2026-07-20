@@ -43,6 +43,12 @@ public class TextView extends View {
 	private boolean single_line = false;
 	private int max_lines = Integer.MAX_VALUE;
 
+	// Telegram's EditTextBoldCursor reflects on TextView.mEditor. Provide the
+	// field so getDeclaredField("mEditor") resolves; its cursor reflection then
+	// reads a null editor and degrades to a no-op, instead of invoking get() on
+	// a null Field (which segfaults under AOT rather than throwing an NPE).
+	private Object mEditor = null;
+
 	public TextView(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
 	}
