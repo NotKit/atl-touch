@@ -195,6 +195,8 @@ public class Notification implements Parcelable {
 
 		public Builder addExtras(Bundle bundle) { return this; }
 
+		public Builder addPerson(String uri) { return this; }
+
 		public Notification build() {
 			return notification;
 		}
