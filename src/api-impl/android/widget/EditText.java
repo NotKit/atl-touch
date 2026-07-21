@@ -7,7 +7,6 @@ import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
-import android.text.TextPaint;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -240,7 +239,7 @@ public class EditText extends TextView {
 	public boolean onTouchEvent(MotionEvent event) {
 		if (event.getAction() == MotionEvent.ACTION_UP) {
 			requestFocus();
-			setCaret(caretFromX(event.getX()));
+			setCaret(caretFromXY(event.getX(), event.getY()));
 			InputMethodManager imm = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
 			if (imm != null)
 				imm.showSoftInput(this, 0);
@@ -255,21 +254,11 @@ public class EditText extends TextView {
 		return new BaseInputConnection(this, true);
 	}
 
-	/** Map a touch x (view coords) to the nearest character boundary. */
-	private int caretFromX(float x) {
-		String cur = content();
-		float local = x - paddingLeft;
-		if (local <= 0)
-			return 0;
-		TextPaint p = getPaint();
-		for (int i = 1; i <= cur.length(); i++) {
-			if (Layout.getDesiredWidth(cur.subSequence(0, i), p) >= local) {
-				float prev = Layout.getDesiredWidth(cur.subSequence(0, i - 1), p);
-				float curw = Layout.getDesiredWidth(cur.subSequence(0, i), p);
-				return (local - prev) < (curw - local) ? i - 1 : i;
-			}
-		}
-		return cur.length();
+	/** Map a touch (view coords) to the nearest character boundary. */
+	private int caretFromXY(float x, float y) {
+		Layout layout = getLayout();
+		int line = layout.getLineForVertical((int)(y - getLayoutOffsetY()));
+		return layout.getOffsetForHorizontal(line, x - getLayoutOffsetX());
 	}
 
 	@Override
@@ -277,19 +266,23 @@ public class EditText extends TextView {
 		super.onDraw(canvas);
 		if (!isFocused())
 			return;
+		/* the caret and the composing underline have to follow the text where
+		 * TextView actually drew it, gravity and all - not a line box of their own */
 		String cur = content();
+		Layout layout = getLayout();
+		float ox = getLayoutOffsetX(), oy = getLayoutOffsetY();
 		int caret = Math.max(0, Math.min(selEnd, cur.length()));
-		float cursorX = paddingLeft + Layout.getDesiredWidth(cur.subSequence(0, caret), getPaint());
-		float lineHeight = getPaint().getTextSize() * 1.2f;
-		int innerHeight = getHeight() - paddingTop - paddingBottom;
-		float top = paddingTop + Math.max(0, (innerHeight - lineHeight) / 2f);
+		int caretLine = layout.getLineForOffset(caret);
 		if (composeStart >= 0 && composeEnd > composeStart && composeEnd <= cur.length()) {
-			float x0 = paddingLeft + Layout.getDesiredWidth(cur.subSequence(0, composeStart), getPaint());
-			float x1 = paddingLeft + Layout.getDesiredWidth(cur.subSequence(0, composeEnd), getPaint());
-			float baseline = top + lineHeight - getPaint().descent();
-			canvas.drawLine(x0, baseline + 2, x1, baseline + 2, getPaint());
+			int line = layout.getLineForOffset(composeStart);
+			float x0 = ox + layout.getPrimaryHorizontal(composeStart);
+			float x1 = ox + layout.getPrimaryHorizontal(composeEnd);
+			float y = oy + layout.getLineBaseline(line) + getPaint().getUnderlinePosition();
+			canvas.drawLine(x0, y, x1, y, getPaint());
 		}
-		canvas.drawLine(cursorX, top, cursorX, top + lineHeight, cursorPaint);
+		float cursorX = ox + layout.getPrimaryHorizontal(caret);
+		canvas.drawLine(cursorX, oy + layout.getLineTop(caretLine),
+		                cursorX, oy + layout.getLineBottom(caretLine), cursorPaint);
 	}
 
 	// --- TextWatcher plumbing ---

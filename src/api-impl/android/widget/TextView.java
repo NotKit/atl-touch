@@ -231,31 +231,43 @@ public class TextView extends View {
 	@Override
 	public void onDraw(Canvas canvas) {
 		drawCompoundDrawables(canvas);
-		final int compoundPaddingLeft = getCompoundPaddingLeft();
-		final int compoundPaddingTop = getCompoundPaddingTop();
 		if (text_layout == null)
-			text_layout = makeLayout(Math.max(0, getWidth() - compoundPaddingLeft - getCompoundPaddingRight()));
-		float tx = compoundPaddingLeft;
-		float ty = compoundPaddingTop;
-		int innerWidth = getWidth() - compoundPaddingLeft - getCompoundPaddingRight();
-		int innerHeight = getHeight() - compoundPaddingTop - getCompoundPaddingBottom();
+			text_layout = makeLayout(Math.max(0, getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight()));
+		canvas.save();
+		canvas.translate(getLayoutOffsetX(), getLayoutOffsetY());
+		text_layout.draw(canvas);
+		canvas.restore();
+	}
+
+	/** Where onDraw() puts the text layout horizontally; subclasses place carets by it. */
+	protected float getLayoutOffsetX() {
+		float tx = getCompoundPaddingLeft();
+		int innerWidth = getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight();
+		int horizontalGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+		if (horizontalGravity == Gravity.CENTER_HORIZONTAL || horizontalGravity == Gravity.RIGHT) {
+			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
+			int free = Math.max(0, innerWidth - desired);
+			tx += horizontalGravity == Gravity.CENTER_HORIZONTAL ? free / 2 : free;
+		}
+		return tx;
+	}
+
+	/** Where onDraw() puts the text layout vertically. */
+	protected float getLayoutOffsetY() {
+		return verticalOffset(getHeight());
+	}
+
+	private float verticalOffset(int height) {
+		float ty = getCompoundPaddingTop();
+		if (text_layout == null)
+			return ty;
+		int innerHeight = height - getCompoundPaddingTop() - getCompoundPaddingBottom();
 		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
 		if (verticalGravity == Gravity.CENTER_VERTICAL)
 			ty += Math.max(0, (innerHeight - text_layout.getHeight()) / 2);
 		else if (verticalGravity == Gravity.BOTTOM)
 			ty += Math.max(0, innerHeight - text_layout.getHeight());
-		int horizontalGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
-		if (horizontalGravity == Gravity.CENTER_HORIZONTAL) {
-			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
-			tx += Math.max(0, (innerWidth - desired) / 2);
-		} else if (horizontalGravity == Gravity.RIGHT) {
-			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
-			tx += Math.max(0, innerWidth - desired);
-		}
-		canvas.save();
-		canvas.translate(tx, ty);
-		text_layout.draw(canvas);
-		canvas.restore();
+		return ty;
 	}
 
 	/* must mirror the vertical offsets applied in onDraw(); uses the measured
@@ -264,14 +276,7 @@ public class TextView extends View {
 	public int getBaseline() {
 		if (text_layout == null)
 			return super.getBaseline();
-		int ty = getCompoundPaddingTop();
-		int innerHeight = getMeasuredHeight() - getCompoundPaddingTop() - getCompoundPaddingBottom();
-		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
-		if (verticalGravity == Gravity.CENTER_VERTICAL)
-			ty += Math.max(0, (innerHeight - text_layout.getHeight()) / 2);
-		else if (verticalGravity == Gravity.BOTTOM)
-			ty += Math.max(0, innerHeight - text_layout.getHeight());
-		return ty + text_layout.getLineBaseline(0);
+		return (int)verticalOffset(getMeasuredHeight()) + text_layout.getLineBaseline(0);
 	}
 
 	public void setGravity(int gravity) {
