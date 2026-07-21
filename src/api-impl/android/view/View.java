@@ -3523,7 +3523,8 @@ public class View implements Drawable.Callback {
 		return true;
 	}
 
-	protected void drawableHotspotChanged(float x, float y) {}
+	/* public in AOSP: apps call it from their own touch listeners */
+	public void drawableHotspotChanged(float x, float y) {}
 
 	public void dispatchDrawableHotspotChanged(float x, float y) {
 		drawableHotspotChanged(x, y);
