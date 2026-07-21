@@ -25,6 +25,7 @@ public class ViewRootImpl implements ViewParent {
 	private View focusedView; // the view currently receiving key input, if any
 	private int width;
 	private int height;
+	private int imeInset; // window height covered by the soft keyboard, in px
 
 	/** callbacks a panel owner (Dialog, PopupWindow) uses to react to modal input */
 	public interface PanelCallbacks {
@@ -79,6 +80,44 @@ public class ViewRootImpl implements ViewParent {
 
 	public int getHeight() {
 		return height;
+	}
+
+	/* --- soft keyboard ---
+	 *
+	 * The window is never resized for the keyboard: like AOSP, the root view
+	 * keeps the full window height and the keyboard is taken out of the content
+	 * as decor padding. Apps derive the keyboard height from the difference
+	 * between the two (getRootView().getHeight() minus the visible display
+	 * frame), so shrinking both would report a keyboard height of zero.
+	 */
+
+	/* called from native when the IME panel geometry changes */
+	protected void setImeInset(int inset) {
+		imeInset = Math.max(0, inset);
+	}
+
+	/** part of the keyboard the content is laid out around (adjustResize) */
+	private int contentImeInset() {
+		if (imeInset <= 0)
+			return 0;
+		int mode = window != null
+		    ? window.getAttributes().softInputMode & WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST : 0;
+		// pan/nothing leave the layout alone; the app is told about the keyboard
+		// through WindowInsets instead
+		if (mode == WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
+		    || mode == WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+			return 0;
+		return Math.min(imeInset, height);
+	}
+
+	/** window height not covered by the soft keyboard */
+	public int getVisibleHeight() {
+		return height - contentImeInset();
+	}
+
+	/** insets the layout did not already account for, as reported to the app */
+	public WindowInsets getWindowInsets() {
+		return new WindowInsets(imeInset - contentImeInset());
 	}
 
 	/* --- panels --- */
@@ -148,11 +187,13 @@ public class ViewRootImpl implements ViewParent {
 	/** measure the panel against the window per its LayoutParams and position it by gravity */
 	private void layoutPanel(Panel panel) {
 		WindowManager.LayoutParams lp = panel.params;
+		// panels (dialogs, popups) live above the keyboard, not under it
+		int height = getVisibleHeight();
 		// floating dialog: resolve its width from the live window size now, not from
 		// the (possibly still-zero) size the window had when the dialog was shown
 		int lpWidth = lp.width;
 		if (lpWidth < 0 && (lp.floatingWidthMajor > 0 || lp.floatingWidthMinor > 0)) {
-			float fraction = width > height ? lp.floatingWidthMajor : lp.floatingWidthMinor;
+			float fraction = width > this.height ? lp.floatingWidthMajor : lp.floatingWidthMinor;
 			if (fraction > 0) {
 				float density = panel.view.getResources().getDisplayMetrics().density;
 				lpWidth = Math.min((int)(width * fraction), (int)(560 * density));
@@ -192,6 +233,11 @@ public class ViewRootImpl implements ViewParent {
 		this.width = width;
 		this.height = height;
 		if (view != null) {
+			// keyboard comes out of the content as decor padding, not out of the
+			// window; guard the write, setPadding always requests a layout
+			int inset = contentImeInset();
+			if (view.getPaddingBottom() != inset)
+				view.setPadding(view.getPaddingLeft(), view.getPaddingTop(), view.getPaddingRight(), inset);
 			view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
 			             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
 			view.layout(0, 0, width, height);

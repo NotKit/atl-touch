@@ -6,13 +6,26 @@ public class WindowInsets {
 
 	public static final WindowInsets CONSUMED = new WindowInsets();
 
-	public WindowInsets() {}
+	/* We have no system bars / cutouts, so the soft keyboard is the only inset
+	 * there can be — and only when the layout isn't already resized around it
+	 * (adjustPan / adjustNothing). */
+	private final int imeBottom;
 
-	public WindowInsets(WindowInsets windowInsets) {}
+	public WindowInsets() {
+		this(0);
+	}
 
-	/* we have no system bars / cutouts, so all inset queries are empty */
+	WindowInsets(int imeBottom) {
+		this.imeBottom = imeBottom;
+	}
+
+	public WindowInsets(WindowInsets windowInsets) {
+		this(windowInsets.imeBottom);
+	}
+
 	public Insets getInsets(int typeMask) {
-		return Insets.NONE;
+		return (typeMask & Type.IME) != 0 && imeBottom > 0
+		    ? Insets.of(0, 0, 0, imeBottom) : Insets.NONE;
 	}
 
 	public Insets getInsetsIgnoringVisibility(int typeMask) {
@@ -20,7 +33,7 @@ public class WindowInsets {
 	}
 
 	public boolean isVisible(int typeMask) {
-		return false;
+		return (typeMask & Type.IME) != 0 && imeBottom > 0;
 	}
 
 	public WindowInsets consumeStableInsets() {
@@ -48,7 +61,7 @@ public class WindowInsets {
 	}
 
 	public int getSystemWindowInsetBottom() {
-		return 0;
+		return imeBottom;
 	}
 
 	public int getStableInsetLeft() {

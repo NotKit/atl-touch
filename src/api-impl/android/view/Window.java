@@ -186,7 +186,12 @@ public class Window {
 		return new WindowManagerImpl();
 	}
 
-	public void setSoftInputMode(int dummy) {}
+	/** how the window reacts to the soft keyboard; see ViewRootImpl.contentImeInset() */
+	public void setSoftInputMode(int mode) {
+		params.softInputMode = mode;
+		if (viewRootImpl != null)
+			viewRootImpl.requestLayout();
+	}
 
 	public int getNavigationBarColor() {
 		return 0xFF888888; // gray

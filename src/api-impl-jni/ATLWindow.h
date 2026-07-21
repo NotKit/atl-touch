@@ -27,6 +27,7 @@ void atl_windows_ime_set_composing(const char *utf8);
 void atl_windows_ime_finish_composing(void);
 void atl_windows_ime_key(int action, int keycode);
 void atl_windows_set_ime_inset(int inset);
+bool atl_debug_ime(void);
 
 ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated);
 void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root);

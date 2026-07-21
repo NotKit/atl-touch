@@ -59,10 +59,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		int theme_res = 0;
 		int label_res = 0;
 		int app_label_res = 0;
+		int soft_input_mode = 0;
 		for (PackageParser.Activity activity : pkg.activities) {
 			if (className.equals(activity.className)) {
 				label_res = activity.info.labelRes;
 				theme_res = activity.info.getThemeResource();
+				soft_input_mode = activity.info.softInputMode;
 				break;
 			}
 		}
@@ -79,6 +81,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		activity.attachBaseContext(new ContextImpl(r, pkg.applicationInfo, theme_res));
 		// Setting up a window requires a context.
 		activity.window = new Window(activity, activity);
+		activity.window.setSoftInputMode(soft_input_mode);
 		activity.window.set_native_window(native_window);
 		// Set the field directly rather than calling the (overridable) setTitle():
 		// for an AppCompatActivity, setTitle() routes through AppCompatDelegate and

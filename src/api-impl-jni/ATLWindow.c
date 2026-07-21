@@ -26,6 +26,7 @@ struct ATLWindow {
 	GLFWwindow *glfw_window;
 	jobject view_root; // global ref, NULL until attached
 	jmethodID perform_layout;
+	jmethodID set_ime_inset;
 	jmethodID perform_draw;
 	jmethodID dispatch_touch_event;
 	jmethodID dispatch_key_event;
@@ -499,10 +500,22 @@ void atl_windows_ime_key(int action, int keycode)
 
 static int ime_inset = 0;
 
+/* keyboard geometry is shell-specific and hard to observe on a device, so make
+ * the inset traceable: ATL_DEBUG_IME=1 */
+bool atl_debug_ime(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = getenv("ATL_DEBUG_IME") != NULL;
+	return cached;
+}
+
 void atl_windows_set_ime_inset(int inset)
 {
 	if (inset < 0)
 		inset = 0;
+	if (atl_debug_ime())
+		fprintf(stderr, "atl_ime: inset %d -> %d\n", ime_inset, inset);
 	if (ime_inset == inset)
 		return;
 	ime_inset = inset;
@@ -539,10 +552,11 @@ static void atl_window_render(ATLWindow *window)
 	if (width != window->layout_width || height != window->layout_height) {
 		window->layout_width = width;
 		window->layout_height = height;
-		/* keep the layout clear of the soft keyboard (adjustResize) */
-		int layout_height = height > ime_inset ? height - ime_inset : height;
+		/* the window keeps its full size; the view root keeps the content clear
+		 * of the soft keyboard itself, per the activity's softInputMode */
+		(*env)->CallVoidMethod(env, window->view_root, window->set_ime_inset, ime_inset);
 		jlong t = debug_render() ? atl_uptime_millis() : 0;
-		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, layout_height);
+		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, height);
 		// clear, don't just describe: a pending exception would break the next JNI call
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
@@ -772,6 +786,7 @@ void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
 	window->view_root = (*env)->NewGlobalRef(env, view_root);
 	jclass view_root_class = (*env)->GetObjectClass(env, view_root);
 	window->perform_layout = (*env)->GetMethodID(env, view_root_class, "performLayout", "(II)V");
+	window->set_ime_inset = (*env)->GetMethodID(env, view_root_class, "setImeInset", "(I)V");
 	window->perform_draw = (*env)->GetMethodID(env, view_root_class, "performDraw", "(JII)V");
 	window->dispatch_touch_event = (*env)->GetMethodID(env, view_root_class, "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z");
 	window->dispatch_key_event = (*env)->GetMethodID(env, view_root_class, "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");

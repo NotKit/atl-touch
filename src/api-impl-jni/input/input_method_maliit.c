@@ -107,6 +107,8 @@ static gboolean on_update_input_method_area(MaliitContext *obj, GDBusMethodInvoc
                                             gint x, gint y, gint width, gint height,
                                             gpointer user_data)
 {
+	if (atl_debug_ime())
+		fprintf(stderr, "atl_ime: maliit area x=%d y=%d %dx%d\n", x, y, width, height);
 	atl_windows_set_ime_inset(height > 0 ? height : 0);
 	return TRUE;
 }

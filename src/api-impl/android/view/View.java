@@ -2595,7 +2595,9 @@ public class View implements Drawable.Callback {
 	public void getWindowVisibleDisplayFrame(Rect rect) {
 		ViewRootImpl root = getViewRootImpl();
 		if (root != null && root.getWidth() > 0) {
-			rect.set(0, 0, root.getWidth(), root.getHeight());
+			// excludes the soft keyboard: apps measure it as the difference
+			// between this and the root view's height
+			rect.set(0, 0, root.getWidth(), root.getVisibleHeight());
 		} else {
 			Display display = new Display();
 			rect.set(0, 0, display.getWidth(), display.getHeight());
@@ -2813,7 +2815,10 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
-	public WindowInsets getRootWindowInsets() { return null; }
+	public WindowInsets getRootWindowInsets() {
+		ViewRootImpl root = getViewRootImpl();
+		return root != null ? root.getWindowInsets() : null; // AOSP: null while detached
+	}
 
 	public PointerIcon getPointerIcon() { return null; }
 

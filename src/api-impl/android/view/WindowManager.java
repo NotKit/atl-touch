@@ -47,6 +47,8 @@ public interface WindowManager {
 		public static final int TYPE_TOAST = 2005;
 		public static final int TYPE_APPLICATION_OVERLAY = 2038;
 
+		public static final int SOFT_INPUT_MASK_ADJUST = 0xf0;
+		public static final int SOFT_INPUT_ADJUST_UNSPECIFIED = 0x00;
 		public static final int SOFT_INPUT_ADJUST_RESIZE = 0x10;
 		public static final int SOFT_INPUT_ADJUST_PAN = 0x20;
 		public static final int SOFT_INPUT_ADJUST_NOTHING = 0x30;
