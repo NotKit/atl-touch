@@ -5,11 +5,43 @@
 #include <jni.h>
 
 #include "input_method.h"
+#include "../ATLWindow.h"
 
-/* Probe order: shell-specific D-Bus transports first, generic wayland
- * protocols (zwp_text_input_v3, once implemented) after. NULL entries are
- * backends that weren't compiled in (weak symbols). */
+/* Fake keyboard for development on a desktop, where there is no soft keyboard
+ * at all: ATL_IM_DEBUG_INSET=<px> reserves that much of the window while an
+ * editor is focused, so the adjustResize path can be exercised. */
+static int debug_inset;
+
+static bool debug_im_init(void)
+{
+	const char *px = getenv("ATL_IM_DEBUG_INSET");
+	debug_inset = px ? atoi(px) : 0;
+	return debug_inset > 0;
+}
+
+static void debug_im_show(int input_type)
+{
+	atl_windows_set_ime_inset(debug_inset);
+}
+
+static void debug_im_hide(void)
+{
+	atl_windows_set_ime_inset(0);
+}
+
+static const struct atl_im_backend atl_im_backend_debug = {
+	.name = "debug",
+	.init = debug_im_init,
+	.show = debug_im_show,
+	.hide = debug_im_hide,
+};
+
+/* Probe order: the debug backend (opt-in through its env var) first, then
+ * shell-specific D-Bus transports, generic wayland protocols
+ * (zwp_text_input_v3, once implemented) after. NULL entries are backends that
+ * weren't compiled in (weak symbols). */
 static const struct atl_im_backend *const candidates[] = {
+	&atl_im_backend_debug,
 	&atl_im_backend_maliit,
 };
 
