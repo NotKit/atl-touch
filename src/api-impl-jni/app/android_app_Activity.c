@@ -247,11 +247,20 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeOpenURI(JNIEnv *env, jcla
 
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_isInMultiWindowMode(JNIEnv *env, jobject this)
 {
+	/* Apps change real behaviour on this — Telegram skips hiding the keyboard
+	 * and never stores its measured height while it believes it is in
+	 * multi-window — and the "not maximized" heuristic below is wrong on
+	 * shells that never set that state (Lomiri). ATL_MULTI_WINDOW=0/1 lets the
+	 * packaging pin it for the shell it targets. */
 	jobject window_obj = _GET_OBJ_FIELD(this, "window", "Landroid/view/Window;");
 	jlong native_window = window_obj ? _GET_LONG_FIELD(window_obj, "native_window") : 0;
-	if (!native_window)
-		return true;
-	return !atl_window_is_maximized((ATLWindow *)_PTR(native_window));
+	bool maximized = native_window && atl_window_is_maximized((ATLWindow *)_PTR(native_window));
+	const char *force = getenv("ATL_MULTI_WINDOW");
+	bool multi_window = force ? force[0] != '0' : !maximized;
+	if (atl_debug_ime())
+		fprintf(stderr, "atl_ime: isInMultiWindowMode -> %d (maximized %d, forced %s)\n",
+		        multi_window, maximized, force ? force : "no");
+	return multi_window;
 }
 
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_isTaskRoot(JNIEnv *env, jobject this)
