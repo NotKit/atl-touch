@@ -2814,7 +2814,14 @@ public final class MotionEvent extends InputEvent {
 			throw new IllegalArgumentException("matrix must not be null");
 		}
 
-		nativeTransform(mNativePtr, matrix);
+		float[] point = new float[2];
+		for (int i = 0; i < ids.length; i++) {
+			point[0] = coords[4 * i + X_OFFSET];
+			point[1] = coords[4 * i + Y_OFFSET];
+			matrix.mapPoints(point);
+			coords[4 * i + X_OFFSET] = point[0];
+			coords[4 * i + Y_OFFSET] = point[1];
+		}
 	}
 
 	/**

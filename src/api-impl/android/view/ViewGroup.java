@@ -133,14 +133,24 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	/** transform a MotionEvent into a child's coordinate space */
 	private MotionEvent transformEventForChild(MotionEvent event, View child) {
 		MotionEvent transformed = event.copy();
-		transformed.offsetLocation(getScrollX() - child.getLeft() - child.getTranslationX(),
-		                           getScrollY() - child.getTop() - child.getTranslationY());
+		transformed.offsetLocation(getScrollX() - child.getLeft(), getScrollY() - child.getTop());
+		if (!child.hasIdentityMatrix())
+			transformed.transform(child.getInverseMatrix());
 		return transformed;
 	}
 
+	private final float[] touchPoint = new float[2];
+
 	private boolean isTransformedTouchPointInView(MotionEvent event, View child) {
-		float x = event.getX() + getScrollX() - child.getLeft() - child.getTranslationX();
-		float y = event.getY() + getScrollY() - child.getTop() - child.getTranslationY();
+		float x = event.getX() + getScrollX() - child.getLeft();
+		float y = event.getY() + getScrollY() - child.getTop();
+		if (!child.hasIdentityMatrix()) {
+			touchPoint[0] = x;
+			touchPoint[1] = y;
+			child.getInverseMatrix().mapPoints(touchPoint);
+			x = touchPoint[0];
+			y = touchPoint[1];
+		}
 		return x >= 0 && y >= 0 && x < child.getWidth() && y < child.getHeight();
 	}
 
@@ -560,6 +570,13 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
 		child.computeScroll();
+		/* Follows AOSP View.draw(Canvas, ViewGroup, long): the child's own scroll is
+		 * applied here and compensated for by the clip (and by drawBackground), so a
+		 * scrolled ViewGroup offsets its content exactly once. */
+		final int sx = child.getScrollX();
+		final int sy = child.getScrollY();
+		final float alpha = child.getAlpha() * child.getTransitionAlpha();
+
 		/* Restore to the saved count rather than a single restore(): a child's
 		 * draw() may leave the canvas save stack unbalanced (e.g. Material's
 		 * CollapsingToolbarLayout saves for its scrim/title and relies on the
@@ -567,10 +584,16 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		 * save in place, corrupting the clip for the next sibling. This matches
 		 * AOSP View.draw(Canvas, ViewGroup, long). */
 		final int restoreTo = canvas.save();
-		canvas.translate(child.getLeft() - getScrollX() + child.getTranslationX(),
-		                 child.getTop() - getScrollY() + child.getTranslationY());
-		canvas.clipRect(0, 0, child.getWidth(), child.getHeight());
-		canvas.translate(-child.getScrollX(), -child.getScrollY());
+		canvas.translate(child.getLeft() - sx, child.getTop() - sy);
+		if (!child.hasIdentityMatrix()) {
+			// undo the scroll translation, transform, then redo it
+			canvas.translate(sx, sy);
+			canvas.concat(child.getMatrix());
+			canvas.translate(-sx, -sy);
+		}
+		if (alpha < 1.f && !child.onSetAlpha(Math.round(alpha * 255)))
+			canvas.saveLayerAlpha(sx, sy, sx + child.getWidth(), sy + child.getHeight(), Math.round(alpha * 255));
+		canvas.clipRect(sx, sy, sx + child.getWidth(), sy + child.getHeight());
 		child.draw(canvas);
 		canvas.restoreToCount(restoreTo);
 		return false;

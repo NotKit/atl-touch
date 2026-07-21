@@ -950,6 +950,15 @@ public class View implements Drawable.Callback {
 
 	private float translationX = 0;
 	private float translationY = 0;
+	private float scaleX = 1;
+	private float scaleY = 1;
+	private float rotation = 0;
+	private float pivotX = 0;
+	private float pivotY = 0;
+	private boolean pivotExplicitlySet = false;
+	private float transitionAlpha = 1.0f;
+	private Matrix matrix; // lazily built by getMatrix()
+	private Matrix inverseMatrix;
 
 	private int scrollX = 0;
 	private int scrollY = 0;
@@ -1248,7 +1257,14 @@ public class View implements Drawable.Callback {
 	void drawBackground(Canvas canvas) {
 		if (background != null) {
 			background.setBounds(0, 0, getWidth(), getHeight());
-			background.draw(canvas);
+			// the parent draws us translated by our scroll; undo it for the background
+			if ((scrollX | scrollY) == 0) {
+				background.draw(canvas);
+			} else {
+				canvas.translate(scrollX, scrollY);
+				background.draw(canvas);
+				canvas.translate(-scrollX, -scrollY);
+			}
 		}
 	}
 
@@ -2091,7 +2107,7 @@ public class View implements Drawable.Callback {
 		return onCreateDrawableState(0);
 	}
 
-	public float getRotation() { return 0.f; }
+	public float getRotation() { return rotation; }
 
 	public void bringToFront() {}
 
@@ -2152,10 +2168,6 @@ public class View implements Drawable.Callback {
 	}
 
 	protected boolean awakenScrollBars() { return false; }
-
-	public Matrix getMatrix() {
-		return Matrix.IDENTITY_MATRIX;
-	}
 
 	protected static final int[] EMPTY_STATE_SET = new int[0];
 
@@ -2604,24 +2616,79 @@ public class View implements Drawable.Callback {
 		}
 	}
 
-	public void setRotation(float rotation) {}
+	public void setRotation(float rotation) {
+		if (this.rotation != rotation) {
+			this.rotation = rotation;
+			invalidate();
+		}
+	}
+
+	// no 3D transforms: the canvas is 2D, so these stay no-ops
 	public void setRotationX(float deg) {}
 	public void setRotationY(float deg) {}
 
 	public float getRotationX() { return 0.f; }
 	public float getRotationY() { return 0.f; }
 
-	public void setScaleX(float scaleX) {}
-	public void setScaleY(float scaleY) {}
+	public void setScaleX(float scaleX) {
+		if (this.scaleX != scaleX) {
+			this.scaleX = scaleX;
+			invalidate();
+		}
+	}
 
-	public float getScaleX() { return 1.f; }
-	public float getScaleY() { return 1.f; }
+	public void setScaleY(float scaleY) {
+		if (this.scaleY != scaleY) {
+			this.scaleY = scaleY;
+			invalidate();
+		}
+	}
 
-	public void setPivotX(float pivot_x) {}
-	public void setPivotY(float pivot_y) {}
+	public float getScaleX() { return scaleX; }
+	public float getScaleY() { return scaleY; }
 
-	public float getPivotX() { return 0.f; }
-	public float getPivotY() { return 0.f; }
+	public void setPivotX(float pivot_x) {
+		pivotExplicitlySet = true;
+		if (pivotX != pivot_x) {
+			pivotX = pivot_x;
+			invalidate();
+		}
+	}
+
+	public void setPivotY(float pivot_y) {
+		pivotExplicitlySet = true;
+		if (pivotY != pivot_y) {
+			pivotY = pivot_y;
+			invalidate();
+		}
+	}
+
+	public float getPivotX() { return pivotExplicitlySet ? pivotX : getWidth() / 2.f; }
+	public float getPivotY() { return pivotExplicitlySet ? pivotY : getHeight() / 2.f; }
+
+	public boolean hasIdentityMatrix() {
+		return translationX == 0 && translationY == 0 && scaleX == 1 && scaleY == 1 && rotation == 0;
+	}
+
+	/** Transform from this view's local space to its parent's, relative to left/top. */
+	public Matrix getMatrix() {
+		if (matrix == null)
+			matrix = new Matrix();
+		matrix.setTranslate(translationX, translationY);
+		if (rotation != 0)
+			matrix.preRotate(rotation, getPivotX(), getPivotY());
+		if (scaleX != 1 || scaleY != 1)
+			matrix.preScale(scaleX, scaleY, getPivotX(), getPivotY());
+		return matrix;
+	}
+
+	Matrix getInverseMatrix() {
+		if (inverseMatrix == null)
+			inverseMatrix = new Matrix();
+		if (!getMatrix().invert(inverseMatrix))
+			inverseMatrix.reset();
+		return inverseMatrix;
+	}
 
 	public float getTranslationZ() { return 0.f; }
 
@@ -2838,7 +2905,7 @@ public class View implements Drawable.Callback {
 		return view;
 	}
 	public float getTransitionAlpha() {
-		return 1.0f;
+		return transitionAlpha;
 	}
 
 	public void onWindowFocusChanged(boolean hasFocus) {}
@@ -3621,7 +3688,12 @@ public class View implements Drawable.Callback {
 		return cameraDistance;
 	}
 
-	public void setTransitionAlpha(float alpha) {}
+	public void setTransitionAlpha(float alpha) {
+		if (transitionAlpha != alpha) {
+			transitionAlpha = alpha;
+			invalidate();
+		}
+	}
 
 	public void setTransitionVisibility(int visibility) {
 		setVisibility(visibility);
@@ -3641,7 +3713,12 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
-	public void resetPivot() {}
+	public void resetPivot() {
+		if (pivotExplicitlySet) {
+			pivotExplicitlySet = false;
+			invalidate();
+		}
+	}
 
 	/* geometry helpers */
 
