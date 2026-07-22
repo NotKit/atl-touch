@@ -287,9 +287,12 @@ public class PopupWindow {
 	}
 
 	public void update(int x, int y, int width, int height) {
-		if (width >= 0 || width == ViewGroup.LayoutParams.MATCH_PARENT)
+		// a negative width/height means "leave the size unchanged" (AOSP contract).
+		// don't treat -1 as MATCH_PARENT here — that would resize a WRAP_CONTENT popup
+		// to full screen on every reposition.
+		if (width >= 0)
 			this.width = width;
-		if (height >= 0 || height == ViewGroup.LayoutParams.MATCH_PARENT)
+		if (height >= 0)
 			this.height = height;
 		if (!showing || hostRoot == null || panelParams == null)
 			return;
