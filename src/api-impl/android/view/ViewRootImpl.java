@@ -285,6 +285,8 @@ public class ViewRootImpl implements ViewParent {
 			layoutNeeded |= panel.view.isLayoutRequested();
 		if (layoutNeeded)
 			performLayout(width, height);
+		if (window != null && window.view_tree_observer != null)
+			window.view_tree_observer.dispatchOnDraw();
 		Canvas canvas = new DisplayListCanvas(canvas_ptr);
 		if (view != null)
 			view.draw(canvas);
