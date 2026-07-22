@@ -343,8 +343,9 @@ public class ViewRootImpl implements ViewParent {
 				View pv = panel.view;
 				if (pv.getVisibility() != View.VISIBLE)
 					continue;
-				if ((panel.params.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) == 0
-				    && x >= pv.getLeft() && x < pv.getRight() && y >= pv.getTop() && y < pv.getBottom()) {
+				if ((panel.params.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0)
+					continue;  // input-transparent overlay: not a target, not modal either
+				if (x >= pv.getLeft() && x < pv.getRight() && y >= pv.getTop() && y < pv.getBottom()) {
 					touchTarget = pv;
 					break;
 				}
