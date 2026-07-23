@@ -31,7 +31,14 @@ public class Window {
 		public boolean onMenuOpened(int featureId, Menu menu);
 	}
 
-	public static interface OnFrameMetricsAvailableListener {}
+	public static interface OnFrameMetricsAvailableListener {
+		public void onFrameMetricsAvailable(Window window, FrameMetrics frameMetrics, int dropCountSinceLastInvocation);
+	}
+
+	/* stubs: we don't produce FrameMetrics, listeners are never invoked */
+	public void addOnFrameMetricsAvailableListener(OnFrameMetricsAvailableListener listener, android.os.Handler handler) {}
+
+	public void removeOnFrameMetricsAvailableListener(OnFrameMetricsAvailableListener listener) {}
 
 	public long native_window;
 	private ViewGroup decorView;

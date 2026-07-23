@@ -625,6 +625,7 @@ srcs = [
 	'android/view/DisplayCutout.java',
 	'android/view/DisplayListCanvas.java',
 	'android/view/FocusFinder.java',
+	'android/view/FrameMetrics.java',
 	'android/view/GestureDetector.java',
 	'android/view/Gravity.java',
 	'android/view/HardwareCanvas.java',
