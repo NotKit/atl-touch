@@ -89,6 +89,8 @@ srcs = [
 	'android/app/usage/UsageStatsManager.java',
 	'android/appwidget/AppWidgetManager.java',
 	'android/appwidget/AppWidgetProvider.java',
+	'android/atl/ATLContentHub.java',
+	'android/atl/ATLContentHubPicker.java',
 	'android/atl/ATLFilePicker.java',
 	'android/atl/ATLKeyboardDialog.java',
 	'android/atl/ATLKeyboardViewer.java',

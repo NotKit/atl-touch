@@ -64,6 +64,16 @@ if wpe_webkit_dep.found()
 	extra_jni_srcs += files('src/api-impl-jni/widgets/webview_wpe.c')
 endif
 
+# content-hub import (Ubuntu Touch gallery/file picker via the system content
+# broker). Its header lives only in the arm64 UT rootfs, not the x86_64 desktop,
+# so this builds only on device; off-device ATLMediaContentProvider falls back
+# to ATLFilePicker.
+content_hub_dep = dependency('libcontent-hub-glib', required: false)
+if content_hub_dep.found()
+	extra_deps += content_hub_dep
+	extra_jni_srcs += files('src/api-impl-jni/content/android_atl_ATLContentHub.c')
+endif
+
 # Qt WebEngine WebView backend: a dlopen'd module (see webview_backend.h), so
 # Qt never becomes a dependency of the main library. Built only when the Qt 6
 # dev packages are present (Ubuntu Touch 24.04-2.x ships Qt 6.10).

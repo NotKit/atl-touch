@@ -21,13 +21,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Bridges Telegram's in-app gallery (MediaStore queries on content://media/...)
- * onto a real host folder the user picks. Telegram enumerates the gallery by
+ * onto real host files the user picks. Telegram enumerates the gallery by
  * querying the images and then the video content URI; we answer with one cursor
- * row per media file in the chosen folder, so its attach sheet shows a real
- * thumbnail grid instead of a single item.
+ * row per media file, so its attach sheet shows a real thumbnail grid.
+ *
+ * The files come from one of two sources, chosen at pick time:
+ *   - Ubuntu Touch: content-hub, the confined-app way to import media. The user
+ *     picks in the system gallery and content-hub hands back the imported files.
+ *   - Desktop: ATLFilePicker, browsing $HOME for a media folder (content-hub is
+ *     unreachable there). The chosen folder is enumerated into the file list.
  */
 public class ATLMediaContentProvider extends ContentProvider {
 
@@ -36,44 +42,146 @@ public class ATLMediaContentProvider extends ContentProvider {
 	private static final Set<String> VIDEO_EXT = new HashSet<String>(Arrays.asList(
 	    "mp4", "mkv", "webm", "mov", "avi", "3gp", "m4v"));
 
-	boolean waitingForFileChooser = false;
-	// the folder the user picked, whose media files back the gallery grid
-	File selectedDir = null;
+	// the picked media files backing the gallery grid; null until a pick resolves
+	// (an empty list means the user canceled — don't re-pop the picker)
+	private List<File> selectedFiles = null;
+	private String bucketName = "Gallery";
+	// only one query drives the pick; the rest wait for its result
+	private boolean picking = false;
 
-	// called from native
-	void setSelectedFile(String selectedFile) {
-		this.selectedDir = selectedFile == null ? null : new File(selectedFile);
-		this.waitingForFileChooser = false;
+	private void openFileChooser() {
+		boolean drive = false;
 		synchronized (this) {
-			notifyAll();
+			if (selectedFiles != null)
+				return;
+			if (!picking) {
+				picking = true;
+				drive = true;
+			}
+		}
+		if (drive) {
+			List<File> result;
+			String name;
+			// content-hub first; UnsatisfiedLinkError (desktop) or null (no broker)
+			// falls through to the folder picker.
+			ATLContentHub.Peer[] peers = null;
+			boolean contentHub = true;
+			try {
+				peers = ATLContentHub.listSources("pictures");
+			} catch (Throwable t) {
+				contentHub = false;
+			}
+			if (contentHub && peers != null) {
+				result = importViaContentHub(peers);
+				name = "Gallery";
+			} else {
+				File folder = pickFolderBlocking();
+				result = listFolder(folder);
+				name = folder != null ? folder.getName() : "Gallery";
+			}
+			synchronized (this) {
+				bucketName = name;
+				selectedFiles = result;
+				picking = false;
+				notifyAll();
+			}
+		} else {
+			synchronized (this) {
+				while (selectedFiles == null) {
+					try {
+						wait();
+					} catch (InterruptedException e) {
+						return;
+					}
+				}
+			}
 		}
 	}
 
-	private void openFileChooser() {
-		if (!waitingForFileChooser) {
-			waitingForFileChooser = true;
-			new Handler(Looper.getMainLooper()).post(new Runnable() {
-				@Override
-				public void run() {
-					new ATLFilePicker(android.content.Context.this_application, ATLFilePicker.ACTION_SELECT_FOLDER,
-					                  "Open Media Folder", null, new ATLFilePicker.ResultListener() {
-						@Override
-						public void onResult(File file) {
-							setSelectedFile(file != null ? file.getAbsolutePath() : null);
-						}
-					}).show();
-				}
-			});
+	// pick a source app, import from it; empty list on cancel/no source
+	private List<File> importViaContentHub(ATLContentHub.Peer[] peers) {
+		if (peers.length == 0)
+			return new ArrayList<File>();
+		String peerId = pickPeerBlocking(peers);
+		if (peerId == null)
+			return new ArrayList<File>();
+		String[] paths;
+		try {
+			paths = ATLContentHub.nativeImport(peerId, "pictures", ATLContentHub.SELECT_MULTIPLE);
+		} catch (Throwable t) {
+			return new ArrayList<File>();
 		}
-		synchronized (this) {
-			try {
-				while (waitingForFileChooser) {
-					wait();
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+		List<File> out = new ArrayList<File>();
+		if (paths != null) {
+			for (String p : paths)
+				out.add(new File(p));
+		}
+		return out;
+	}
+
+	// show ATLContentHubPicker on the UI thread, block until a peer is chosen
+	private String pickPeerBlocking(final ATLContentHub.Peer[] peers) {
+		final CountDownLatch latch = new CountDownLatch(1);
+		final String[] out = new String[1];
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				new ATLContentHubPicker(android.content.Context.this_application, "Import From",
+				                        peers, new ATLContentHubPicker.ResultListener() {
+					@Override
+					public void onResult(String peerId) {
+						out[0] = peerId;
+						latch.countDown();
+					}
+				}).show();
 			}
+		});
+		try {
+			latch.await();
+		} catch (InterruptedException e) {
+			// treated as cancel
 		}
+		return out[0];
+	}
+
+	// show ATLFilePicker on the UI thread, block until a folder is chosen
+	private File pickFolderBlocking() {
+		final CountDownLatch latch = new CountDownLatch(1);
+		final File[] out = new File[1];
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				new ATLFilePicker(android.content.Context.this_application, ATLFilePicker.ACTION_SELECT_FOLDER,
+				                  "Open Media Folder", null, new ATLFilePicker.ResultListener() {
+					@Override
+					public void onResult(File file) {
+						out[0] = file;
+						latch.countDown();
+					}
+				}).show();
+			}
+		});
+		try {
+			latch.await();
+		} catch (InterruptedException e) {
+			// treated as cancel
+		}
+		return out[0];
+	}
+
+	// all media files in a folder (both kinds), so listMedia can split by type
+	private static List<File> listFolder(File dir) {
+		List<File> out = new ArrayList<File>();
+		if (dir == null || !dir.isDirectory())
+			return out;
+		File[] files = dir.listFiles();
+		if (files == null)
+			return out;
+		for (File f : files) {
+			if (f.isFile() && (hasExt(f, IMAGE_EXT) || hasExt(f, VIDEO_EXT)))
+				out.add(f);
+		}
+		return out;
 	}
 
 	private static boolean hasExt(File f, Set<String> exts) {
@@ -84,16 +192,14 @@ public class ATLMediaContentProvider extends ContentProvider {
 		return exts.contains(name.substring(dot + 1).toLowerCase(Locale.ROOT));
 	}
 
-	// media files of the requested kind in the chosen folder, newest first
+	// picked media files of the requested kind, newest first
 	private List<File> listMedia(boolean video) {
 		List<File> out = new ArrayList<File>();
-		if (selectedDir == null || !selectedDir.isDirectory())
+		if (selectedFiles == null)
 			return out;
-		File[] files = selectedDir.listFiles();
-		if (files == null)
-			return out;
-		for (File f : files) {
-			if (f.isFile() && hasExt(f, video ? VIDEO_EXT : IMAGE_EXT))
+		Set<String> exts = video ? VIDEO_EXT : IMAGE_EXT;
+		for (File f : selectedFiles) {
+			if (f.isFile() && hasExt(f, exts))
 				out.add(f);
 		}
 		Collections.sort(out, new java.util.Comparator<File>() {
@@ -121,10 +227,10 @@ public class ATLMediaContentProvider extends ContentProvider {
 					row[i] = file.getAbsolutePath();
 					break;
 				case "bucket_id":
-					row[i] = selectedDir.getAbsolutePath().hashCode();
+					row[i] = bucketName.hashCode();
 					break;
 				case "bucket_display_name":
-					row[i] = selectedDir.getName();
+					row[i] = bucketName;
 					break;
 				case "mime_type":
 					row[i] = mimeOf(file);
@@ -191,9 +297,9 @@ public class ATLMediaContentProvider extends ContentProvider {
 		boolean idLookup = "0".equals(uri.getLastPathSegment())
 		    || (selectionArgs != null && selectionArgs.length > 0);
 
-		// Pop the folder picker once, when Telegram starts enumerating the gallery
-		// (its images query). The video query that follows reuses the same folder.
-		if (!count && !distinct && !idLookup && !video && selectedDir == null) {
+		// Pop the picker once, when Telegram starts enumerating the gallery
+		// (its images query). The video query that follows reuses the result.
+		if (!count && !distinct && !idLookup && !video && selectedFiles == null) {
 			openFileChooser();
 		}
 
@@ -205,15 +311,15 @@ public class ATLMediaContentProvider extends ContentProvider {
 
 		if (distinct) {
 			MatrixCursor cursor = new MatrixCursor(projection);
-			if (selectedDir != null) {
+			if (selectedFiles != null && !selectedFiles.isEmpty()) {
 				Object[] row = new Object[projection.length];
 				for (int i = 0; i < projection.length; i++) {
 					switch (projection[i]) {
 						case "bucket_display_name":
-							row[i] = selectedDir.getName();
+							row[i] = bucketName;
 							break;
 						case "bucket_id":
-							row[i] = selectedDir.getAbsolutePath().hashCode();
+							row[i] = bucketName.hashCode();
 							break;
 					}
 				}
@@ -249,7 +355,7 @@ public class ATLMediaContentProvider extends ContentProvider {
 		List<File> images = listMedia(false);
 		if (!images.isEmpty())
 			return images.get(0);
-		return selectedDir;
+		return null;
 	}
 
 	@Override
