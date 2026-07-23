@@ -151,6 +151,7 @@ public class TextView extends View {
 		return StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
 		    .setAlignment(getLayoutAlignment())
 		    .setLineSpacing(spacing_add, spacing_mult)
+		    .setUseLineSpacingFromFallbacks(fallbackLineSpacing)
 		    .setIncludePad(include_padding)
 		    .setBreakStrategy(break_strategy)
 		    .setHyphenationFrequency(hyphenation_frequency)
@@ -374,6 +375,21 @@ public class TextView extends View {
 		}
 	}
 	public final void setLinksClickable(boolean whether) {}
+
+	// Whether fallback fonts (used for glyphs missing from the primary typeface,
+	// e.g. emoji/CJK) may expand a line's ascent/descent so consecutive lines
+	// don't overlap. AOSP defaults this true for targetSdk >= P; StaticLayout
+	// honours it (see setUseLineSpacingFromFallbacks below).
+	private boolean fallbackLineSpacing = true;
+	public void setFallbackLineSpacing(boolean enabled) {
+		if (fallbackLineSpacing != enabled) {
+			fallbackLineSpacing = enabled;
+			text_layout = null;
+			requestLayout();
+			invalidate();
+		}
+	}
+	public boolean isFallbackLineSpacing() { return fallbackLineSpacing; }
 
 	private int inputType = 0x00000001; // InputType.TYPE_CLASS_TEXT
 
