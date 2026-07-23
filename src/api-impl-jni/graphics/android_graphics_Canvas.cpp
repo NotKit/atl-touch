@@ -34,6 +34,9 @@ extern "C" {
  */
 
 #define CANVAS(ptr) (((ATLCanvas *)_PTR(ptr))->canvas)
+/* for ops that mutate the canvas: also bumps a backing bitmap's generation ID
+ * so the GPU path re-uploads its cached texture */
+#define DRAW_CANVAS(ptr) (((ATLCanvas *)_PTR(ptr))->mark_dirty(), CANVAS(ptr))
 
 static const SkSamplingOptions atl_sampling(SkFilterMode::kLinear);
 
@@ -145,14 +148,16 @@ JNIEXPORT jint JNICALL Java_android_graphics_Canvas_nSaveUnclippedLayer(JNIEnv *
 	return CANVAS(canvas_ptr)->saveLayer(rec);
 }
 
+/* restores count as draws: popping a saveLayer writes it into the target */
+
 JNIEXPORT void JNICALL Java_android_graphics_Canvas_nRestoreUnclippedLayer(JNIEnv *env, jclass, jlong canvas_ptr, jint save_count, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->restoreToCount(save_count);
+	DRAW_CANVAS(canvas_ptr)->restoreToCount(save_count);
 }
 
 JNIEXPORT jboolean JNICALL Java_android_graphics_Canvas_nRestore(JNIEnv *env, jclass, jlong canvas_ptr)
 {
-	SkCanvas *canvas = CANVAS(canvas_ptr);
+	SkCanvas *canvas = DRAW_CANVAS(canvas_ptr);
 	if (canvas->getSaveCount() <= 1)
 		return false;
 	canvas->restore();
@@ -161,7 +166,7 @@ JNIEXPORT jboolean JNICALL Java_android_graphics_Canvas_nRestore(JNIEnv *env, jc
 
 JNIEXPORT void JNICALL Java_android_graphics_Canvas_nRestoreToCount(JNIEnv *env, jclass, jlong canvas_ptr, jint save_count)
 {
-	CANVAS(canvas_ptr)->restoreToCount(save_count);
+	DRAW_CANVAS(canvas_ptr)->restoreToCount(save_count);
 }
 
 JNIEXPORT jint JNICALL Java_android_graphics_Canvas_nGetSaveCount(JNIEnv *env, jclass, jlong canvas_ptr)
@@ -244,7 +249,7 @@ JNIEXPORT jboolean JNICALL Java_android_graphics_Canvas_nQuickReject__JJ(JNIEnv 
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawColor__JII(JNIEnv *env, jclass, jlong canvas_ptr, jint color, jint mode)
 {
-	CANVAS(canvas_ptr)->drawColor((SkColor)color, porterduff_to_skia(mode));
+	DRAW_CANVAS(canvas_ptr)->drawColor((SkColor)color, porterduff_to_skia(mode));
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawColor__JJJI(JNIEnv *env, jclass, jlong canvas_ptr, jlong colorspace_ptr, jlong color_long, jint mode)
@@ -254,18 +259,18 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawColor__JJJI(JNIEnv 
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawPaint(JNIEnv *env, jclass, jlong canvas_ptr, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawPaint(((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawPaint(((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawPoint(JNIEnv *env, jclass, jlong canvas_ptr, jfloat x, jfloat y, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawPoint(x, y, ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawPoint(x, y, ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawPoints(JNIEnv *env, jclass, jlong canvas_ptr, jfloatArray pts_arr, jint offset, jint count, jlong paint_ptr)
 {
 	jfloat *pts = env->GetFloatArrayElements(pts_arr, NULL);
-	CANVAS(canvas_ptr)->drawPoints(SkCanvas::kPoints_PointMode, count / 2,
+	DRAW_CANVAS(canvas_ptr)->drawPoints(SkCanvas::kPoints_PointMode, count / 2,
 	                               (const SkPoint *)(pts + offset),
 	                               ((AndroidPaint *)_PTR(paint_ptr))->paint);
 	env->ReleaseFloatArrayElements(pts_arr, pts, JNI_ABORT);
@@ -275,13 +280,13 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawLine(JNIEnv *env, j
 {
 	if (isnan(x0) || isnan(y0) || isnan(x1) || isnan(y1))
 		return;
-	CANVAS(canvas_ptr)->drawLine(x0, y0, x1, y1, ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawLine(x0, y0, x1, y1, ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawLines(JNIEnv *env, jclass, jlong canvas_ptr, jfloatArray pts_arr, jint offset, jint count, jlong paint_ptr)
 {
 	jfloat *pts = env->GetFloatArrayElements(pts_arr, NULL);
-	CANVAS(canvas_ptr)->drawPoints(SkCanvas::kLines_PointMode, count / 2,
+	DRAW_CANVAS(canvas_ptr)->drawPoints(SkCanvas::kLines_PointMode, count / 2,
 	                               (const SkPoint *)(pts + offset),
 	                               ((AndroidPaint *)_PTR(paint_ptr))->paint);
 	env->ReleaseFloatArrayElements(pts_arr, pts, JNI_ABORT);
@@ -289,28 +294,28 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawLines(JNIEnv *env, 
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawRect(JNIEnv *env, jclass, jlong canvas_ptr, jfloat l, jfloat t, jfloat r, jfloat b, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawRect(SkRect::MakeLTRB(l, t, r, b), ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawRect(SkRect::MakeLTRB(l, t, r, b), ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawOval(JNIEnv *env, jclass, jlong canvas_ptr, jfloat l, jfloat t, jfloat r, jfloat b, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawOval(SkRect::MakeLTRB(l, t, r, b), ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawOval(SkRect::MakeLTRB(l, t, r, b), ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawCircle(JNIEnv *env, jclass, jlong canvas_ptr, jfloat cx, jfloat cy, jfloat radius, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawCircle(cx, cy, radius, ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawCircle(cx, cy, radius, ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawArc(JNIEnv *env, jclass, jlong canvas_ptr, jfloat l, jfloat t, jfloat r, jfloat b, jfloat start_angle, jfloat sweep_angle, jboolean use_center, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawArc(SkRect::MakeLTRB(l, t, r, b), start_angle, sweep_angle,
+	DRAW_CANVAS(canvas_ptr)->drawArc(SkRect::MakeLTRB(l, t, r, b), start_angle, sweep_angle,
 	                            use_center, ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawRoundRect(JNIEnv *env, jclass, jlong canvas_ptr, jfloat l, jfloat t, jfloat r, jfloat b, jfloat rx, jfloat ry, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawRRect(SkRRect::MakeRectXY(SkRect::MakeLTRB(l, t, r, b), rx, ry),
+	DRAW_CANVAS(canvas_ptr)->drawRRect(SkRRect::MakeRectXY(SkRect::MakeLTRB(l, t, r, b), rx, ry),
 	                              ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
@@ -318,7 +323,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawShadow(JNIEnv *env,
 {
 	SkPath path;
 	path.addRRect(SkRRect::MakeRectXY(SkRect::MakeLTRB(l, t, r, b), radius, radius));
-	SkShadowUtils::DrawShadow(CANVAS(canvas_ptr), path, SkPoint3::Make(0, 0, elevation),
+	SkShadowUtils::DrawShadow(DRAW_CANVAS(canvas_ptr), path, SkPoint3::Make(0, 0, elevation),
 	                          SkPoint3::Make(light_x, light_y, light_z), light_radius,
 	                          (SkColor)ambient_color, (SkColor)spot_color,
 	                          SkShadowFlags::kNone_ShadowFlag);
@@ -328,7 +333,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawDoubleRoundRect__JF
 {
 	SkRRect outer = SkRRect::MakeRectXY(SkRect::MakeLTRB(ol, ot, or_, ob), orx, ory);
 	SkRRect inner = SkRRect::MakeRectXY(SkRect::MakeLTRB(il, it, ir, ib), irx, iry);
-	CANVAS(canvas_ptr)->drawDRRect(outer, inner, ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawDRRect(outer, inner, ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawDoubleRoundRect__JFFFF_3FFFFF_3FJ(JNIEnv *env, jclass, jlong canvas_ptr, jfloat ol, jfloat ot, jfloat or_, jfloat ob, jfloatArray outer_radii_arr, jfloat il, jfloat it, jfloat ir, jfloat ib, jfloatArray inner_radii_arr, jlong paint_ptr)
@@ -338,14 +343,14 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawDoubleRoundRect__JF
 	SkRRect outer, inner;
 	outer.setRectRadii(SkRect::MakeLTRB(ol, ot, or_, ob), (const SkVector *)outer_radii);
 	inner.setRectRadii(SkRect::MakeLTRB(il, it, ir, ib), (const SkVector *)inner_radii);
-	CANVAS(canvas_ptr)->drawDRRect(outer, inner, ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawDRRect(outer, inner, ((AndroidPaint *)_PTR(paint_ptr))->paint);
 	env->ReleaseFloatArrayElements(outer_radii_arr, outer_radii, JNI_ABORT);
 	env->ReleaseFloatArrayElements(inner_radii_arr, inner_radii, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawPath(JNIEnv *env, jclass, jlong canvas_ptr, jlong path_ptr, jlong paint_ptr)
 {
-	CANVAS(canvas_ptr)->drawPath(*(SkPath *)_PTR(path_ptr), ((AndroidPaint *)_PTR(paint_ptr))->paint);
+	DRAW_CANVAS(canvas_ptr)->drawPath(*(SkPath *)_PTR(path_ptr), ((AndroidPaint *)_PTR(paint_ptr))->paint);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawRegion(JNIEnv *env, jclass, jlong canvas_ptr, jlong region_ptr, jlong paint_ptr)
@@ -363,6 +368,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmap__JJFFJIII(JN
 	if (!image)
 		return;
 	/* density scaling deliberately not applied: everything runs at DENSITY_NONE */
+	atl_canvas->mark_dirty();
 	atl_canvas->canvas->drawImage(image, left, top, atl_sampling, paint ? &paint->paint : nullptr);
 }
 
@@ -373,6 +379,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmap__JJFFFFFFFFJ
 	sk_sp<SkImage> image = atl_image_for_draw(atl_canvas, (SkBitmap *)_PTR(bitmap_ptr));
 	if (!image)
 		return;
+	atl_canvas->mark_dirty();
 	atl_canvas->canvas->drawImageRect(image, SkRect::MakeLTRB(src_l, src_t, src_r, src_b),
 	                                  SkRect::MakeLTRB(dst_l, dst_t, dst_r, dst_b),
 	                                  atl_sampling, paint ? &paint->paint : nullptr,
@@ -394,7 +401,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmap__J_3IIIFFIIZ
 	}
 	env->ReleaseIntArrayElements(colors_arr, colors, JNI_ABORT);
 	bitmap.setImmutable();
-	CANVAS(canvas_ptr)->drawImage(bitmap.asImage(), x, y, atl_sampling, paint ? &paint->paint : nullptr);
+	DRAW_CANVAS(canvas_ptr)->drawImage(bitmap.asImage(), x, y, atl_sampling, paint ? &paint->paint : nullptr);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmapMatrix(JNIEnv *env, jclass, jlong canvas_ptr, jlong bitmap_ptr, jlong matrix_ptr, jlong paint_ptr)
@@ -404,6 +411,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmapMatrix(JNIEnv
 	sk_sp<SkImage> image = atl_image_for_draw(atl_canvas, (SkBitmap *)_PTR(bitmap_ptr));
 	if (!image)
 		return;
+	atl_canvas->mark_dirty();
 	SkCanvas *canvas = atl_canvas->canvas;
 	canvas->save();
 	if (matrix_ptr)
@@ -435,7 +443,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawVertices(JNIEnv *en
 	    indices ? (const uint16_t *)(indices + index_offset) : nullptr);
 
 	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
-	CANVAS(canvas_ptr)->drawVertices(vertices, SkBlendMode::kModulate, paint->paint);
+	DRAW_CANVAS(canvas_ptr)->drawVertices(vertices, SkBlendMode::kModulate, paint->paint);
 
 	env->ReleaseFloatArrayElements(verts_arr, verts, JNI_ABORT);
 	if (texs)
@@ -483,7 +491,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawBitmapMesh(JNIEnv *
 	AndroidPaint *paint = (AndroidPaint *)_PTR(paint_ptr);
 	SkPaint sk_paint = paint ? paint->paint : SkPaint();
 	sk_paint.setShader(image->makeShader(SkTileMode::kClamp, SkTileMode::kClamp, atl_sampling));
-	CANVAS(canvas_ptr)->drawVertices(vertices, SkBlendMode::kModulate, sk_paint);
+	DRAW_CANVAS(canvas_ptr)->drawVertices(vertices, SkBlendMode::kModulate, sk_paint);
 
 	env->ReleaseFloatArrayElements(verts_arr, verts, JNI_ABORT);
 	if (colors)
@@ -501,14 +509,14 @@ static void draw_text_utf16(SkCanvas *canvas, const jchar *chars, int count, flo
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawText__J_3CIIFFIJ(JNIEnv *env, jclass, jlong canvas_ptr, jcharArray text_arr, jint index, jint count, jfloat x, jfloat y, jint bidi_flags, jlong paint_ptr)
 {
 	jchar *chars = env->GetCharArrayElements(text_arr, NULL);
-	draw_text_utf16(CANVAS(canvas_ptr), chars + index, count, x, y, (AndroidPaint *)_PTR(paint_ptr));
+	draw_text_utf16(DRAW_CANVAS(canvas_ptr), chars + index, count, x, y, (AndroidPaint *)_PTR(paint_ptr));
 	env->ReleaseCharArrayElements(text_arr, chars, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawText__JLjava_lang_String_2IIFFIJ(JNIEnv *env, jclass, jlong canvas_ptr, jstring text, jint start, jint end, jfloat x, jfloat y, jint bidi_flags, jlong paint_ptr)
 {
 	const jchar *chars = env->GetStringChars(text, NULL);
-	draw_text_utf16(CANVAS(canvas_ptr), chars + start, end - start, x, y, (AndroidPaint *)_PTR(paint_ptr));
+	draw_text_utf16(DRAW_CANVAS(canvas_ptr), chars + start, end - start, x, y, (AndroidPaint *)_PTR(paint_ptr));
 	env->ReleaseStringChars(text, chars);
 }
 
@@ -516,14 +524,14 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawText__JLjava_lang_S
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawTextRun__JLjava_lang_String_2IIIIFFZJ(JNIEnv *env, jclass, jlong canvas_ptr, jstring text, jint start, jint end, jint context_start, jint context_end, jfloat x, jfloat y, jboolean is_rtl, jlong paint_ptr)
 {
 	const jchar *chars = env->GetStringChars(text, NULL);
-	draw_text_utf16(CANVAS(canvas_ptr), chars + start, end - start, x, y, (AndroidPaint *)_PTR(paint_ptr));
+	draw_text_utf16(DRAW_CANVAS(canvas_ptr), chars + start, end - start, x, y, (AndroidPaint *)_PTR(paint_ptr));
 	env->ReleaseStringChars(text, chars);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawTextRun__J_3CIIIIFFZJJ(JNIEnv *env, jclass, jlong canvas_ptr, jcharArray text_arr, jint start, jint count, jint context_start, jint context_count, jfloat x, jfloat y, jboolean is_rtl, jlong paint_ptr, jlong precomputed_ptr)
 {
 	jchar *chars = env->GetCharArrayElements(text_arr, NULL);
-	draw_text_utf16(CANVAS(canvas_ptr), chars + start, count, x, y, (AndroidPaint *)_PTR(paint_ptr));
+	draw_text_utf16(DRAW_CANVAS(canvas_ptr), chars + start, count, x, y, (AndroidPaint *)_PTR(paint_ptr));
 	env->ReleaseCharArrayElements(text_arr, chars, JNI_ABORT);
 }
 
@@ -555,7 +563,7 @@ static void draw_text_on_path_utf16(SkCanvas *canvas, const jchar *chars, int co
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawTextOnPath__J_3CIIJFFIJ(JNIEnv *env, jclass, jlong canvas_ptr, jcharArray text_arr, jint index, jint count, jlong path_ptr, jfloat h_offset, jfloat v_offset, jint bidi_flags, jlong paint_ptr)
 {
 	jchar *chars = env->GetCharArrayElements(text_arr, NULL);
-	draw_text_on_path_utf16(CANVAS(canvas_ptr), chars + index, count, (SkPath *)_PTR(path_ptr),
+	draw_text_on_path_utf16(DRAW_CANVAS(canvas_ptr), chars + index, count, (SkPath *)_PTR(path_ptr),
 	                        h_offset, v_offset, (AndroidPaint *)_PTR(paint_ptr));
 	env->ReleaseCharArrayElements(text_arr, chars, JNI_ABORT);
 }
@@ -563,7 +571,7 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawTextOnPath__J_3CIIJ
 JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawTextOnPath__JLjava_lang_String_2JFFIJ(JNIEnv *env, jclass, jlong canvas_ptr, jstring text, jlong path_ptr, jfloat h_offset, jfloat v_offset, jint bidi_flags, jlong paint_ptr)
 {
 	const jchar *chars = env->GetStringChars(text, NULL);
-	draw_text_on_path_utf16(CANVAS(canvas_ptr), chars, env->GetStringLength(text), (SkPath *)_PTR(path_ptr),
+	draw_text_on_path_utf16(DRAW_CANVAS(canvas_ptr), chars, env->GetStringLength(text), (SkPath *)_PTR(path_ptr),
 	                        h_offset, v_offset, (AndroidPaint *)_PTR(paint_ptr));
 	env->ReleaseStringChars(text, chars);
 }
@@ -572,5 +580,5 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nDrawTextOnPath__JLjava_
 
 JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawRenderNode(JNIEnv *env, jclass, jlong canvas_ptr, jlong node_ptr)
 {
-	CANVAS(canvas_ptr)->drawDrawable((ATLNode *)_PTR(node_ptr));
+	DRAW_CANVAS(canvas_ptr)->drawDrawable((ATLNode *)_PTR(node_ptr));
 }

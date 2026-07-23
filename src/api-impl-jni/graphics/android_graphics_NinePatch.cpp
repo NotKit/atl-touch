@@ -191,6 +191,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawNinePatch(JNIEnv *env, 
 	if (!atl_canvas || !bitmap || !chunk)
 		return;
 
+	atl_canvas->mark_dirty();
 	SkCanvas *canvas = atl_canvas->canvas;
 	sk_sp<SkImage> image = atl_image_for_draw(atl_canvas, bitmap);
 	if (!image)

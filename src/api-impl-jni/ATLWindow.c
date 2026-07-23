@@ -42,11 +42,14 @@ struct ATLWindow {
 	bool pointer_down;
 	double pointer_x, pointer_y;
 	int layout_width, layout_height;
-	/* persistent raster surface: pixels outside a frame's damage rect keep
-	 * their previous contents, which partial GL uploads rely on */
+	/* persistent surface (raster or GPU): pixels outside a frame's damage rect
+	 * keep their previous contents, which partial redraws rely on */
 	void *canvas;
 	int canvas_width, canvas_height;
 	int tex_width, tex_height;
+	void *gpu_context;   // GrDirectContext for this window's GL context
+	bool canvas_is_gpu;
+	bool gpu_failed;     // context/surface creation failed: stay on raster
 	jfieldID dirty_field; // ViewRootImpl.mDirty (android.graphics.Rect)
 	jfieldID rect_left, rect_top, rect_right, rect_bottom;
 	unsigned int gl_texture;
@@ -560,6 +563,16 @@ static bool damage_enabled(void)
 	return cached;
 }
 
+/* ATL_NO_GPU=1 disables Ganesh rendering (CPU raster + texture upload instead);
+ * also the automatic fallback when a GPU context can't be created */
+static bool gpu_enabled(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = getenv("ATL_NO_GPU") == NULL;
+	return cached;
+}
+
 static bool debug_damage(void)
 {
 	static int cached = -1;
@@ -597,14 +610,47 @@ static void atl_window_render(ATLWindow *window)
 			layout_ms = atl_uptime_millis() - t;
 	}
 
+	/* Skia GPU work (surface creation, draws, flush) needs the window's GL
+	 * context current on this thread; harmless for the raster path, which
+	 * previously only made it current for the upload */
+	glfwMakeContextCurrent(window->glfw_window);
+
+	if (gpu_enabled() && !window->gpu_failed && !window->gpu_context) {
+		window->gpu_context = atl_gpu_context_create((void *(*)(const char *))glfwGetProcAddress);
+		if (!window->gpu_context) {
+			window->gpu_failed = true;
+			fprintf(stderr, "ATLWindow: GPU context creation failed, using CPU raster\n");
+		} else {
+			fprintf(stderr, "ATLWindow: GPU rendering (Ganesh) on %s, %s\n",
+			        glGetString(GL_RENDERER), glGetString(GL_VERSION));
+		}
+	}
+
 	if (!window->canvas || window->canvas_width != width || window->canvas_height != height) {
 		if (window->canvas)
 			atl_canvas_free(window->canvas);
-		window->canvas = atl_canvas_new_raster(width, height);
+		window->canvas = NULL;
+		window->canvas_is_gpu = false;
+		if (window->gpu_context && !window->gpu_failed) {
+			window->canvas = atl_canvas_new_gpu(window->gpu_context, width, height);
+			if (window->canvas)
+				window->canvas_is_gpu = true;
+			else {
+				window->gpu_failed = true;
+				fprintf(stderr, "ATLWindow: GPU surface creation failed, using CPU raster\n");
+			}
+		}
+		if (!window->canvas)
+			window->canvas = atl_canvas_new_raster(width, height);
 		window->canvas_width = width;
 		window->canvas_height = height;
 		full = true;
 	}
+
+	/* foreign GL use on this context (WebView texture binds) invalidates the
+	 * state Ganesh caches between frames */
+	if (window->canvas_is_gpu)
+		atl_gpu_context_reset(window->gpu_context);
 
 	/* this frame's damage: everything, or what the view hierarchy accumulated
 	 * in ViewRootImpl.mDirty since the last frame */
@@ -640,6 +686,17 @@ static void atl_window_render(ATLWindow *window)
 	}
 	atl_canvas_end_frame(canvas);
 	jlong draw_ms = debug_render() ? atl_uptime_millis() - t_draw : 0;
+
+	if (window->canvas_is_gpu) {
+		atl_canvas_gpu_present(window->gpu_context, canvas, width, height);
+		glfwSwapBuffers(window->glfw_window);
+		window->needs_redraw = false;
+		window->full_redraw = false;
+		if (debug_render() && (layout_ms > 50 || draw_ms > 50))
+			fprintf(stderr, "ATLWindow: slow frame: layout %lldms, draw %lldms (%dx%d, damage %d,%d-%d,%d)\n",
+			        (long long)layout_ms, (long long)draw_ms, width, height, dl, dt, dr, db);
+		return;
+	}
 
 	int pixel_width, pixel_height, stride;
 	const void *pixels = atl_canvas_get_pixels(canvas, &pixel_width, &pixel_height, &stride);

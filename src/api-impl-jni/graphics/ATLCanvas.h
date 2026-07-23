@@ -24,23 +24,31 @@
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPictureRecorder.h"
+#include "include/core/SkSurface.h"
 #include "include/core/SkTypeface.h"
 
 #include <vector>
 
+class GrDirectContext;
 struct ATLNode;
 
 struct ATLCanvas {
-	SkCanvas *canvas = nullptr; // valid in all modes; not owned in recording mode
+	SkCanvas *canvas = nullptr; // valid in all modes; not owned in recording/GPU mode
 	SkBitmap *bitmap = nullptr;
 	bool owns_bitmap = false;
 	SkPictureRecorder *recorder = nullptr;
+	sk_sp<SkSurface> surface; // GPU mode: persistent Ganesh render target
 	std::vector<sk_sp<ATLNode>> stubs; // stub nodes recorded into a display list
 
 	static ATLCanvas *new_raster(int width, int height);
 	static ATLCanvas *for_bitmap(SkBitmap *bitmap);
 	static ATLCanvas *new_recording(void);
+	static ATLCanvas *new_gpu(GrDirectContext *context, int width, int height);
 	bool is_recording() const { return recorder != nullptr; }
+	bool is_gpu() const { return surface != nullptr; }
+	/* the GPU path caches an SkImage per bitmap keyed by generation ID; draws
+	 * INTO a bitmap-backed canvas must bump it or those caches go stale */
+	void mark_dirty() { if (bitmap) bitmap->notifyPixelsChanged(); }
 	~ATLCanvas();
 };
 
@@ -89,6 +97,18 @@ const void *atl_canvas_get_pixels(void *atl_canvas, int *width, int *height, int
 void atl_canvas_begin_frame(void *atl_canvas, int left, int top, int right, int bottom);
 /* pop the damage clip (and any unbalanced app saves) after the frame */
 void atl_canvas_end_frame(void *atl_canvas);
+
+/* --- GPU (Ganesh) rendering; the GL context must be current on this thread ---
+ * get_proc resolves GL symbols (glfwGetProcAddress); returns NULL on failure */
+void *atl_gpu_context_create(void *(*get_proc)(const char *name));
+/* mark all cached GL state stale (call after foreign GL use, e.g. WebView) */
+void atl_gpu_context_reset(void *context);
+/* persistent GPU canvas; returns NULL if the surface can't be created */
+void *atl_canvas_new_gpu(void *context, int width, int height);
+/* flush the frame and blit the GPU canvas onto the default framebuffer */
+void atl_canvas_gpu_present(void *context, void *atl_canvas, int width, int height);
+/* forget the cached GPU image for a bitmap about to be freed */
+void atl_bitmap_cache_drop(void *sk_bitmap);
 
 #ifdef __cplusplus
 }

@@ -79,8 +79,10 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1recycle(JNIEnv *env,
 {
 	if (canvas_ptr)
 		delete (ATLCanvas *)_PTR(canvas_ptr);
-	if (bitmap_ptr)
+	if (bitmap_ptr) {
+		atl_bitmap_cache_drop(_PTR(bitmap_ptr));
 		delete (SkBitmap *)_PTR(bitmap_ptr);
+	}
 }
 
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1copy_1bitmap(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
@@ -128,7 +130,11 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1to_1buffer(JNI
 
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1get_1pixels_1ptr(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
 {
-	return _INTPTR(((SkBitmap *)_PTR(bitmap_ptr))->getPixels());
+	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
+	/* callers (AndroidBitmap_lockPixels: RLottie, video decoders) usually write
+	 * through this pointer; bump the generation so GPU texture caches refresh */
+	bitmap->notifyPixelsChanged();
+	return _INTPTR(bitmap->getPixels());
 }
 
 /* detach the backing SkBitmap from a raster ATLCanvas (frees the canvas);
