@@ -9,6 +9,8 @@
 #include "include/core/SkPixmap.h"
 #include "include/core/SkStream.h"
 #include "include/encode/SkPngEncoder.h"
+#include "include/encode/SkJpegEncoder.h"
+#include "include/encode/SkWebpEncoder.h"
 
 extern "C" {
 #include "../generated_headers/android_graphics_Bitmap.h"
@@ -161,4 +163,41 @@ JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1png(
 	jbyteArray result = env->NewByteArray(data->size());
 	env->SetByteArrayRegion(result, 0, data->size(), (const jbyte *)data->data());
 	return result;
+}
+
+static jbyteArray encoded_to_array(JNIEnv *env, SkDynamicMemoryWStream &stream)
+{
+	sk_sp<SkData> data = stream.detachAsData();
+	jbyteArray result = env->NewByteArray(data->size());
+	env->SetByteArrayRegion(result, 0, data->size(), (const jbyte *)data->data());
+	return result;
+}
+
+JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1jpeg(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jint quality)
+{
+	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
+	SkPixmap pixmap;
+	if (!bitmap->peekPixels(&pixmap))
+		return NULL;
+	SkJpegEncoder::Options options;
+	options.fQuality = quality;
+	SkDynamicMemoryWStream stream;
+	if (!SkJpegEncoder::Encode(&stream, pixmap, options))
+		return NULL;
+	return encoded_to_array(env, stream);
+}
+
+JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1webp(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jint quality, jboolean lossless)
+{
+	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
+	SkPixmap pixmap;
+	if (!bitmap->peekPixels(&pixmap))
+		return NULL;
+	SkWebpEncoder::Options options;
+	options.fCompression = lossless ? SkWebpEncoder::Compression::kLossless : SkWebpEncoder::Compression::kLossy;
+	options.fQuality = quality;
+	SkDynamicMemoryWStream stream;
+	if (!SkWebpEncoder::Encode(&stream, pixmap, options))
+		return NULL;
+	return encoded_to_array(env, stream);
 }

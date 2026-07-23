@@ -282,13 +282,19 @@ public final class Bitmap {
 	}
 
 	public boolean compress(Bitmap.CompressFormat format, int quality, OutputStream stream) throws IOException {
+		byte[] encoded;
 		if (format == CompressFormat.PNG) {
-			stream.write(native_save_to_png(getTexture()));
-			return true;
+			encoded = native_save_to_png(getTexture());
+		} else if (format == CompressFormat.WEBP || format == CompressFormat.WEBP_LOSSLESS || format == CompressFormat.WEBP_LOSSY) {
+			encoded = native_save_to_webp(getTexture(), quality, format == CompressFormat.WEBP_LOSSLESS);
 		} else {
-			stream.write(("fixme Bitmap.compress " + format.name()).getBytes());
-			return false;
+			// JPEG (and anything else) -> JPEG
+			encoded = native_save_to_jpeg(getTexture(), quality);
 		}
+		if (encoded == null)
+			return false;
+		stream.write(encoded);
+		return true;
 	}
 
 	public void setPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
@@ -330,6 +336,8 @@ public final class Bitmap {
 	private static native void native_get_pixels(long bitmap, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native void native_copy_to_buffer(long bitmap, Buffer buffer, int format, int stride);
 	private static native byte[] native_save_to_png(long bitmap);
+	private static native byte[] native_save_to_jpeg(long bitmap, int quality);
+	private static native byte[] native_save_to_webp(long bitmap, int quality, boolean lossless);
 	private static native void native_set_pixels(long bitmap, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native long native_get_pixels_ptr(long bitmap);
 }
