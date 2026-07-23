@@ -3235,6 +3235,9 @@ public class View implements Drawable.Callback {
 
 	public int getAccessibilityLiveRegion() { return 0; }
 
+	public void setAccessibilityTraversalBefore(int beforeId) {}
+	public void setAccessibilityTraversalAfter(int afterId) {}
+
 	public void setLabelFor(int id) {}
 
 	/* --- AOSP-13 API surface: methods apps call or override-and-chain to super.

@@ -78,6 +78,12 @@ public class Dialog implements Window.Callback, DialogInterface {
 		getWindow().setContentView(view);
 	}
 
+	public void setContentView(View view, android.view.ViewGroup.LayoutParams params) {
+		if (params != null)
+			view.setLayoutParams(params);
+		getWindow().setContentView(view);
+	}
+
 	public void setContentView(int layoutResId) {
 		setContentView(LayoutInflater.from(context).inflate(layoutResId, null));
 	}

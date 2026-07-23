@@ -16,6 +16,10 @@ public class MediaStore {
 
 			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/images/media");
 			public static final Uri INTERNAL_CONTENT_URI = Uri.parse("content://media/internal/images/media");
+
+			public static Cursor query(ContentResolver cr, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+				return cr.query(uri, projection, selection, selectionArgs, sortOrder);
+			}
 		}
 
 		public static class Thumbnails {
@@ -37,6 +41,10 @@ public class MediaStore {
 
 			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/video/media");
 			public static final Uri INTERNAL_CONTENT_URI = Uri.parse("content://media/internal/video/media");
+
+			public static Cursor query(ContentResolver cr, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+				return cr.query(uri, projection, selection, selectionArgs, sortOrder);
+			}
 		}
 	}
 
