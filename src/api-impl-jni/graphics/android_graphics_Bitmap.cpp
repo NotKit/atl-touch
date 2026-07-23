@@ -57,6 +57,28 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1bitmap(JNIE
 	return _INTPTR(bitmap);
 }
 
+JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1reconfigure(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jint width, jint height, jint stride, jint format)
+{
+	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
+	SkImageInfo info = image_info_for_format(width, height, format);
+
+	/* AOSP contract: the new configuration must fit within the existing
+	 * allocation, otherwise reconfigure() throws (callers may catch this).
+	 * Unlike AOSP we then reallocate rather than reinterpreting the same
+	 * pixels in place -- nothing in ATL relies on the buffer staying put, and
+	 * reallocating keeps the SkBitmap geometry, stride and pixels consistent. */
+	if (info.computeMinByteSize() > bitmap->computeByteSize()) {
+		env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"),
+		              "Bitmap not large enough to support new configuration");
+		return;
+	}
+
+	atl_bitmap_cache_drop(bitmap);
+	bitmap->setInfo(info, std::max((size_t)stride, info.minRowBytes()));
+	bitmap->allocPixels();
+	bitmap->eraseColor(SK_ColorTRANSPARENT);
+}
+
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1canvas(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
 {
 	return _INTPTR(ATLCanvas::for_bitmap((SkBitmap *)_PTR(bitmap_ptr)));

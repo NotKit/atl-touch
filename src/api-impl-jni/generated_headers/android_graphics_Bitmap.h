@@ -19,6 +19,14 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1bitmap
 
 /*
  * Class:     android_graphics_Bitmap
+ * Method:    native_reconfigure
+ * Signature: (JIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1reconfigure
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint);
+
+/*
+ * Class:     android_graphics_Bitmap
  * Method:    native_create_canvas
  * Signature: (J)J
  */

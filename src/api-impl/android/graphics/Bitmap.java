@@ -327,7 +327,30 @@ public final class Bitmap {
 		return native_get_pixels_ptr(getTexture());
 	}
 
-	public void reconfigure(int width, int height, Bitmap.Config config) {}
+	public void reconfigure(int width, int height, Bitmap.Config config) {
+		if (recycled)
+			throw new IllegalStateException("Can't call reconfigure() on a recycled bitmap");
+		if (width <= 0 || height <= 0)
+			throw new IllegalArgumentException("width and height must be > 0");
+		if (!mutable)
+			throw new IllegalStateException("only mutable bitmaps may be reconfigured");
+
+		int newStride = (width * config.bytes_per_pixel + 3) & ~3;
+		if (texture != 0) {
+			// the cached canvas snapshots the old geometry and pixel pointer;
+			// drop it so getSnapshot() rebuilds it against the new allocation
+			if (snapshot != 0) {
+				native_recycle(0, snapshot);
+				snapshot = 0;
+			}
+			native_reconfigure(texture, width, height, newStride, config.android_memory_format);
+		}
+		this.width = width;
+		this.height = height;
+		this.stride = newStride;
+		this.config = config;
+		generation_id = next_generation_id++;
+	}
 
 	public void setPremultiplied(boolean premultiplied) {}
 
@@ -346,6 +369,7 @@ public final class Bitmap {
 	}
 
 	private static native long native_create_bitmap(int width, int height, int stride, int format);
+	private static native void native_reconfigure(long bitmap, int width, int height, int stride, int format);
 	private static native long native_create_canvas(long bitmap);
 	private static native int native_get_width(long bitmap);
 	private static native int native_get_height(long bitmap);

@@ -4,6 +4,7 @@
 #include "../defines.h"
 #include "NinePatchChunk.h"
 
+#include "include/codec/SkAndroidCodec.h"
 #include "include/codec/SkBmpDecoder.h"
 #include "include/codec/SkCodec.h"
 #include "include/codec/SkGifDecoder.h"
@@ -20,7 +21,7 @@ extern "C" {
 #include "../generated_headers/android_graphics_BitmapFactory.h"
 }
 
-static std::unique_ptr<SkCodec> make_codec(sk_sp<SkData> data)
+static std::unique_ptr<SkCodec> make_codec(sk_sp<SkData> data, SkPngChunkReader *chunk_reader = nullptr)
 {
 	static const SkCodecs::Decoder decoders[] = {
 		SkPngDecoder::Decoder(),
@@ -31,7 +32,7 @@ static std::unique_ptr<SkCodec> make_codec(sk_sp<SkData> data)
 		SkIcoDecoder::Decoder(),
 		SkWbmpDecoder::Decoder(),
 	};
-	return SkCodec::MakeFromData(std::move(data), SkSpan(decoders, std::size(decoders)));
+	return SkCodec::MakeFromData(std::move(data), SkSpan(decoders, std::size(decoders)), chunk_reader);
 }
 
 /* captures the npTc chunk aapt embeds in compiled .9.png files */
@@ -46,14 +47,35 @@ public:
 	std::vector<uint8_t> chunk;
 };
 
-static SkBitmap *decode_from_codec(std::unique_ptr<SkCodec> codec)
+/* Decode into a new SkBitmap, subsampling the source by sample_size like
+ * AOSP's BitmapFactory (Options.inSampleSize) so a large image can be decoded
+ * straight to a smaller bitmap instead of at full resolution. sample_size <= 1
+ * decodes at full size. */
+static SkBitmap *decode_from_codec(std::unique_ptr<SkCodec> codec, int sample_size)
 {
-	if (!codec)
+	std::unique_ptr<SkAndroidCodec> android_codec = SkAndroidCodec::MakeFromCodec(std::move(codec));
+	if (!android_codec)
 		return nullptr;
-	SkImageInfo info = codec->getInfo().makeColorType(kRGBA_8888_SkColorType).makeAlphaType(kPremul_SkAlphaType);
+
+	if (sample_size < 1)
+		sample_size = 1;
+
+	SkISize sampled = android_codec->getSampledDimensions(sample_size);
+	SkImageInfo info = android_codec->getInfo()
+	                       .makeWH(sampled.width(), sampled.height())
+	                       .makeColorType(kRGBA_8888_SkColorType)
+	                       .makeAlphaType(kPremul_SkAlphaType);
+
 	SkBitmap *bitmap = new SkBitmap();
-	bitmap->allocPixels(info);
-	if (codec->getPixels(info, bitmap->getPixels(), bitmap->rowBytes()) != SkCodec::kSuccess) {
+	if (!bitmap->tryAllocPixels(info)) {
+		delete bitmap;
+		return nullptr;
+	}
+
+	SkAndroidCodec::AndroidOptions options;
+	options.fSampleSize = sample_size;
+	SkCodec::Result result = android_codec->getAndroidPixels(info, bitmap->getPixels(), bitmap->rowBytes(), &options);
+	if (result != SkCodec::kSuccess && result != SkCodec::kIncompleteInput) {
 		delete bitmap;
 		return nullptr;
 	}
@@ -62,7 +84,7 @@ static SkBitmap *decode_from_codec(std::unique_ptr<SkCodec> codec)
 
 SkBitmap *atl_decode_image_data(sk_sp<SkData> data)
 {
-	return decode_from_codec(make_codec(std::move(data)));
+	return decode_from_codec(make_codec(std::move(data)), 1);
 }
 
 JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(JNIEnv *env, jclass clazz, jobject is, jbyteArray storage, jobject outPadding, jobject opts, jobjectArray nine_patch_chunk_out)
@@ -84,18 +106,17 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 		env->GetByteArrayRegion(storage, 0, count, (jbyte *)data.data() + old_size);
 	}
 
-	SkBitmap *bitmap;
-	sk_sp<NinePatchChunkReader> chunk_reader;
-	if (SkPngDecoder::IsPng(data.data(), data.size())) {
-		/* decode PNGs through SkPngDecoder directly so a chunk reader can
-		 * pick up the ninepatch metadata */
-		chunk_reader = sk_make_sp<NinePatchChunkReader>();
-		SkCodec::Result result;
-		bitmap = decode_from_codec(SkPngDecoder::Decode(SkData::MakeWithCopy(data.data(), data.size()),
-		                                                &result, chunk_reader.get()));
-	} else {
-		bitmap = atl_decode_image_data(SkData::MakeWithCopy(data.data(), data.size()));
+	int sample_size = 1;
+	if (opts) {
+		jclass opts_class = env->GetObjectClass(opts);
+		sample_size = env->GetIntField(opts, env->GetFieldID(opts_class, "inSampleSize", "I"));
 	}
+
+	/* pass a chunk reader so a PNG's ninepatch metadata is captured; it stays
+	 * empty for other formats */
+	sk_sp<NinePatchChunkReader> chunk_reader = sk_make_sp<NinePatchChunkReader>();
+	SkBitmap *bitmap = decode_from_codec(make_codec(SkData::MakeWithCopy(data.data(), data.size()), chunk_reader.get()),
+	                                     sample_size);
 	if (!bitmap)
 		return 0;
 
