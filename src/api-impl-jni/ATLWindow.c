@@ -36,9 +36,19 @@ struct ATLWindow {
 	jmethodID dispatch_finish_composing;
 	jobject window_jobj;    // weak ref to the java android.view.Window
 	bool needs_redraw;
+	/* redraw everything: set by native-initiated invalidations (resize, show,
+	 * WebView frames, ...) that have no ViewRootImpl.mDirty damage rect */
+	bool full_redraw;
 	bool pointer_down;
 	double pointer_x, pointer_y;
 	int layout_width, layout_height;
+	/* persistent raster surface: pixels outside a frame's damage rect keep
+	 * their previous contents, which partial GL uploads rely on */
+	void *canvas;
+	int canvas_width, canvas_height;
+	int tex_width, tex_height;
+	jfieldID dirty_field; // ViewRootImpl.mDirty (android.graphics.Rect)
+	jfieldID rect_left, rect_top, rect_right, rect_bottom;
 	unsigned int gl_texture;
 	unsigned int gl_program;
 	int gl_attr_pos, gl_attr_uv;
@@ -436,6 +446,7 @@ static void on_framebuffer_size(GLFWwindow *glfw_window, int width, int height)
 {
 	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
 	window->needs_redraw = true;
+	window->full_redraw = true;
 }
 
 static void on_window_close(GLFWwindow *glfw_window)
@@ -539,6 +550,24 @@ static bool debug_render(void)
 	return cached;
 }
 
+/* ATL_NO_DAMAGE=1 disables damage-region rendering (full redraw+upload every
+ * frame), as a fallback if partial redraw ever leaves artifacts */
+static bool damage_enabled(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = getenv("ATL_NO_DAMAGE") == NULL;
+	return cached;
+}
+
+static bool debug_damage(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = getenv("ATL_DEBUG_DAMAGE") != NULL;
+	return cached;
+}
+
 static void atl_window_render(ATLWindow *window)
 {
 	if (!window->view_root || !glfwGetWindowAttrib(window->glfw_window, GLFW_VISIBLE))
@@ -548,10 +577,12 @@ static void atl_window_render(ATLWindow *window)
 	if (width < 1 || height < 1)
 		return;
 	JNIEnv *env = get_jni_env();
+	bool full = window->full_redraw || !damage_enabled();
 	jlong layout_ms = 0;
 	if (width != window->layout_width || height != window->layout_height) {
 		window->layout_width = width;
 		window->layout_height = height;
+		full = true;
 		/* the window keeps its full size; the view root keeps the content clear
 		 * of the soft keyboard itself, per the activity's softInputMode */
 		(*env)->CallVoidMethod(env, window->view_root, window->set_ime_inset, ime_inset);
@@ -566,13 +597,48 @@ static void atl_window_render(ATLWindow *window)
 			layout_ms = atl_uptime_millis() - t;
 	}
 
+	if (!window->canvas || window->canvas_width != width || window->canvas_height != height) {
+		if (window->canvas)
+			atl_canvas_free(window->canvas);
+		window->canvas = atl_canvas_new_raster(width, height);
+		window->canvas_width = width;
+		window->canvas_height = height;
+		full = true;
+	}
+
+	/* this frame's damage: everything, or what the view hierarchy accumulated
+	 * in ViewRootImpl.mDirty since the last frame */
+	int dl = 0, dt = 0, dr = width, db = height;
+	if (!full) {
+		jobject dirty = (*env)->GetObjectField(env, window->view_root, window->dirty_field);
+		dl = (*env)->GetIntField(env, dirty, window->rect_left);
+		dt = (*env)->GetIntField(env, dirty, window->rect_top);
+		dr = (*env)->GetIntField(env, dirty, window->rect_right);
+		db = (*env)->GetIntField(env, dirty, window->rect_bottom);
+		(*env)->DeleteLocalRef(env, dirty);
+		if (dl < 0) dl = 0;
+		if (dt < 0) dt = 0;
+		if (dr > width) dr = width;
+		if (db > height) db = height;
+		if (dl >= dr || dt >= db) {
+			/* nothing visible changed */
+			window->needs_redraw = false;
+			return;
+		}
+	}
+	if (debug_damage())
+		fprintf(stderr, "ATLWindow: damage %d,%d-%d,%d%s of %dx%d\n", dl, dt, dr, db,
+		        full ? " (full)" : "", width, height);
+
 	jlong t_draw = debug_render() ? atl_uptime_millis() : 0;
-	void *canvas = atl_canvas_new_raster(width, height);
+	void *canvas = window->canvas;
+	atl_canvas_begin_frame(canvas, dl, dt, dr, db);
 	(*env)->CallVoidMethod(env, window->view_root, window->perform_draw, _INTPTR(canvas), width, height);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
+	atl_canvas_end_frame(canvas);
 	jlong draw_ms = debug_render() ? atl_uptime_millis() - t_draw : 0;
 
 	int pixel_width, pixel_height, stride;
@@ -586,6 +652,7 @@ static void atl_window_render(ATLWindow *window)
 		glBindTexture(GL_TEXTURE_2D, window->gl_texture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		window->tex_width = window->tex_height = 0;
 	} else {
 		glBindTexture(GL_TEXTURE_2D, window->gl_texture);
 	}
@@ -599,8 +666,18 @@ static void atl_window_render(ATLWindow *window)
 			       (const char *)pixels + (size_t)y * stride,
 			       (size_t)pixel_width * 4);
 		pixels = packed;
+		stride = pixel_width * 4;
 	}
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pixel_width, pixel_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+	if (window->tex_width != pixel_width || window->tex_height != pixel_height) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pixel_width, pixel_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+		window->tex_width = pixel_width;
+		window->tex_height = pixel_height;
+	} else {
+		/* upload only the damaged rows (full width keeps the data contiguous
+		 * without GL_UNPACK_ROW_LENGTH, which ES 2.0 lacks) */
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, dt, pixel_width, db - dt, GL_RGBA, GL_UNSIGNED_BYTE,
+		                (const char *)pixels + (size_t)dt * stride);
+	}
 	free(packed);
 
 	glViewport(0, 0, width, height);
@@ -623,15 +700,15 @@ static void atl_window_render(ATLWindow *window)
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glfwSwapBuffers(window->glfw_window);
 
-	atl_canvas_free(canvas);
 	window->needs_redraw = false;
+	window->full_redraw = false;
 
 	/* Only a handful of frames should ever be slow (the first layout, genuine
 	 * resizes); a steady stream of these means something is scheduling
 	 * needless relayouts/redraws. */
 	if (debug_render() && (layout_ms > 50 || draw_ms > 50))
-		fprintf(stderr, "ATLWindow: slow frame: layout %lldms, draw %lldms (%dx%d)\n",
-		        (long long)layout_ms, (long long)draw_ms, width, height);
+		fprintf(stderr, "ATLWindow: slow frame: layout %lldms, draw %lldms (%dx%d, damage %d,%d-%d,%d)\n",
+		        (long long)layout_ms, (long long)draw_ms, width, height, dl, dt, dr, db);
 }
 
 /* --- event pump on the GLib main loop --- */
@@ -775,8 +852,10 @@ void atl_primary_make_context_current(void)
 /* schedule a repaint (e.g. when a WebView has a fresh frame to composite) */
 void atl_window_invalidate_all(void)
 {
-	for (ATLWindow *window = windows; window; window = window->next)
+	for (ATLWindow *window = windows; window; window = window->next) {
 		window->needs_redraw = true;
+		window->full_redraw = true; // no java-side damage rect for this
+	}
 }
 
 void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
@@ -794,9 +873,16 @@ void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
 	window->dispatch_commit_text = (*env)->GetMethodID(env, view_root_class, "dispatchCommitText", "(Ljava/lang/String;)Z");
 	window->dispatch_composing_text = (*env)->GetMethodID(env, view_root_class, "dispatchComposingText", "(Ljava/lang/String;)Z");
 	window->dispatch_finish_composing = (*env)->GetMethodID(env, view_root_class, "dispatchFinishComposing", "()V");
+	window->dirty_field = (*env)->GetFieldID(env, view_root_class, "mDirty", "Landroid/graphics/Rect;");
+	jclass rect_class = (*env)->FindClass(env, "android/graphics/Rect");
+	window->rect_left = (*env)->GetFieldID(env, rect_class, "left", "I");
+	window->rect_top = (*env)->GetFieldID(env, rect_class, "top", "I");
+	window->rect_right = (*env)->GetFieldID(env, rect_class, "right", "I");
+	window->rect_bottom = (*env)->GetFieldID(env, rect_class, "bottom", "I");
 	(*env)->SetLongField(env, view_root, (*env)->GetFieldID(env, view_root_class, "scene", "J"), _INTPTR(window));
 	window->layout_width = window->layout_height = 0; // force a layout pass
 	window->needs_redraw = true;
+	window->full_redraw = true;
 }
 
 void atl_window_set_title(ATLWindow *window, const char *title)
@@ -814,6 +900,7 @@ void atl_window_show(ATLWindow *window)
 {
 	glfwShowWindow(window->glfw_window);
 	window->needs_redraw = true;
+	window->full_redraw = true; // a fresh surface needs a full commit
 }
 
 void atl_window_hide(ATLWindow *window)

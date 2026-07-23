@@ -21,6 +21,9 @@ public class ViewRootImpl implements ViewParent {
 
 	public long scene; // ATLSceneWidget*, set by native code on attach
 	public Window window;
+	/** damage accumulated since the last frame, in window coordinates; read
+	 *  (and clipped to) by native atl_window_render, reset by performDraw */
+	private final Rect mDirty = new Rect();
 	private View view;
 	private View focusedView; // the view currently receiving key input, if any
 	private int width;
@@ -253,6 +256,7 @@ public class ViewRootImpl implements ViewParent {
 	}
 
 	private static final boolean DUMP_HIERARCHY = System.getenv("ATL_DUMP_HIERARCHY") != null;
+	private static final boolean DEBUG_INVALIDATE = System.getenv("ATL_DEBUG_INVALIDATE") != null;
 
 	private static void dumpHierarchy(View v, String indent) {
 		ViewGroup.LayoutParams lp = v.getLayoutParams();
@@ -275,8 +279,10 @@ public class ViewRootImpl implements ViewParent {
 		}
 	}
 
-	/* called from native (ATLSceneWidget snapshot); canvas_ptr is an ATLCanvas* */
+	/* called from native (ATLSceneWidget snapshot); canvas_ptr is an ATLCanvas*
+	 * already clipped to this frame's damage region (native read mDirty first) */
 	protected void performDraw(long canvas_ptr, int width, int height) {
+		mDirty.setEmpty(); // invalidations from here on belong to the next frame
 		if (view == null && panels.isEmpty())
 			return;
 		boolean layoutNeeded = width != this.width || height != this.height
@@ -298,6 +304,9 @@ public class ViewRootImpl implements ViewParent {
 			drawPanelShadow(canvas, panel.view);
 			canvas.save();
 			canvas.translate(panel.view.getLeft(), panel.view.getTop());
+			// a panel is a window of its own size: clip like AOSP's surface would,
+			// so panel damage (the panel's bounds) covers everything it can draw
+			canvas.clipRect(0, 0, panel.view.getWidth(), panel.view.getHeight());
 			panel.view.draw(canvas);
 			canvas.restore();
 		}
@@ -446,9 +455,46 @@ public class ViewRootImpl implements ViewParent {
 		android.view.inputmethod.InputMethodManager.onFocusChanged(v);
 	}
 
+	/** Invalidate the whole window. */
 	public void invalidate() {
+		// pre-layout the size is unknown; union something large, native clamps
+		// the damage to the framebuffer
+		mDirty.union(0, 0, width > 0 ? width : Integer.MAX_VALUE / 2,
+		             height > 0 ? height : Integer.MAX_VALUE / 2);
 		if (scene != 0)
 			nativeInvalidate(scene);
+	}
+
+	/* AOSP software invalidation: a view whose parent is this root (the main
+	 * view or a panel root) reports its damage here, in its own coordinates. */
+	@Override
+	public void invalidateChild(View child, Rect dirty) {
+		ViewGroup.mapRect(child.getMatrix(), dirty);
+		invalidateChildInParent(new int[] {child.getLeft(), child.getTop()}, dirty);
+	}
+
+	@Override
+	public ViewParent invalidateChildInParent(int[] location, Rect dirty) {
+		if (dirty == null) {
+			invalidate();
+			return null;
+		}
+		if (dirty.isEmpty())
+			return null;
+		if (location != null)
+			dirty.offset(location[0], location[1]);
+		if (DEBUG_INVALIDATE) {
+			System.err.println("ATL_INVAL " + dirty);
+			StackTraceElement[] st = Thread.currentThread().getStackTrace();
+			for (int i = 2; i < Math.min(st.length, 14); i++)
+				System.err.println("  " + st[i]);
+		}
+		mDirty.union(dirty.left, dirty.top, dirty.right, dirty.bottom);
+		if (width > 0 && height > 0 && !mDirty.intersect(0, 0, width, height))
+			mDirty.setEmpty();
+		if (scene != 0)
+			nativeInvalidate(scene);
+		return null;
 	}
 
 	public void requestLayout() {

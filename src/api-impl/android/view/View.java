@@ -1605,15 +1605,23 @@ public class View implements Drawable.Callback {
 	public void unscheduleDrawable(Drawable drawable) {}
 
 	public void invalidate(Rect dirty) {
-		invalidate();
+		invalidateInternal(dirty.left - scrollX, dirty.top - scrollY,
+		                   dirty.right - scrollX, dirty.bottom - scrollY);
 	}
 	public void invalidate(int l, int t, int r, int b) {
-		invalidate();
+		invalidateInternal(l - scrollX, t - scrollY, r - scrollX, b - scrollY);
 	}
 	public void invalidate() {
-		ViewRootImpl root = getViewRootImpl();
-		if (root != null)
-			root.invalidate();
+		invalidateInternal(0, 0, right - left, bottom - top);
+	}
+
+	/* AOSP software invalidation: hand the damage rect (view-local coordinates)
+	 * to the parent, which walks it up to the ViewRootImpl (invalidateInternal ->
+	 * ViewGroup.invalidateChild -> ViewRootImpl.invalidateChildInParent). */
+	void invalidateInternal(int l, int t, int r, int b) {
+		final ViewParent p = parent;
+		if (p != null && l < r && t < b)
+			p.invalidateChild(this, new Rect(l, t, r, b));
 	}
 
 	public void setBackgroundColor(int color) {
@@ -1897,6 +1905,9 @@ public class View implements Drawable.Callback {
 		int oldT = this.top;
 		int oldR = this.right;
 		int oldB = this.bottom;
+		boolean moved = oldL != l || oldT != t || oldR != r || oldB != b;
+		if (moved)
+			invalidate(); // damage the old position (AOSP setFrame)
 		this.left = l;
 		this.top = t;
 		this.right = r;
@@ -1909,6 +1920,8 @@ public class View implements Drawable.Callback {
 		oldWidth = width;
 		oldHeight = height;
 		onLayout(changed, l, t, r, b);
+		if (moved)
+			invalidate(); // damage the new position
 		layoutRequested = false;
 		if (layout_change_listeners != null && !layout_change_listeners.isEmpty()) {
 			java.util.ArrayList<OnLayoutChangeListener> listeners = new java.util.ArrayList<>(layout_change_listeners);
@@ -2139,11 +2152,17 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setTranslationX(float translationX) {
+		if (this.translationX == translationX)
+			return;
+		invalidate(); // damage the old position (maps through the old matrix)
 		this.translationX = translationX;
 		invalidate();
 	}
 
 	public void setTranslationY(float translationY) {
+		if (this.translationY == translationY)
+			return;
+		invalidate();
 		this.translationY = translationY;
 		invalidate();
 	}
@@ -2157,8 +2176,10 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setAlpha(float alpha) {
-		this.alpha = alpha;
-		invalidate();
+		if (this.alpha != alpha) {
+			this.alpha = alpha;
+			invalidate();
+		}
 	}
 
 	public boolean onGenericMotionEvent(MotionEvent event) { return false; }
@@ -2618,6 +2639,7 @@ public class View implements Drawable.Callback {
 
 	public void setRotation(float rotation) {
 		if (this.rotation != rotation) {
+			invalidate(); // damage the old position (maps through the old matrix)
 			this.rotation = rotation;
 			invalidate();
 		}
@@ -2632,6 +2654,7 @@ public class View implements Drawable.Callback {
 
 	public void setScaleX(float scaleX) {
 		if (this.scaleX != scaleX) {
+			invalidate();
 			this.scaleX = scaleX;
 			invalidate();
 		}
@@ -2639,6 +2662,7 @@ public class View implements Drawable.Callback {
 
 	public void setScaleY(float scaleY) {
 		if (this.scaleY != scaleY) {
+			invalidate();
 			this.scaleY = scaleY;
 			invalidate();
 		}
@@ -2650,6 +2674,7 @@ public class View implements Drawable.Callback {
 	public void setPivotX(float pivot_x) {
 		pivotExplicitlySet = true;
 		if (pivotX != pivot_x) {
+			invalidate();
 			pivotX = pivot_x;
 			invalidate();
 		}
@@ -2658,6 +2683,7 @@ public class View implements Drawable.Callback {
 	public void setPivotY(float pivot_y) {
 		pivotExplicitlySet = true;
 		if (pivotY != pivot_y) {
+			invalidate();
 			pivotY = pivot_y;
 			invalidate();
 		}
@@ -3751,6 +3777,8 @@ public class View implements Drawable.Callback {
 	protected boolean setFrame(int left, int top, int right, int bottom) {
 		boolean changed = this.left != left || this.top != top
 		    || this.right != right || this.bottom != bottom;
+		if (changed)
+			invalidate(); // damage the old position (AOSP setFrame)
 		this.left = left;
 		this.top = top;
 		this.right = right;

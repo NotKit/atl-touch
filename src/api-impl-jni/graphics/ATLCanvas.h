@@ -85,6 +85,10 @@ void *atl_canvas_new_raster(int width, int height);
 void atl_canvas_free(void *atl_canvas);
 /* direct access to a raster canvas's RGBA pixels (premultiplied) */
 const void *atl_canvas_get_pixels(void *atl_canvas, int *width, int *height, int *stride);
+/* clip a persistent raster canvas to this frame's damage rect and clear it */
+void atl_canvas_begin_frame(void *atl_canvas, int left, int top, int right, int bottom);
+/* pop the damage clip (and any unbalanced app saves) after the frame */
+void atl_canvas_end_frame(void *atl_canvas);
 
 #ifdef __cplusplus
 }

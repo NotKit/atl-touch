@@ -3,6 +3,11 @@ package android.view;
 public interface ViewParent {
 	public abstract ViewParent getParent();
 
+	/** AOSP software invalidation: propagate a child's damage rect to the root. */
+	public void invalidateChild(View child, android.graphics.Rect dirty);
+
+	public ViewParent invalidateChildInParent(int[] location, android.graphics.Rect dirty);
+
 	public boolean isLayoutRequested();
 
 	public void requestLayout();

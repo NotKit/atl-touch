@@ -126,3 +126,20 @@ extern "C" const void *atl_canvas_get_pixels(void *atl_canvas, int *width, int *
 	return bitmap->getPixels();
 }
 
+/* Damage-region frame on a persistent raster canvas: clip to the damage rect
+ * and clear just that region; pixels outside it survive from the last frame. */
+extern "C" void atl_canvas_begin_frame(void *atl_canvas, int left, int top, int right, int bottom)
+{
+	SkCanvas *canvas = ((ATLCanvas *)atl_canvas)->canvas;
+	canvas->save();
+	canvas->clipRect(SkRect::MakeLTRB(left, top, right, bottom));
+	canvas->clear(SK_ColorTRANSPARENT);
+}
+
+extern "C" void atl_canvas_end_frame(void *atl_canvas)
+{
+	/* pop the damage clip and anything an unbalanced app draw left behind;
+	 * leftovers would otherwise accumulate on the reused canvas */
+	((ATLCanvas *)atl_canvas)->canvas->restoreToCount(1);
+}
+

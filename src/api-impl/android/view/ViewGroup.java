@@ -302,6 +302,43 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
+	/* AOSP software invalidation (ViewGroup.invalidateChild): walk the damage
+	 * rect up to the ViewRootImpl, mapping through each level's transform and
+	 * offsetting into parent coordinates as it goes. */
+	@Override
+	public final void invalidateChild(View child, final Rect dirty) {
+		ViewParent parent = this;
+		final int[] location = {child.getLeft(), child.getTop()};
+		mapRect(child.getMatrix(), dirty);
+		do {
+			View view = parent instanceof View ? (View)parent : null;
+			parent = parent.invalidateChildInParent(location, dirty);
+			if (view != null)
+				mapRect(view.getMatrix(), dirty);
+		} while (parent != null);
+	}
+
+	static void mapRect(android.graphics.Matrix m, Rect dirty) {
+		if (m.isIdentity())
+			return;
+		android.graphics.RectF boundingRect = new android.graphics.RectF(dirty);
+		m.mapRect(boundingRect);
+		dirty.set((int)Math.floor(boundingRect.left), (int)Math.floor(boundingRect.top),
+		          (int)Math.ceil(boundingRect.right), (int)Math.ceil(boundingRect.bottom));
+	}
+
+	@Override
+	public ViewParent invalidateChildInParent(final int[] location, final Rect dirty) {
+		dirty.offset(location[0] - getScrollX(), location[1] - getScrollY());
+		// drawChild always clips children to our bounds, so damage outside them
+		// cannot appear on screen
+		if (!dirty.intersect(0, 0, getWidth(), getHeight()))
+			dirty.setEmpty();
+		location[0] = getLeft();
+		location[1] = getTop();
+		return parent;
+	}
+
 	@Override
 	void dispatchAttachedToWindow() {
 		super.dispatchAttachedToWindow();
@@ -590,6 +627,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			canvas.translate(sx, sy);
 			canvas.concat(child.getMatrix());
 			canvas.translate(-sx, -sy);
+		}
+		/* Skip subtrees entirely outside the current clip (the frame's damage
+		 * region and any ancestor bounds); AOSP quick-rejects the same way in
+		 * View.draw(Canvas, ViewGroup, long). The child is always clipped to its
+		 * bounds below, so it cannot have drawn outside the rect tested here. */
+		if (canvas.quickReject(sx, sy, sx + child.getWidth(), sy + child.getHeight())) {
+			canvas.restoreToCount(restoreTo);
+			return false;
 		}
 		if (alpha < 1.f && !child.onSetAlpha(Math.round(alpha * 255)))
 			canvas.saveLayerAlpha(sx, sy, sx + child.getWidth(), sy + child.getHeight(), Math.round(alpha * 255));
