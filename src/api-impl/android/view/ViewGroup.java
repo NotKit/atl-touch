@@ -605,6 +605,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		this.transition = transition;
 	}
 
+	// ATL_DEBUG_DRAWTIME=<ms>: print every child whose draw() took at least
+	// that long (a parent's time includes its children)
+	private static final float DEBUG_DRAWTIME = System.getenv("ATL_DEBUG_DRAWTIME") != null
+	    ? Float.parseFloat(System.getenv("ATL_DEBUG_DRAWTIME")) : -1;
+
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
 		child.computeScroll();
 		/* Follows AOSP View.draw(Canvas, ViewGroup, long): the child's own scroll is
@@ -639,7 +644,16 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (alpha < 1.f && !child.onSetAlpha(Math.round(alpha * 255)))
 			canvas.saveLayerAlpha(sx, sy, sx + child.getWidth(), sy + child.getHeight(), Math.round(alpha * 255));
 		canvas.clipRect(sx, sy, sx + child.getWidth(), sy + child.getHeight());
-		child.draw(canvas);
+		if (DEBUG_DRAWTIME >= 0) {
+			long t0 = System.nanoTime();
+			child.draw(canvas);
+			float ms = (System.nanoTime() - t0) / 1e6f;
+			if (ms >= DEBUG_DRAWTIME)
+				System.err.println(String.format("ATL_DRAWTIME %7.2fms %s %dx%d",
+				    ms, child.getClass().getName(), child.getWidth(), child.getHeight()));
+		} else {
+			child.draw(canvas);
+		}
 		canvas.restoreToCount(restoreTo);
 		return false;
 	}
