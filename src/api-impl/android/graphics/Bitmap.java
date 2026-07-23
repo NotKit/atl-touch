@@ -104,10 +104,29 @@ public final class Bitmap {
 	}
 
 	public static Bitmap createBitmap(Bitmap src, int x, int y, int width, int height, Matrix matrix, boolean filter) {
-		Bitmap dest = new Bitmap(width, height, src.getConfig());
+		// AOSP semantics: the matrix maps the (0,0,width,height) subset into the
+		// destination, so the destination is sized to the *mapped* bounds and the
+		// subset is drawn under that transform. Sizing dest at width x height and
+		// applying the matrix on top would shrink the image into a corner.
+		Rect srcR = new Rect(x, y, x + width, y + height);
+		RectF dstR = new RectF(0, 0, width, height);
+
+		if (matrix == null || matrix.isIdentity()) {
+			Bitmap dest = new Bitmap(width, height, src.getConfig());
+			new Canvas(dest).drawBitmap(src, srcR, new Rect(0, 0, width, height),
+			    filter ? new Paint(Paint.FILTER_BITMAP_FLAG) : null);
+			return dest;
+		}
+
+		RectF deviceR = new RectF();
+		matrix.mapRect(deviceR, dstR);
+		int neww = Math.round(deviceR.width());
+		int newh = Math.round(deviceR.height());
+		Bitmap dest = new Bitmap(neww, newh, src.getConfig());
 		Canvas canvas = new Canvas(dest);
+		canvas.translate(-deviceR.left, -deviceR.top);
 		canvas.concat(matrix);
-		canvas.drawBitmap(src, new Rect(x, y, x + width, y + height), new Rect(0, 0, width, height), null);
+		canvas.drawBitmap(src, srcR, dstR, filter ? new Paint(Paint.FILTER_BITMAP_FLAG) : null);
 		return dest;
 	}
 
