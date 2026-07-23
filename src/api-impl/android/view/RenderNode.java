@@ -292,7 +292,19 @@ public class RenderNode {
 		this.height = height;
 		children.clear();
 		children_nodes.clear();
-		return new DisplayListCanvas(nativeCreateSnapshot()) {
+		return new DisplayListCanvas(nativeCreateSnapshot(), true) {
+			/* the native recording canvas has no meaningful size (infinite cull
+			 * rect); report the node's size like AOSP's RecordingCanvas */
+			@Override
+			public int getWidth() {
+				return (int)RenderNode.this.width;
+			}
+
+			@Override
+			public int getHeight() {
+				return (int)RenderNode.this.height;
+			}
+
 			@Override
 			public void drawRenderNode(RenderNode node) {
 				/* gtk_snapshot_append_node() may unpack container nodes since GTK 4.22 https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/9488
@@ -310,6 +322,15 @@ public class RenderNode {
 		if (transformed_node != 0) {
 			nativeUnref(transformed_node);
 			transformed_node = 0;
+		}
+	}
+
+	@Override
+	protected void finalize() throws Throwable {
+		try {
+			discardDisplayList();
+		} finally {
+			super.finalize();
 		}
 	}
 

@@ -1,5 +1,6 @@
 #include "ATLCanvas.h"
 
+#include "include/core/SkBBHFactory.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkPixelRef.h"
 #include "include/core/SkSamplingOptions.h"
@@ -45,7 +46,10 @@ ATLCanvas *ATLCanvas::new_recording(void)
 {
 	ATLCanvas *atl_canvas = new ATLCanvas();
 	atl_canvas->recorder = new SkPictureRecorder();
-	atl_canvas->canvas = atl_canvas->recorder->beginRecording(SkRect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f));
+	/* R-tree of op bounds: replaying a partially-visible recording (an
+	 * offscreen list row, a damage-clipped frame) then skips the culled ops */
+	static SkRTreeFactory rtree_factory;
+	atl_canvas->canvas = atl_canvas->recorder->beginRecording(SkRect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f), &rtree_factory);
 	return atl_canvas;
 }
 
@@ -151,7 +155,10 @@ extern "C" void atl_bitmap_cache_drop(void *sk_bitmap)
 sk_sp<SkImage> atl_image_for_draw(ATLCanvas *atl_canvas, SkBitmap *bitmap)
 {
 	if (atl_canvas->is_recording())
-		return bitmap->asImage(); // copies mutable pixels: safe beyond this call
+		/* by-ref like AOSP display lists: no pixel copy per re-record. A view
+		 * showing changing pixels must invalidate() (and thus re-record), so
+		 * the recording never outlives the content it references. */
+		return atl_image_cached(bitmap);
 	if (atl_canvas->is_gpu())
 		return atl_image_cached(bitmap); // stable uniqueID -> texture cache hits
 	SkPixmap pixmap;

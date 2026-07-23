@@ -1254,6 +1254,67 @@ public class View implements Drawable.Callback {
 
 	protected void dispatchDraw(Canvas canvas) {}
 
+	/* Retained display lists (AOSP updateDisplayListIfDirty): each view caches
+	 * a recording of its own content (background + onDraw) in local
+	 * coordinates. drawChild applies position/scroll/transform/alpha outside
+	 * the recording, so moving a view (RecyclerView scrolling) replays the
+	 * cached ops without re-recording them; only invalidated views re-record. */
+	private static final boolean USE_DISPLAY_LISTS = System.getenv("ATL_NO_DISPLAYLIST") == null;
+	private RenderNode contentDisplayList;
+	boolean displayListDirty = true;
+	/* views whose native content changes without invalidate() (WebView) must
+	 * draw live every frame instead of through the display list */
+	protected boolean displayListEnabled = true;
+
+	/* views that neither override onDraw nor have a background draw nothing
+	 * themselves; skip recording and replaying empty display lists for them */
+	private static final Map<Class<?>, Boolean> overridesOnDrawCache = new HashMap<>();
+
+	private boolean overridesOnDraw() {
+		Class<?> cls = getClass();
+		synchronized (overridesOnDrawCache) {
+			Boolean cached = overridesOnDrawCache.get(cls);
+			if (cached != null)
+				return cached;
+		}
+		boolean overrides = false;
+		for (Class<?> c = cls; c != View.class; c = c.getSuperclass()) {
+			try {
+				c.getDeclaredMethod("onDraw", Canvas.class);
+				overrides = true;
+				break;
+			} catch (NoSuchMethodException e) {}
+		}
+		synchronized (overridesOnDrawCache) {
+			overridesOnDrawCache.put(cls, overrides);
+		}
+		return overrides;
+	}
+
+	private void updateDisplayListIfDirty() {
+		if (!displayListDirty && contentDisplayList != null)
+			return;
+		// clear the flag before drawing: an invalidate() from inside onDraw
+		// (self-animating views) must dirty the new recording, not this one
+		displayListDirty = false;
+		if (background == null && !overridesOnDraw()) {
+			if (contentDisplayList != null) {
+				contentDisplayList.discardDisplayList();
+				contentDisplayList = null;
+			}
+			return;
+		}
+		if (contentDisplayList == null)
+			contentDisplayList = new RenderNode();
+		DisplayListCanvas recording = contentDisplayList.start(getWidth(), getHeight());
+		try {
+			drawBackground(recording);
+			onDraw(recording);
+		} finally {
+			contentDisplayList.end(recording);
+		}
+	}
+
 	void drawBackground(Canvas canvas) {
 		if (background != null) {
 			background.setBounds(0, 0, getWidth(), getHeight());
@@ -1289,8 +1350,18 @@ public class View implements Drawable.Callback {
 				canvas.clipPath(outline.mPath);
 			}
 		}
-		drawBackground(canvas);
-		onDraw(canvas);
+		/* nested view.draw() calls from inside a recording (an app drawing a
+		 * child from its own onDraw) draw live: a cached node reference inside
+		 * another recording would go stale when the child re-records */
+		if (USE_DISPLAY_LISTS && displayListEnabled
+		    && !(canvas instanceof DisplayListCanvas && ((DisplayListCanvas)canvas).isRecording())) {
+			updateDisplayListIfDirty();
+			if (contentDisplayList != null)
+				canvas.drawRenderNode(contentDisplayList);
+		} else {
+			drawBackground(canvas);
+			onDraw(canvas);
+		}
 		// HACK: catch non critical exceptions happening in some composeUI apps
 		try {
 			dispatchDraw(canvas);
@@ -1462,11 +1533,18 @@ public class View implements Drawable.Callback {
 	}
 
 	void dispatchAttachedToWindow() {
+		displayListDirty = true;
 		onAttachedToWindow();
 	}
 
 	void dispatchDetachedFromWindow() {
 		onDetachedFromWindow();
+		// AOSP destroyHardwareResources: drop the retained display list
+		displayListDirty = true;
+		if (contentDisplayList != null) {
+			contentDisplayList.discardDisplayList();
+			contentDisplayList = null;
+		}
 	}
 
 	// --- stubs
@@ -1612,16 +1690,43 @@ public class View implements Drawable.Callback {
 		invalidateInternal(l - scrollX, t - scrollY, r - scrollX, b - scrollY);
 	}
 	public void invalidate() {
-		invalidateInternal(0, 0, right - left, bottom - top);
+		invalidate(true);
+	}
+
+	/* AOSP invalidate(boolean): invalidateCache=false damages the view's area
+	 * without re-recording its display list, for changes the parent applies
+	 * outside the recording (position; the content itself is still valid). */
+	public void invalidate(boolean invalidateCache) {
+		invalidateInternal(0, 0, right - left, bottom - top, invalidateCache);
+	}
+
+	void invalidateInternal(int l, int t, int r, int b) {
+		invalidateInternal(l, t, r, b, true);
 	}
 
 	/* AOSP software invalidation: hand the damage rect (view-local coordinates)
 	 * to the parent, which walks it up to the ViewRootImpl (invalidateInternal ->
 	 * ViewGroup.invalidateChild -> ViewRootImpl.invalidateChildInParent). */
-	void invalidateInternal(int l, int t, int r, int b) {
+	void invalidateInternal(int l, int t, int r, int b, boolean invalidateCache) {
+		if (invalidateCache)
+			displayListDirty = true; // AOSP PFLAG_INVALIDATED
 		final ViewParent p = parent;
 		if (p != null && l < r && t < b)
 			p.invalidateChild(this, new Rect(l, t, r, b));
+	}
+
+	/* AOSP invalidateViewProperty: quick damage for property changes (alpha,
+	 * translationXY, ...) which drawChild applies outside the display list. */
+	void invalidateViewProperty(boolean invalidateParent, boolean forceRedraw) {
+		damageInParent();
+	}
+
+	/* AOSP damageInParent: report our bounds as damage without touching the
+	 * display list. */
+	protected void damageInParent() {
+		final ViewParent p = parent;
+		if (p != null && right > left && bottom > top)
+			p.invalidateChild(this, new Rect(0, 0, right - left, bottom - top));
 	}
 
 	public void setBackgroundColor(int color) {
@@ -1906,22 +2011,24 @@ public class View implements Drawable.Callback {
 		int oldR = this.right;
 		int oldB = this.bottom;
 		boolean moved = oldL != l || oldT != t || oldR != r || oldB != b;
+		int width = r - l;
+		int height = b - t;
+		boolean changed = oldWidth != width || oldHeight != height;
+		/* AOSP setFrame invalidates old+new position, re-recording the display
+		 * list only when the size changed (a pure move replays the recording) */
 		if (moved)
-			invalidate(); // damage the old position (AOSP setFrame)
+			invalidate(changed); // damage the old position (AOSP setFrame)
 		this.left = l;
 		this.top = t;
 		this.right = r;
 		this.bottom = b;
-		int width = r - l;
-		int height = b - t;
-		boolean changed = oldWidth != width || oldHeight != height;
 		if (changed)
 			onSizeChanged(width, height, oldWidth, oldHeight);
 		oldWidth = width;
 		oldHeight = height;
 		onLayout(changed, l, t, r, b);
 		if (moved)
-			invalidate(); // damage the new position
+			invalidate(changed); // damage the new position
 		layoutRequested = false;
 		if (layout_change_listeners != null && !layout_change_listeners.isEmpty()) {
 			java.util.ArrayList<OnLayoutChangeListener> listeners = new java.util.ArrayList<>(layout_change_listeners);
@@ -2154,17 +2261,17 @@ public class View implements Drawable.Callback {
 	public void setTranslationX(float translationX) {
 		if (this.translationX == translationX)
 			return;
-		invalidate(); // damage the old position (maps through the old matrix)
+		invalidateViewProperty(true, false); // damage the old position (maps through the old matrix)
 		this.translationX = translationX;
-		invalidate();
+		invalidateViewProperty(false, true);
 	}
 
 	public void setTranslationY(float translationY) {
 		if (this.translationY == translationY)
 			return;
-		invalidate();
+		invalidateViewProperty(true, false);
 		this.translationY = translationY;
-		invalidate();
+		invalidateViewProperty(false, true);
 	}
 
 	public void setX(float x) {
@@ -2178,7 +2285,7 @@ public class View implements Drawable.Callback {
 	public void setAlpha(float alpha) {
 		if (this.alpha != alpha) {
 			this.alpha = alpha;
-			invalidate();
+			invalidateViewProperty(true, false); // alpha is applied by the parent (drawChild)
 		}
 	}
 
@@ -2639,9 +2746,9 @@ public class View implements Drawable.Callback {
 
 	public void setRotation(float rotation) {
 		if (this.rotation != rotation) {
-			invalidate(); // damage the old position (maps through the old matrix)
+			invalidateViewProperty(true, false); // damage the old position (maps through the old matrix)
 			this.rotation = rotation;
-			invalidate();
+			invalidateViewProperty(false, true);
 		}
 	}
 
@@ -2654,17 +2761,17 @@ public class View implements Drawable.Callback {
 
 	public void setScaleX(float scaleX) {
 		if (this.scaleX != scaleX) {
-			invalidate();
+			invalidateViewProperty(true, false);
 			this.scaleX = scaleX;
-			invalidate();
+			invalidateViewProperty(false, true);
 		}
 	}
 
 	public void setScaleY(float scaleY) {
 		if (this.scaleY != scaleY) {
-			invalidate();
+			invalidateViewProperty(true, false);
 			this.scaleY = scaleY;
-			invalidate();
+			invalidateViewProperty(false, true);
 		}
 	}
 
@@ -2674,18 +2781,18 @@ public class View implements Drawable.Callback {
 	public void setPivotX(float pivot_x) {
 		pivotExplicitlySet = true;
 		if (pivotX != pivot_x) {
-			invalidate();
+			invalidateViewProperty(true, false);
 			pivotX = pivot_x;
-			invalidate();
+			invalidateViewProperty(false, true);
 		}
 	}
 
 	public void setPivotY(float pivot_y) {
 		pivotExplicitlySet = true;
 		if (pivotY != pivot_y) {
-			invalidate();
+			invalidateViewProperty(true, false);
 			pivotY = pivot_y;
-			invalidate();
+			invalidateViewProperty(false, true);
 		}
 	}
 
@@ -3777,14 +3884,16 @@ public class View implements Drawable.Callback {
 	protected boolean setFrame(int left, int top, int right, int bottom) {
 		boolean changed = this.left != left || this.top != top
 		    || this.right != right || this.bottom != bottom;
+		boolean sizeChanged = this.right - this.left != right - left
+		    || this.bottom - this.top != bottom - top;
 		if (changed)
-			invalidate(); // damage the old position (AOSP setFrame)
+			invalidate(sizeChanged); // damage the old position (AOSP setFrame)
 		this.left = left;
 		this.top = top;
 		this.right = right;
 		this.bottom = bottom;
 		if (changed)
-			invalidate();
+			invalidate(sizeChanged);
 		return changed;
 	}
 
@@ -3826,10 +3935,6 @@ public class View implements Drawable.Callback {
 	}
 
 	/* invalidation */
-
-	public void invalidate(boolean invalidateCache) {
-		invalidate();
-	}
 
 	public void postInvalidateDelayed(long delayMilliseconds) {
 		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {

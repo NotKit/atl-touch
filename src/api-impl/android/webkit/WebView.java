@@ -39,6 +39,9 @@ public class WebView extends ViewGroup {
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
+		// onDraw blits the live backend frame straight into the native canvas;
+		// caching it in a display list would show stale content
+		displayListEnabled = false;
 	}
 
 	/* size last pushed to the native WPE backend; the peer is often created at
