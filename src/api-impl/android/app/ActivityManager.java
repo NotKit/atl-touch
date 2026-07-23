@@ -38,6 +38,8 @@ public class ActivityManager {
 
 	public boolean isLowRamDevice() { return false; }
 
+	public boolean isBackgroundRestricted() { return false; }
+
 	public static class MemoryInfo {
 		/* For now, just always report there's 10GB free RAM */
 		public long availMem = 10000;

@@ -118,6 +118,8 @@ public class Typeface {
 
 	public static class Builder {
 		private final String path;
+		private int weight = -1;
+		private boolean italic = false;
 
 		public Builder(AssetManager mgr, String path) {
 			this.path = mgr.extractAsset(path);
@@ -127,8 +129,25 @@ public class Typeface {
 			return this;
 		}
 
+		public Builder setWeight(int weight) {
+			this.weight = weight;
+			return this;
+		}
+
+		public Builder setItalic(boolean italic) {
+			this.italic = italic;
+			return this;
+		}
+
 		public Typeface build() {
-			return path != null ? createFromFile(path) : DEFAULT;
+			Typeface base = path != null ? createFromFile(path) : DEFAULT;
+			if (weight < 0 && !italic) {
+				return base;
+			}
+			// map exact weight/italic onto the nearest legacy style until
+			// exact-weight derivation is wired through minikin
+			int style = ((weight >= 600) ? BOLD : NORMAL) | (italic ? ITALIC : NORMAL);
+			return create(base, style);
 		}
 	}
 

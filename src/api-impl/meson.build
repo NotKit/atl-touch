@@ -65,6 +65,7 @@ srcs = [
 	'android/app/NotificationChannelGroup.java',
 	'android/app/NotificationManager.java',
 	'android/app/PendingIntent.java',
+	'android/app/Person.java',
 	'android/app/ProgressDialog.java',
 	'android/app/RemoteInput.java',
 	'android/app/SearchableInfo.java',

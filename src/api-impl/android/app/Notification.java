@@ -61,12 +61,15 @@ public class Notification implements Parcelable {
 	String iconPath;
 	boolean ongoing;
 	Style style;
+	String channelId;
 
 	public String toString() {
 		return "Notification [" + title + ", " + text + ", " + actions + "]";
 	}
 
 	public String getGroup() { return null; }
+
+	public String getChannelId() { return channelId; }
 
 	public static class Builder {
 		private Notification notification;
@@ -75,8 +78,14 @@ public class Notification implements Parcelable {
 			notification = new Notification();
 		}
 
-		public Builder(Context context, String tag) {
+		public Builder(Context context, String channelId) {
 			this(context);
+			notification.channelId = channelId;
+		}
+
+		public Builder setChannelId(String channelId) {
+			notification.channelId = channelId;
+			return this;
 		}
 
 		public Builder setWhen(long when) { return this; }
@@ -232,6 +241,10 @@ public class Notification implements Parcelable {
 
 			public Builder setAllowGeneratedReplies(boolean allowGeneratedReplies) { return this; }
 
+			public Builder setSemanticAction(int semanticAction) { return this; }
+
+			public Builder setContextual(boolean isContextual) { return this; }
+
 			public Action build() {
 				return action;
 			}
@@ -246,6 +259,8 @@ public class Notification implements Parcelable {
 
 		public MessagingStyle(CharSequence userDisplayName) {}
 
+		public MessagingStyle(Person user) {}
+
 		public MessagingStyle setConversationTitle(CharSequence conversationTitle) { return this; }
 
 		public MessagingStyle setGroupConversation(boolean isGroupConversation) { return this; }
@@ -259,6 +274,8 @@ public class Notification implements Parcelable {
 		public static class Message {
 
 			public Message(CharSequence text, long timestamp, CharSequence sender) {}
+
+			public Message(CharSequence text, long timestamp, Person sender) {}
 
 			public Message setData(String dataMimeType, android.net.Uri dataUri) { return this; }
 		}

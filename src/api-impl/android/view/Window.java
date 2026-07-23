@@ -174,6 +174,8 @@ public class Window {
 
 	public void setNavigationBarColor(int color) {}
 
+	public void setNavigationBarDividerColor(int color) {}
+
 	public void setFormat(int format) {}
 
 	public void setLayout(int width, int height) {
