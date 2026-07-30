@@ -259,6 +259,30 @@ executable('android-translation-layer', [
 					'-DINSTALL_DATADIR_NAME="'+get_option('datadir')+'"'
                                         ])
 
+# The same launcher against a stock JVM: no ART, no dex, no bionic, so the
+# framework and the app come in as jars on the class path and the bionic_*
+# entry points the library imports are the plain host calls.
+jvm_dep = dependency('jni', modules: ['jvm'], required: get_option('hotspot-launcher'))
+if jvm_dep.found()
+	executable('android-translation-layer-hotspot', [
+	                                                	'src/main-executable-hotspot/main.c',
+	                                                	'src/main-executable-hotspot/glibc_compat.c',
+	                                                	'src/main-executable/actions.c',
+	                                                ],
+	                                                install: true,
+	                                                dependencies: [
+	                                                	dependency('gio-2.0'), jvm_dep, dependency('glfw3'), dependency('egl'), dependency('gl'),
+	                                                	declare_dependency(link_with: libtranslationlayer_so), dependency('dl'),
+	                                                ],
+	                                                link_args: [
+	                                                	'-rdynamic',
+	                                                	# so the launcher and the framework libraries can be shipped in one flat dir
+	                                                	'-Wl,-rpath,$ORIGIN',
+	                                                ],
+	                                                install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
+	                                                               get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives')
+endif
+
 # hax.jar
 subdir('src/api-impl')
 

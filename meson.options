@@ -1,0 +1,4 @@
+option('hotspot-launcher',
+       type: 'feature',
+       value: 'auto',
+       description: 'build android-translation-layer-hotspot, the launcher that runs apps on a stock JVM instead of ART (needs a JDK with libjvm)')
