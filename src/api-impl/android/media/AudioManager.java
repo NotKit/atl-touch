@@ -6,6 +6,11 @@ public class AudioManager {
 
 	public static final int STREAM_MUSIC = 0x3;
 
+	/* getDevices() filters, values match AOSP */
+	public static final int GET_DEVICES_INPUTS = 0x1;
+	public static final int GET_DEVICES_OUTPUTS = 0x2;
+	public static final int GET_DEVICES_ALL = GET_DEVICES_INPUTS | GET_DEVICES_OUTPUTS;
+
 	private native void nativeSetStreamVolume(int volume);
 
 	public boolean isBluetoothA2dpOn() {
@@ -91,6 +96,15 @@ public class AudioManager {
 		System.out.println("AudioManager.setMicrophoneMute(" + on + ")");
 	}
 	public void unloadSoundEffects() {}
+
+	/* no device hotplug notifications here, so a callback is only ever remembered */
+	public void registerAudioDeviceCallback(AudioDeviceCallback callback, android.os.Handler handler) {}
+
+	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
+
+	public AudioDeviceInfo[] getDevices(int flags) {
+		return new AudioDeviceInfo[0];
+	}
 
 	public int generateAudioSessionId() {
 		return 0;
