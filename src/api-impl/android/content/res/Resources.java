@@ -1394,7 +1394,7 @@ public class Resources {
 			XmlResourceParser parser = (XmlResourceParser)set;
 			getAssets().applyStyle(theme, set != null ? ((XmlBlock.Parser)set).mParseState : 0,
 			                       defStyleAttr, defStyleRes,
-			                       attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
+			                       attrs, attrs.length, array.mData, array.mIndices);
 			array.mRsrcs = attrs;
 			array.mXml = parser;
 			array.mTheme = this;
@@ -1643,7 +1643,7 @@ public class Resources {
 		// out the attributes from the XML file (applying type information
 		// contained in the resources and such).
 		XmlBlock.Parser parser = (XmlBlock.Parser)set;
-		getAssets().retrieveAttributes(parser.mParseState, attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
+		getAssets().retrieveAttributes(parser.mParseState, attrs, attrs.length, array.mData, array.mIndices);
 
 		array.mXml = parser;
 
