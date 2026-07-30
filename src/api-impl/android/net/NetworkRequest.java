@@ -2,7 +2,8 @@ package android.net;
 
 public class NetworkRequest {
 
-	public class Builder {
+	/* static: apps build a request before they have one */
+	public static class Builder {
 
 		public NetworkRequest build() {
 			return new NetworkRequest();

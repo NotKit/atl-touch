@@ -6,7 +6,8 @@ class ProxyInfo {}
 
 public class ConnectivityManager {
 
-	public class NetworkCallback {
+	/* static: apps subclass it without a ConnectivityManager in hand */
+	public static class NetworkCallback {
 		public void onAvailable(Network network) {}
 		public void onLost(Network network) {}
 	}
