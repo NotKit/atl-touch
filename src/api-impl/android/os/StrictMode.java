@@ -100,6 +100,13 @@ public final class StrictMode {
 	public static final class VmPolicy {
 		public static final VmPolicy LAX;
 		public static final class Builder {
+			public Builder() {
+			}
+
+			/** Apps extend the policy in force rather than starting from nothing. */
+			public Builder(VmPolicy policy) {
+			}
+
 			public Builder detectActivityLeaks() {
 				return this;
 			}

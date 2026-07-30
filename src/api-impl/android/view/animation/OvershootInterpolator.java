@@ -6,6 +6,10 @@ public class OvershootInterpolator implements TimeInterpolator {
 
 	private float overshoot;
 
+	public OvershootInterpolator() {
+		this(2.0f);
+	}
+
 	public OvershootInterpolator(float overshoot) {
 		this.overshoot = overshoot;
 	}
