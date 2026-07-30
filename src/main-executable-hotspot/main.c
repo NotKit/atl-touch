@@ -67,6 +67,7 @@ struct launcher_options {
 	int window_height;
 	int sdk_int;
 	int smoke_test;
+	char *run_class;
 };
 
 static bool exception_check(JNIEnv *env, const char *what)
@@ -306,6 +307,36 @@ static gboolean smoke_test_done(gpointer user_data)
 	exit(0);
 }
 
+/*
+ * --run-class: run one class in the app's runtime instead of the application.
+ * The framework, the class path and the native libraries are exactly what a
+ * real run gets, which is what makes it useful for testing a single piece of an
+ * app (or of the framework) without a UI.
+ */
+static gboolean run_class_main(gpointer user_data)
+{
+	const char *class_name = user_data;
+	JNIEnv *env = get_jni_env();
+
+	char *binary_name = g_strdelimit(g_strdup(class_name), ".", '/');
+	jclass class = (*env)->FindClass(env, binary_name);
+	g_free(binary_name);
+	if (exception_check(env, "looking up the --run-class class"))
+		exit(1);
+
+	jmethodID main_method = (*env)->GetStaticMethodID(env, class, "main", "([Ljava/lang/String;)V");
+	if (exception_check(env, "looking up its main(String[])"))
+		exit(1);
+
+	jobjectArray no_args = (*env)->NewObjectArray(env, 0, (*env)->FindClass(env, "java/lang/String"), NULL);
+	(*env)->CallStaticVoidMethod(env, class, main_method, no_args);
+	if (exception_check(env, "running the --run-class class"))
+		exit(1);
+
+	fprintf(stderr, "run-class: %s.main() returned\n", class_name);
+	exit(0);
+}
+
 static char *required_path(const char *path, const char *option, const char *what)
 {
 	if (!path) {
@@ -400,6 +431,12 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 		return;
 	}
 
+	if (d->run_class) {
+		fprintf(stderr, "run-class: running %s.main() instead of creating the application\n", d->run_class);
+		g_idle_add(run_class_main, d->run_class);
+		return;
+	}
+
 	jobject application_object = (*env)->CallStaticObjectMethod(env, handle_cache.context.class,
 	                                                            _STATIC_METHOD(handle_cache.context.class, "createApplication", "(J)Landroid/app/Application;"),
 	                                                            _INTPTR(atl_window));
@@ -461,6 +498,7 @@ static void init_cmd_parameters(GApplication *app, struct launcher_options *d)
 		{ "extra-jvm-option", 'X', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_jvm_options,  "pass an additional option directly to the JVM (e.g -X \"-Xmx512m\")",                 "\"OPTION\""    },
 		{ "sdk-int",          0,  0, G_OPTION_ARG_INT,          &d->sdk_int,             "the SDK level to report as Build.VERSION.SDK_INT",                                    "SDK_INT"       },
 		{ "smoke-test",       0,  0, G_OPTION_ARG_INT,          &d->smoke_test,          "boot the runtime and a window but no application, then exit 0 after N seconds",       "SECONDS"       },
+		{ "run-class",        0,  0, G_OPTION_ARG_STRING,      &d->run_class,           "run this class's main(String[]) in the app's runtime instead of the application",     "CLASS"         },
 		{NULL}
 		/* clang-format on */
 	};
