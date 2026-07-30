@@ -80,6 +80,17 @@ static bool exception_check(JNIEnv *env, const char *what)
 	return true;
 }
 
+/*
+ * Every step of the boot sequence hands its result to the next one, so carrying
+ * on after one throws just turns a readable stack trace into a JVM crash a few
+ * calls later.
+ */
+static void fatal_exception_check(JNIEnv *env, const char *what)
+{
+	if (exception_check(env, what))
+		exit(1);
+}
+
 static void add_option(GPtrArray *options, const char *format, ...) G_GNUC_PRINTF(2, 3);
 static void add_option(GPtrArray *options, const char *format, ...)
 {
@@ -440,19 +451,22 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	jobject application_object = (*env)->CallStaticObjectMethod(env, handle_cache.context.class,
 	                                                            _STATIC_METHOD(handle_cache.context.class, "createApplication", "(J)Landroid/app/Application;"),
 	                                                            _INTPTR(atl_window));
-	exception_check(env, "Context.createApplication");
+	fatal_exception_check(env, "Context.createApplication");
+	fprintf(stderr, "boot: application created\n");
 
 	jclass content_provider = (*env)->FindClass(env, "android/content/ContentProvider");
 	(*env)->CallStaticVoidMethod(env, content_provider, _STATIC_METHOD(content_provider, "createContentProviders", "()V"));
-	exception_check(env, "ContentProvider.createContentProviders");
+	fatal_exception_check(env, "ContentProvider.createContentProviders");
+	fprintf(stderr, "boot: content providers created\n");
 
 	(*env)->CallVoidMethod(env, application_object, _METHOD(handle_cache.application.class, "onCreate", "()V"));
-	exception_check(env, "Application.onCreate");
+	fatal_exception_check(env, "Application.onCreate");
+	fprintf(stderr, "boot: Application.onCreate returned\n");
 
 	jobject activity_object = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
 	                                                         _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
 	                                                         _JSTRING(d->main_activity_class), _INTPTR(atl_window), NULL);
-	exception_check(env, "Activity.createMainActivity");
+	fatal_exception_check(env, "Activity.createMainActivity");
 
 	jstring package_name_jstr = (*env)->CallObjectMethod(env, application_object, handle_cache.context.get_package_name);
 	if (!exception_check(env, "Context.getPackageName") && package_name_jstr)
@@ -467,6 +481,9 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02);
 
 	activity_start(env, activity_object);
+	fatal_exception_check(env, "Activity.onStart");
+	fprintf(stderr, "boot: main activity started\n");
+
 	g_timeout_add(10, G_SOURCE_FUNC(hacky_on_window_focus_changed_callback), env);
 }
 
