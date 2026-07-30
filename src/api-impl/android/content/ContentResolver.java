@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -21,16 +22,73 @@ public class ContentResolver {
 
 	public static final String SYNC_EXTRAS_IGNORE_SETTINGS = "ignore_settings";
 
+	/* getContentResolver() hands out a fresh instance every call, so the
+	 * registrations have to live in the class, not the object. */
+	private static final ArrayList<Registration> observers = new ArrayList<Registration>();
+
+	private static final class Registration {
+		final String uri;
+		final boolean notifyForDescendants;
+		final ContentObserver observer;
+
+		Registration(Uri uri, boolean notifyForDescendants, ContentObserver observer) {
+			this.uri = uri.toString();
+			this.notifyForDescendants = notifyForDescendants;
+			this.observer = observer;
+		}
+	}
+
 	public final void registerContentObserver(Uri uri, boolean notifyForDescendants, ContentObserver observer) {
+		if (uri == null || observer == null)
+			return;
+		synchronized (observers) {
+			observers.add(new Registration(uri, notifyForDescendants, observer));
+		}
 	}
 	public final void unregisterContentObserver(ContentObserver observer) {
+		if (observer == null)
+			return;
+		synchronized (observers) {
+			for (int i = observers.size() - 1; i >= 0; i--) {
+				if (observers.get(i).observer == observer)
+					observers.remove(i);
+			}
+		}
 	}
 	public void notifyChange(Uri uri, ContentObserver observer) {
+		if (uri == null)
+			return;
+		String changed = uri.toString();
+		ArrayList<Registration> matched = new ArrayList<Registration>();
+		synchronized (observers) {
+			for (Registration r : observers) {
+				if (matches(r, changed))
+					matched.add(r);
+			}
+		}
+		for (Registration r : matched)
+			r.observer.dispatchChange(r.observer == observer, uri);
+	}
+
+	/* AOSP walks a tree of uri path segments; the shape of it is: an exact hit
+	 * always notifies, a change below a registration only with
+	 * notifyForDescendants, and a change above one always notifies it. */
+	private static boolean matches(Registration r, String changed) {
+		if (r.uri.equals(changed))
+			return true;
+		if (r.notifyForDescendants && changed.startsWith(r.uri + "/"))
+			return true;
+		return r.uri.startsWith(changed + "/");
+	}
+
+	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
+		notifyChange(uri, observer);
 	}
 	public int getUserId() {
 		return 0;
 	}
 	public final void registerContentObserver(Uri uri, boolean notifyForDescendants, ContentObserver observer, int userHandle) {
+		registerContentObserver(uri, notifyForDescendants, observer);
 	}
 
 	public ParcelFileDescriptor openFileDescriptor(Uri uri, String mode) throws FileNotFoundException {

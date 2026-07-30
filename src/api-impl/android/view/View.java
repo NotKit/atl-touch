@@ -2699,23 +2699,15 @@ public class View implements Drawable.Callback {
 
 	public boolean hasOnClickListeners() { return false; }
 
-	public void setTextAlignment(int textAlignment) {
-		String[] classesToRemove = {"ATL-text-align-left", "ATL-text-align-center", "ATL-text-align-right"};
-		native_removeClasses(widget, classesToRemove);
+	/* AOSP's default: the alignment follows the view's gravity. It must never
+	 * stay INHERIT — TextView reads this to align its lines, and INHERIT there
+	 * means "unresolved", which lands on ALIGN_NORMAL and leaves wrapped text
+	 * left-aligned however the gravity is set. */
+	private int textAlignment = TEXT_ALIGNMENT_GRAVITY;
 
-		switch (textAlignment) {
-			case TEXT_ALIGNMENT_CENTER:
-				native_addClass(widget, "ATL-text-align-center");
-				break;
-			case TEXT_ALIGNMENT_TEXT_START:
-			case TEXT_ALIGNMENT_VIEW_START:
-				native_addClass(widget, "ATL-text-align-left");
-				break;
-			case TEXT_ALIGNMENT_TEXT_END:
-			case TEXT_ALIGNMENT_VIEW_END:
-				native_addClass(widget, "ATL-text-align-right");
-				break;
-		}
+	public void setTextAlignment(int textAlignment) {
+		this.textAlignment = textAlignment == TEXT_ALIGNMENT_INHERIT
+		    ? TEXT_ALIGNMENT_GRAVITY : textAlignment;
 	}
 
 	private boolean hapticFeedbackEnabled = true;
@@ -2893,7 +2885,7 @@ public class View implements Drawable.Callback {
 
 	public void cancelLongPress() {}
 
-	public int getTextAlignment() { return 0; }
+	public int getTextAlignment() { return textAlignment; }
 
 	public View findViewWithTag(Object tag) {
 		if (Objects.equals(tag, this.tag))

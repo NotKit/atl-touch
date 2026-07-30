@@ -1,6 +1,7 @@
 package android.atl;
 
 import android.content.ContentProvider;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
@@ -10,6 +11,8 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.SystemClock;
+import android.provider.MediaStore;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -48,6 +51,56 @@ public class ATLMediaContentProvider extends ContentProvider {
 	private String bucketName = "Gallery";
 	// only one query drives the pick; the rest wait for its result
 	private boolean picking = false;
+	// until when enumerations answer empty instead of picking, because they are
+	// the re-read our own expiry asked for
+	private long refreshUntil = 0;
+
+	/* A pick answers one enumeration, but apps cache the album they build from it
+	 * (Telegram only re-reads the media store when its cached album is null), so
+	 * without help the picker would appear once per app launch. Some time after
+	 * the app stops touching the gallery we drop the selection and report a media
+	 * store change: the app re-enumerates, gets nothing, forgets its album, and
+	 * the next attach-menu open pops the picker again.
+	 *
+	 * Long enough that it can't clear a grid the user is still looking at. */
+	private static final long IDLE_EXPIRY_MS = 20000;
+	/* How long we wait for that re-read. An app that doesn't watch the media store
+	 * never sends one; past this the next enumeration picks again, so nothing
+	 * stays stuck. */
+	private static final long EXPIRY_REFRESH_MS = 6000;
+	/* Once it does arrive, keep answering empty for a beat: an app that watches
+	 * several media uris reloads once per observer, and a second reload that
+	 * picked would pop the picker with nobody asking for it. */
+	private static final long REFRESH_SETTLE_MS = 1000;
+
+	private final Handler expiryHandler = new Handler(Looper.getMainLooper());
+	private final Runnable expiry = new Runnable() {
+		@Override
+		public void run() {
+			expireSelection();
+		}
+	};
+
+	private void touchSelection() {
+		expiryHandler.removeCallbacks(expiry);
+		synchronized (this) {
+			if (selectedFiles == null || picking)
+				return;
+		}
+		expiryHandler.postDelayed(expiry, IDLE_EXPIRY_MS);
+	}
+
+	private void expireSelection() {
+		synchronized (this) {
+			if (selectedFiles == null || picking)
+				return;
+			selectedFiles = null;
+			refreshUntil = SystemClock.uptimeMillis() + EXPIRY_REFRESH_MS;
+		}
+		ContentResolver resolver = getContext().getContentResolver();
+		resolver.notifyChange(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null);
+		resolver.notifyChange(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, null);
+	}
 
 	private void openFileChooser() {
 		boolean drive = false;
@@ -126,7 +179,7 @@ public class ATLMediaContentProvider extends ContentProvider {
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
-				new ATLContentHubPicker(android.content.Context.this_application, "Import From",
+				new ATLContentHubPicker(android.content.Context.this_application, null,
 				                        peers, new ATLContentHubPicker.ResultListener() {
 					@Override
 					public void onResult(String peerId) {
@@ -297,11 +350,21 @@ public class ATLMediaContentProvider extends ContentProvider {
 		boolean idLookup = "0".equals(uri.getLastPathSegment())
 		    || (selectionArgs != null && selectionArgs.length > 0);
 
-		// Pop the picker once, when Telegram starts enumerating the gallery
-		// (its images query). The video query that follows reuses the result.
+		// Pop the picker when Telegram starts enumerating the gallery (its images
+		// query). The video query that follows reuses the result.
 		if (!count && !distinct && !idLookup && !video && selectedFiles == null) {
-			openFileChooser();
+			boolean refresh;
+			synchronized (this) {
+				long now = SystemClock.uptimeMillis();
+				refresh = now < refreshUntil;
+				if (refresh)
+					refreshUntil = Math.min(refreshUntil, now + REFRESH_SETTLE_MS);
+			}
+			// the enumeration our own expiry provoked: answer empty, don't pick
+			if (!refresh)
+				openFileChooser();
 		}
+		touchSelection();
 
 		if (count) {
 			MatrixCursor cursor = new MatrixCursor(projection);
@@ -340,6 +403,7 @@ public class ATLMediaContentProvider extends ContentProvider {
 
 	// resolve a file for the single-file access paths (openFile/getType)
 	private File fileFor(Uri uri) {
+		touchSelection();
 		String last = uri.getLastPathSegment();
 		try {
 			int id = Integer.parseInt(last);

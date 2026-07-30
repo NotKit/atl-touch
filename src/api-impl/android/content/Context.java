@@ -14,6 +14,7 @@ import android.app.SharedPreferencesImpl;
 import android.app.StatusBarManager;
 import android.app.UiModeManager;
 import android.app.job.JobScheduler;
+import android.atl.ATLTimeZone;
 import android.bluetooth.BluetoothManager;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -164,6 +165,9 @@ public abstract class Context {
 
 	static Application createApplication(long native_window) throws Exception {
 		Application application;
+
+		// before any app code runs: apps cache date formatters built from the default timezone
+		ATLTimeZone.init();
 
 		if (pkg.applicationInfo.className != null) {
 			Class<? extends Application> cls = Class.forName(pkg.applicationInfo.className).asSubclass(Application.class);

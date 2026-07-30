@@ -26,6 +26,7 @@
 #include "../generated_headers/android_atl_ATLContentHub.h"
 
 #define LOGE(...) do { fprintf(stderr, "[atl-ch] " __VA_ARGS__); fputc('\n', stderr); } while (0)
+#define LOGI LOGE
 
 /* Well-known bus name + object path the content-hub daemon registers. */
 static const char *SERVICE_BUS_NAME = "com.lomiri.content.dbus.Service";
@@ -267,6 +268,10 @@ static int ch_list_sources(const char *content_type, ch_peer **out, size_t *coun
 	g_object_unref(service);
 	g_object_unref(conn);
 
+	for (size_t i = 0; i < n; ++i)
+		LOGI("source[%zu/%zu] id='%s' name='%s' icon=%zu bytes",
+		     i + 1, n, list[i].id, list[i].name, list[i].icon_len);
+
 	*out = list;
 	*count = n;
 	return 0;
@@ -293,7 +298,12 @@ typedef struct {
 	int        cancelled;/* our own UI cancelled */
 	int        done;     /* handle-import ran to completion */
 	char      *tmp;      /* our cache dir the files are moved into */
+	guint      serial;   /* this import's number, part of the temp path */
 } pick_state;
+
+/* Bumped per import so two imports never land on the same path: an app that
+ * caches thumbnails by file path would otherwise show the previous picture. */
+static guint import_serial;
 
 /* The single in-flight import, so a cancel from another thread can unblock it.
  * g_main_loop_quit is thread-safe. */
@@ -344,7 +354,7 @@ static gboolean on_handle_import(ContentHubHandler *handler,
 				                 : g_file_new_for_path(url);
 				/* Keep the original basename; a numbered subdir per file avoids
 				 * collisions within a multi-select. */
-				char *sub = g_strdup_printf("%s/%d", st->tmp, idx++);
+				char *sub = g_strdup_printf("%s/%u-%d", st->tmp, st->serial, idx++);
 				g_mkdir_with_parents(sub, 0700);
 				char *base = g_file_get_basename(src);
 				char *dest = g_build_filename(sub, base && *base ? base : "file", NULL);
@@ -465,7 +475,13 @@ static char **ch_import(const char *peer_id, const char *content_type, int selec
 	char **result = NULL;
 	GMainLoop *loop = g_main_loop_new(ctx, FALSE);
 	pick_state st = { .loop = loop, .paths = g_ptr_array_new_with_free_func(g_free),
-	                  .aborted = 0, .tmp = temp_dir() };
+	                  .aborted = 0, .tmp = temp_dir(),
+	                  .serial = g_atomic_int_add(&import_serial, 1) };
+
+	/* Serials restart at 0 each launch, so clear what the last run left behind
+	 * before reusing the numbers. Files from this run are never touched. */
+	if (st.serial == 0)
+		remove_recursive(st.tmp);
 
 	ContentHubTransfer *transfer = content_hub_transfer_proxy_new_sync(
 	    conn, G_DBUS_PROXY_FLAGS_NONE, SERVICE_BUS_NAME, transfer_path, NULL, &err);

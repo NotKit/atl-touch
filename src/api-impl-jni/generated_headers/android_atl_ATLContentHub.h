@@ -21,6 +21,14 @@ JNIEXPORT jobjectArray JNICALL Java_android_atl_ATLContentHub_nativeListSources
 
 /*
  * Class:     android_atl_ATLContentHub
+ * Method:    nativeRenderSvg
+ * Signature: ([BI)[I
+ */
+JNIEXPORT jintArray JNICALL Java_android_atl_ATLContentHub_nativeRenderSvg
+  (JNIEnv *, jclass, jbyteArray, jint);
+
+/*
+ * Class:     android_atl_ATLContentHub
  * Method:    nativeImport
  * Signature: (Ljava/lang/String;Ljava/lang/String;I)[Ljava/lang/String;
  */
