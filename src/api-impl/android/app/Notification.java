@@ -281,6 +281,32 @@ public class Notification implements Parcelable {
 		}
 	}
 
+	/** API 31 call notification. No call UI here, so it only carries the intents. */
+	public static class CallStyle extends Style {
+
+		public static CallStyle forIncomingCall(Person person, PendingIntent declineIntent, PendingIntent answerIntent) {
+			return new CallStyle();
+		}
+
+		public static CallStyle forOngoingCall(Person person, PendingIntent hangUpIntent) {
+			return new CallStyle();
+		}
+
+		public static CallStyle forScreeningCall(Person person, PendingIntent hangUpIntent, PendingIntent answerIntent) {
+			return new CallStyle();
+		}
+
+		public CallStyle setIsVideo(boolean isVideo) { return this; }
+
+		public CallStyle setVerificationIcon(android.graphics.drawable.Icon verificationIcon) { return this; }
+
+		public CallStyle setVerificationText(CharSequence verificationText) { return this; }
+
+		public CallStyle setAnswerButtonColorHint(int color) { return this; }
+
+		public CallStyle setDeclineButtonColorHint(int color) { return this; }
+	}
+
 	public static class MediaStyle extends Style {
 
 		public MediaStyle setShowActionsInCompactView(int... viewActions) { return this; }
