@@ -97,6 +97,7 @@ srcs = [
 	'android/atl/ATLMediaContentProvider.java',
 	'android/atl/ATLRuntime.java',
 	'android/atl/ATLTimeZone.java',
+	'android/atl/ATLZoneInfoDb.java',
 	'android/atl/FileDescriptorUtils.java',
 	'android/atl/GVariantBuilderParcel.java',
 	'android/atl/GVariantIterParcel.java',
