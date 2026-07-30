@@ -50,10 +50,15 @@ public class ATLTimeZone {
 			return;
 		}
 
-		TimeZone zone = installZoneDatabase() ? TimeZone.getTimeZone(id) : null;
-		// the database is missing or doesn't know the host zone: at least get the default right
-		if (zone == null || !id.equals(zone.getID()))
-			zone = readZoneFile(id);
+		// A runtime that carries its own zone database (any JDK) already knows the
+		// host zone, and libcore.util.ZoneInfoDB does not exist there at all.
+		TimeZone zone = TimeZone.getTimeZone(id);
+		if (!id.equals(zone.getID())) {
+			zone = installZoneDatabase() ? TimeZone.getTimeZone(id) : null;
+			// the database is missing or doesn't know the host zone: at least get the default right
+			if (zone == null || !id.equals(zone.getID()))
+				zone = readZoneFile(id);
+		}
 
 		if (zone == null) {
 			Slog.w(TAG, "no data for host timezone " + id + ", staying on " + TimeZone.getDefault().getID());
@@ -93,7 +98,7 @@ public class ATLTimeZone {
 		File tzfile = new File(zoneInfoDir(), id);
 		try (MemoryMappedFile mapped = MemoryMappedFile.mmapRO(tzfile.getPath())) {
 			return ZoneInfo.readTimeZone(id, mapped.bigEndianIterator(), System.currentTimeMillis());
-		} catch (Exception e) {
+		} catch (Exception | LinkageError e) {
 			Slog.w(TAG, "failed to load " + tzfile + ": " + e);
 			return null;
 		}
