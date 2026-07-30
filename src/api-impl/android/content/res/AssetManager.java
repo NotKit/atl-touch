@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import android.atl.FileDescriptorUtils;
 
 /**
  * Provides access to an application's raw asset files; see {@link Resources}
@@ -440,7 +441,7 @@ public final class AssetManager {
 				throw new FileNotFoundException("file: " + fileName + ", error: " + asset);
 
 			FileDescriptor fd = new FileDescriptor();
-			fd.setInt$(asset);
+			FileDescriptorUtils.setInt(fd, asset);
 			ParcelFileDescriptor pfd = new ParcelFileDescriptor(fd);
 			if (pfd != null) {
 				AssetFileDescriptor afd = new AssetFileDescriptor(pfd, offset[0], length[0]);

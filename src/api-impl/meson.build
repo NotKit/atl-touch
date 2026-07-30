@@ -96,6 +96,7 @@ srcs = [
 	'android/atl/ATLKeyboardViewer.java',
 	'android/atl/ATLMediaContentProvider.java',
 	'android/atl/ATLTimeZone.java',
+	'android/atl/FileDescriptorUtils.java',
 	'android/atl/GVariantBuilderParcel.java',
 	'android/atl/GVariantIterParcel.java',
 	'android/bluetooth/BluetoothAdapter.java',
@@ -858,8 +859,13 @@ srcs = [
 	'org/apache/harmony/xnet/provider/jsse/SSLParametersImpl.java',
 ]
 java_args = [
-	'-bootclasspath', bootclasspath,
-	'-source', '1.8', '-target', '1.8',
+	# Compile against the JDK's own java.*, with core-all only for the classes it
+	# adds (libcore, dalvik, android.system, ...). Using core-all as the boot
+	# classpath instead makes javac bind libcore-only overloads such as
+	# System.arraycopy(char[], int, char[], int, int), which then link on ART but
+	# not on any other runtime.
+	'--release', '8',
+	'-classpath', bootclasspath,
 	'-encoding', 'UTF-8',
 	'-Xlint:-deprecation', # we implement deprecated APIs
 	'-h', join_paths(dir_base, 'src/api-impl-jni/generated_headers')

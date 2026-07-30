@@ -191,7 +191,7 @@ public class LruCache<K, V> {
 				if (size <= maxSize) {
 					break;
 				}
-				Map.Entry<K, V> toEvict = map.eldest();
+				Map.Entry<K, V> toEvict = map.isEmpty() ? null : map.entrySet().iterator().next();
 				if (toEvict == null) {
 					break;
 				}

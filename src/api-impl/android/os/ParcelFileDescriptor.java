@@ -54,6 +54,7 @@ import java.nio.ByteOrder;
 import libcore.io.IoUtils;
 import libcore.io.Libcore;
 import libcore.io.Memory;
+import android.atl.FileDescriptorUtils;
 
 /**
  * The FileDescriptor returned by {@link Parcel#readFileDescriptor}, allowing
@@ -326,7 +327,7 @@ public class ParcelFileDescriptor implements Closeable {
 	 */
 	public static ParcelFileDescriptor fromFd(int fd) throws IOException {
 		final FileDescriptor original = new FileDescriptor();
-		original.setInt$(fd);
+		FileDescriptorUtils.setInt(original, fd);
 
 		try {
 			final FileDescriptor dup = android.system.Os.dup(original);
@@ -348,7 +349,7 @@ public class ParcelFileDescriptor implements Closeable {
 	 */
 	public static ParcelFileDescriptor adoptFd(int fd) {
 		final FileDescriptor fdesc = new FileDescriptor();
-		fdesc.setInt$(fd);
+		FileDescriptorUtils.setInt(fdesc, fd);
 
 		return new ParcelFileDescriptor(fdesc);
 	}
@@ -366,7 +367,7 @@ public class ParcelFileDescriptor implements Closeable {
 	 *         specified Socket.
 	 */
 	public static ParcelFileDescriptor fromSocket(Socket socket) {
-		FileDescriptor fd = socket.getFileDescriptor$();
+		FileDescriptor fd = FileDescriptorUtils.of(socket);
 		return fd != null ? new ParcelFileDescriptor(fd) : null;
 	}
 
@@ -380,7 +381,7 @@ public class ParcelFileDescriptor implements Closeable {
 	 *         specified DatagramSocket.
 	 */
 	public static ParcelFileDescriptor fromDatagramSocket(DatagramSocket datagramSocket) {
-		FileDescriptor fd = datagramSocket.getFileDescriptor$();
+		FileDescriptor fd = FileDescriptorUtils.of(datagramSocket);
 		return fd != null ? new ParcelFileDescriptor(fd) : null;
 	}
 
@@ -592,7 +593,7 @@ public class ParcelFileDescriptor implements Closeable {
 			if (mClosed) {
 				throw new IllegalStateException("Already closed");
 			}
-			return mFd.getInt$();
+			return FileDescriptorUtils.getInt(mFd);
 		}
 	}
 
@@ -616,7 +617,7 @@ public class ParcelFileDescriptor implements Closeable {
 			}
 			final int fd = getFd();
 			// Parcel.clearFileDescriptor(mFd);
-			mFd.setInt$(-1);
+			FileDescriptorUtils.setInt(mFd, -1);
 			writeCommStatusAndClose(Status.DETACHED, null);
 			return fd;
 		}
