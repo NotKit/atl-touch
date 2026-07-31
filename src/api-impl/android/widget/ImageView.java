@@ -53,6 +53,11 @@ public class ImageView extends View {
 	}
 
 	public void setImageResource(final int resid) {
+		if (resid == 0) {
+			// Resource id 0 is how an app clears the image, not a lookup failure.
+			setImageDrawable(null);
+			return;
+		}
 		if (Context.this_application.getResources().getString(resid).endsWith(".xml")) {
 			setImageDrawable(getContext().getDrawable(resid));
 			return;
