@@ -243,11 +243,15 @@ public class TextView extends View {
 	/** Where onDraw() puts the text layout horizontally; subclasses place carets by it. */
 	protected float getLayoutOffsetX() {
 		float tx = getCompoundPaddingLeft();
+		if (text_layout == null)
+			return tx;
 		int innerWidth = getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight();
 		int horizontalGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
 		if (horizontalGravity == Gravity.CENTER_HORIZONTAL || horizontalGravity == Gravity.RIGHT) {
-			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
-			int free = Math.max(0, innerWidth - desired);
+			/* the layout box, not the text: getLayoutAlignment() derives the line
+			 * alignment from the same gravity, so measuring the text here as well
+			 * applied it twice and centred text came out flush right. */
+			int free = Math.max(0, innerWidth - text_layout.getWidth());
 			tx += horizontalGravity == Gravity.CENTER_HORIZONTAL ? free / 2 : free;
 		}
 		return tx;
