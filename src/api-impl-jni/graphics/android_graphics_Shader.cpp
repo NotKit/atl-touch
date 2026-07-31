@@ -2,6 +2,7 @@
 
 #include "../defines.h"
 #include "ATLShader.h"
+#include "porter_duff.h"
 
 #include "include/core/SkBitmap.h"
 #include "include/core/SkColor.h"
@@ -79,6 +80,17 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapShader_native_1create(JNIEnv
 	ATLShader *shader = new ATLShader();
 	shader->base = bitmap->makeShader(tile_mode(tile_x), tile_mode(tile_y),
 	                                  SkSamplingOptions(SkFilterMode::kLinear));
+	return _INTPTR(shader);
+}
+
+/* Android's ComposeShader gives shaderA to the blend as its "dst" and shaderB
+ * as its "src"; skia's Blend() takes them in that order. */
+JNIEXPORT jlong JNICALL Java_android_graphics_ComposeShader_native_1create(JNIEnv *env, jclass clazz, jlong shader_a, jlong shader_b, jint porter_duff_mode)
+{
+	ATLShader *shader = new ATLShader();
+	shader->compose_dst = (ATLShader *)_PTR(shader_a);
+	shader->compose_src = (ATLShader *)_PTR(shader_b);
+	shader->compose_mode = porter_duff_to_blend_mode(porter_duff_mode);
 	return _INTPTR(shader);
 }
 
