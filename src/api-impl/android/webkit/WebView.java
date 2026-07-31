@@ -18,6 +18,16 @@ import java.util.Map;
 
 public class WebView extends ViewGroup {
 
+	/**
+	 * Find-on-page results. The backend has no find-on-page, so nothing ever
+	 * calls this; it has to exist because a WebView subclass that declares
+	 * setFindListener(FindListener) makes the runtime load the parameter type
+	 * as soon as anything reflects over its declared methods.
+	 */
+	public interface FindListener {
+		void onFindResultReceived(int activeMatchOrdinal, int numberOfMatches, boolean isDoneCounting);
+	}
+
 	private WebViewClient webViewClient;
 
 	/* native backend peer (webview_host_peer*); created lazily once a
