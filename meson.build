@@ -68,7 +68,12 @@ endif
 # broker). Its header lives only in the arm64 UT rootfs, not the x86_64 desktop,
 # so this builds only on device; off-device ATLMediaContentProvider falls back
 # to ATLFilePicker.
-content_hub_dep = dependency('libcontent-hub-glib', required: false)
+# 24.04 renamed the pkg-config file with the rest of the lomiri rename; older
+# rootfs still carry the ubuntu-era name, so try both.
+content_hub_dep = dependency('liblomiri-content-hub-glib', required: false)
+if not content_hub_dep.found()
+	content_hub_dep = dependency('libcontent-hub-glib', required: false)
+endif
 if content_hub_dep.found()
 	extra_deps += content_hub_dep
 	extra_jni_srcs += files('src/api-impl-jni/content/android_atl_ATLContentHub.c')
