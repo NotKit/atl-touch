@@ -107,8 +107,20 @@ public class Camera {
 		errorCallback = callback;
 	}
 
+	public final void startPreview() {
+		if (nativePtr != 0)
+			native_startPreview(nativePtr);
+	}
+
+	public final void stopPreview() {
+		if (nativePtr != 0)
+			native_stopPreview(nativePtr);
+	}
+
 	private static native int native_getNumberOfCameras();
 	private static native void native_getCameraInfo(int cameraId, CameraInfo cameraInfo);
 	private native long native_open(int cameraId);
 	private native void native_release(long nativePtr);
+	private native void native_startPreview(long nativePtr);
+	private native void native_stopPreview(long nativePtr);
 }

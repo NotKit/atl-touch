@@ -101,4 +101,7 @@ struct atl_camera_backend {
  * report zero cameras. */
 const struct atl_camera_backend *atl_camera_backend_get(void);
 
+/* camera_backend_gst.c; NULL when GStreamer fails to initialize */
+const struct atl_camera_backend *atl_camera_backend_gst_get(void);
+
 #endif

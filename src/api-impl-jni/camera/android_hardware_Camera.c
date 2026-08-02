@@ -41,3 +41,19 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release(JNIEnv *env,
 	if (backend && camera_ptr)
 		backend->close(_PTR(camera_ptr));
 }
+
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1startPreview(JNIEnv *env, jobject this, jlong camera_ptr)
+{
+	const struct atl_camera_backend *backend = atl_camera_backend_get();
+
+	if (backend && camera_ptr)
+		backend->start_preview(_PTR(camera_ptr));
+}
+
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1stopPreview(JNIEnv *env, jobject this, jlong camera_ptr)
+{
+	const struct atl_camera_backend *backend = atl_camera_backend_get();
+
+	if (backend && camera_ptr)
+		backend->stop_preview(_PTR(camera_ptr));
+}

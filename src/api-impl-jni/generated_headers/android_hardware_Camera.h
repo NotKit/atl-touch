@@ -45,6 +45,22 @@ JNIEXPORT jlong JNICALL Java_android_hardware_Camera_native_1open
 JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release
   (JNIEnv *, jobject, jlong);
 
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_startPreview
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1startPreview
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_stopPreview
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1stopPreview
+  (JNIEnv *, jobject, jlong);
+
 #ifdef __cplusplus
 }
 #endif
