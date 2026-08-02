@@ -1,5 +1,8 @@
 package android.atl;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
 /**
  * Bridge to Ubuntu Touch's content-hub broker, the confined-app way to import
  * files/media the app can't reach directly (AppArmor blocks browsing $HOME).
@@ -48,6 +51,39 @@ public class ATLContentHub {
 	}
 
 	private static native Object[] nativeListSources(String contentType);
+
+	/**
+	 * Decode a peer's icon to a {@code size}x{@code size} bitmap, or null if it
+	 * can't be decoded. UT's peers carry SVG, which needs the native rasterizer;
+	 * anything else goes through BitmapFactory.
+	 */
+	public static Bitmap iconBitmap(Peer peer, int size) {
+		if (peer == null || peer.icon == null || peer.icon.length == 0 || size <= 0)
+			return null;
+		try {
+			if (isSvg(peer.icon)) {
+				int[] pixels = nativeRenderSvg(peer.icon, size);
+				return pixels == null ? null
+				    : Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888);
+			}
+			return BitmapFactory.decodeByteArray(peer.icon, 0, peer.icon.length);
+		} catch (Throwable t) {
+			return null; // a bad icon must never take the picker down
+		}
+	}
+
+	// leading whitespace then '<' — an XML declaration or a bare <svg> root
+	private static boolean isSvg(byte[] data) {
+		for (int i = 0; i < data.length && i < 8; i++) {
+			byte b = data[i];
+			if (b == ' ' || b == '\t' || b == '\n' || b == '\r')
+				continue;
+			return b == '<';
+		}
+		return false;
+	}
+
+	private static native int[] nativeRenderSvg(byte[] svg, int size);
 
 	/**
 	 * Run an import from one peer, blocking until the user finishes picking in the

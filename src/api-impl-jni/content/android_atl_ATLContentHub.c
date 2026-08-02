@@ -26,6 +26,7 @@
 #include "../generated_headers/android_atl_ATLContentHub.h"
 
 #define LOGE(...) do { fprintf(stderr, "[atl-ch] " __VA_ARGS__); fputc('\n', stderr); } while (0)
+#define LOGI LOGE
 
 /* Well-known bus name + object path the content-hub daemon registers. */
 static const char *SERVICE_BUS_NAME = "com.lomiri.content.dbus.Service";
@@ -266,6 +267,10 @@ static int ch_list_sources(const char *content_type, ch_peer **out, size_t *coun
 	g_variant_unref(peers);
 	g_object_unref(service);
 	g_object_unref(conn);
+
+	for (size_t i = 0; i < n; ++i)
+		LOGI("source[%zu/%zu] id='%s' name='%s' icon=%zu bytes",
+		     i + 1, n, list[i].id, list[i].name, list[i].icon_len);
 
 	*out = list;
 	*count = n;
