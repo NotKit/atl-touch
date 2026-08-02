@@ -130,8 +130,15 @@ public final class Bitmap {
 		return dest;
 	}
 
+	public static Bitmap createBitmap(int[] colors, int offset, int stride, int width, int height, Config config) {
+		Bitmap bitmap = new Bitmap(width, height, config);
+		bitmap.setPixels(colors, offset, stride, 0, 0, width, height);
+		bitmap.mutable = false; // AOSP: bitmaps built from a color array are immutable
+		return bitmap;
+	}
+
 	public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {
-		return createBitmap(width, height, config);
+		return createBitmap(colors, 0, width, width, height, config);
 	}
 
 	public static Bitmap createBitmap(Bitmap src) {
