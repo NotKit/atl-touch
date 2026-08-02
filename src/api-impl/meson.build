@@ -95,6 +95,7 @@ srcs = [
 	'android/atl/ATLKeyboardDialog.java',
 	'android/atl/ATLKeyboardViewer.java',
 	'android/atl/ATLMediaContentProvider.java',
+	'android/atl/ATLTimeZone.java',
 	'android/atl/GVariantBuilderParcel.java',
 	'android/atl/GVariantIterParcel.java',
 	'android/bluetooth/BluetoothAdapter.java',
