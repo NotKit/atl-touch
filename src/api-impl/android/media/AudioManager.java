@@ -60,6 +60,13 @@ public class AudioManager {
 		nativeSetStreamVolume(index);
 	}
 
+	/**
+	 * Ignored: the argument is a direction, not a level, and there is no system
+	 * volume UI to raise for FLAG_SHOW_UI either. Apps call this to nudge the
+	 * volume they are about to play at.
+	 */
+	public void adjustStreamVolume(int streamType, int direction, int flags) {}
+
 	public boolean isStreamMute(int streamType) {
 		return false;
 	}
@@ -79,6 +86,17 @@ public class AudioManager {
 	public boolean isBluetoothScoOn() {
 		return false;
 	}
+
+	/**
+	 * There is no SCO route here — capture goes straight to ALSA — so an app that
+	 * offers "record over Bluetooth" is told the route does not exist rather than
+	 * being left to start a link that never carries audio.
+	 */
+	public boolean isBluetoothScoAvailableOffCall() {
+		return false;
+	}
+
+	public void startBluetoothSco() {}
 
 	public void stopBluetoothSco() {}
 
