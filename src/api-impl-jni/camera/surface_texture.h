@@ -2,6 +2,7 @@
 #define ATL_SURFACE_TEXTURE_H
 
 #include <jni.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
@@ -22,5 +23,23 @@ void atl_surface_texture_unref(struct atl_surface_texture *texture);
 /* producer side, called on the backend thread; the newest frame wins */
 void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8_t *nv21,
                                 int width, int height, int stride);
+
+/*
+ * A producer that can fill the GL texture itself (the hybris preview-texture
+ * fast path). update() is called from updateTexImage on the app's GL thread and
+ * must bind and update tex_name; returning false drops the texture back to the
+ * NV21 upload path for good. Both callbacks run under the texture's lock.
+ */
+struct atl_surface_texture_source {
+	bool (*update)(void *user, unsigned tex_name);
+	bool (*get_transform)(void *user, float matrix[16]);
+	void *user;
+};
+
+/* source = NULL detaches the fast path */
+void atl_surface_texture_set_source(struct atl_surface_texture *texture,
+                                    const struct atl_surface_texture_source *source);
+/* fast path producer side: a new frame is waiting in the texture */
+void atl_surface_texture_notify_frame_available(struct atl_surface_texture *texture);
 
 #endif

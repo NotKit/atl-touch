@@ -1,7 +1,11 @@
 /* Pixel helpers shared by the camera backends and the preview path. */
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include <glib.h>
 
 #include "camera_frame.h"
 
@@ -42,4 +46,33 @@ void atl_camera_nv21_to_rgba(const uint8_t *nv21, int width, int height, int str
 			out[col * 4 + 3] = 0xff;
 		}
 	}
+}
+
+void atl_camera_dump_frame(const char *dir, uint64_t count, const uint8_t *nv21,
+                           int width, int height, int stride)
+{
+	char path[512];
+	FILE *f;
+
+	if (!dir)
+		return;
+
+	snprintf(path, sizeof(path), "%s/frame-count", dir);
+	f = fopen(path, "w");
+	if (f) {
+		fprintf(f, "%" G_GUINT64_FORMAT "\n", count);
+		fclose(f);
+	}
+
+	if (count % 30 != 1)
+		return;
+
+	uint8_t *rgba = malloc((size_t)width * height * 4);
+	if (!rgba)
+		return;
+	atl_camera_nv21_to_rgba(nv21, width, height, stride, rgba);
+	snprintf(path, sizeof(path), "%s/frame-%06" G_GUINT64_FORMAT ".png", dir, count);
+	if (!atl_camera_write_png(path, rgba, width, height))
+		fprintf(stderr, "Camera: failed to write %s\n", path);
+	free(rgba);
 }

@@ -144,6 +144,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/camera/android_hardware_Camera.c',
                                                                   	'src/api-impl-jni/camera/camera_backend.c',
                                                                   	'src/api-impl-jni/camera/camera_backend_gst.c',
+                                                                  	'src/api-impl-jni/camera/camera_backend_hybris.c',
                                                                   	'src/api-impl-jni/camera/camera_callbacks.c',
                                                                   	'src/api-impl-jni/camera/camera_events.c',
                                                                   	'src/api-impl-jni/camera/camera_frame.c',

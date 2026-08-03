@@ -1009,6 +1009,9 @@ public class Camera {
 				!native_setParameters(nativePtr, previewSize.width, previewSize.height,
 						format, fpsRange[0], fpsRange[1]))
 			throw new RuntimeException("setParameters failed");
+		/* keys only a real camera HAL acts on; backends without them ignore these */
+		native_setModeParameters(nativePtr, params.getFocusMode(), params.getFlashMode(),
+				params.getZoom());
 		parametersFlattened = params.flatten();
 	}
 
@@ -1044,5 +1047,6 @@ public class Camera {
 	private native String native_getDefaultParameters(long nativePtr);
 	private native boolean native_setParameters(long nativePtr, int width, int height,
 			int format, int fpsMin, int fpsMax);
+	private native void native_setModeParameters(long nativePtr, String focusMode, String flashMode, int zoom);
 	private native void native_setDisplayOrientation(long nativePtr, int degrees);
 }

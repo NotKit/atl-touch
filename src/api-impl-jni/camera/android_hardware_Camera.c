@@ -122,6 +122,10 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release(JNIEnv *env,
 	camera->backend->stop_preview(camera->camera);
 	camera->backend->set_frame_callback(camera->camera, NULL, NULL);
 	camera->backend->set_error_callback(camera->camera, NULL, NULL);
+	if (camera->backend->set_texture_callback)
+		camera->backend->set_texture_callback(camera->camera, NULL, NULL);
+	/* the fast path points at this struct: unhook it before it goes away */
+	atl_surface_texture_set_source(camera->texture, NULL);
 	/* close() first: it joins any capture still in flight, so no backend
 	 * thread can reach the state freed below */
 	camera->backend->close(camera->camera);
@@ -158,6 +162,39 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewSurface(JN
 		atl_camera_preview_set_surface(camera->preview, env, surface);
 }
 
+/* the GL-thread half of the backend's preview-texture fast path */
+static bool texture_source_update(void *user, unsigned tex_name)
+{
+	struct atl_camera_jni *camera = user;
+
+	return camera->backend->update_preview_texture(camera->camera, tex_name);
+}
+
+static bool texture_source_get_transform(void *user, float matrix[16])
+{
+	struct atl_camera_jni *camera = user;
+
+	return camera->backend->get_preview_texture_transform &&
+	       camera->backend->get_preview_texture_transform(camera->camera, matrix);
+}
+
+/* the backend rendered a frame into the app's texture, so onFrameAvailable is
+ * the only thing left to do */
+static void on_texture_frame(void *user)
+{
+	struct atl_camera_jni *camera = user;
+
+	g_mutex_lock(&camera->texture_lock);
+	struct atl_surface_texture *texture = camera->texture;
+	if (texture)
+		atl_surface_texture_ref(texture);
+	g_mutex_unlock(&camera->texture_lock);
+	if (texture) {
+		atl_surface_texture_notify_frame_available(texture);
+		atl_surface_texture_unref(texture);
+	}
+}
+
 /* surface_texture: an android.graphics.SurfaceTexture, or NULL to stop */
 JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewTexture(JNIEnv *env, jobject this, jlong camera_ptr,
                                                                               jobject surface_texture)
@@ -173,6 +210,21 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewTexture(JN
 	struct atl_surface_texture *previous = camera->texture;
 	camera->texture = texture;
 	g_mutex_unlock(&camera->texture_lock);
+
+	/* a backend that can render into the texture itself takes it over; the
+	 * NV21 mailbox stays as the fallback if its first update fails */
+	if (previous)
+		atl_surface_texture_set_source(previous, NULL);
+	if (camera->backend->update_preview_texture) {
+		struct atl_surface_texture_source source = {
+			.update = texture_source_update,
+			.get_transform = texture_source_get_transform,
+			.user = camera,
+		};
+		atl_surface_texture_set_source(texture, &source); /* no-op without a texture */
+		if (camera->backend->set_texture_callback)
+			camera->backend->set_texture_callback(camera->camera, texture ? on_texture_frame : NULL, camera);
+	}
 
 	atl_surface_texture_unref(previous);
 }
@@ -330,6 +382,29 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_Camera_native_1setParameters(JN
 	if (fps_max > 0 && !camera->backend->set_fps_range(camera->camera, fps_min, fps_max))
 		return JNI_FALSE;
 	return JNI_TRUE;
+}
+
+/* the Parameters keys that mean something to a real camera HAL; the gst backend
+ * implements none of them and ignores the lot */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setModeParameters(JNIEnv *env, jobject this, jlong camera_ptr,
+                                                                              jstring focus_mode, jstring flash_mode, jint zoom)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (!camera)
+		return;
+	if (camera->backend->set_focus_mode && focus_mode) {
+		const char *mode = _CSTRING(focus_mode);
+		camera->backend->set_focus_mode(camera->camera, mode);
+		(*env)->ReleaseStringUTFChars(env, focus_mode, mode);
+	}
+	if (camera->backend->set_flash_mode && flash_mode) {
+		const char *mode = _CSTRING(flash_mode);
+		camera->backend->set_flash_mode(camera->camera, mode);
+		(*env)->ReleaseStringUTFChars(env, flash_mode, mode);
+	}
+	if (camera->backend->set_zoom)
+		camera->backend->set_zoom(camera->camera, zoom);
 }
 
 /* the picture lands later on Camera.dispatchPictureTaken, off the main loop */

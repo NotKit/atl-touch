@@ -80,6 +80,9 @@ typedef void (*atl_camera_frame_cb)(const uint8_t *nv21, int width, int height,
 typedef void (*atl_camera_jpeg_cb)(const uint8_t *jpeg, size_t size, void *user);
 typedef void (*atl_camera_autofocus_cb)(bool success, void *user);
 typedef void (*atl_camera_error_cb)(int error, void *user);
+/* a new frame is waiting in the backend's preview texture; the consumer has to
+ * call update_preview_texture() from its GL thread */
+typedef void (*atl_camera_texture_cb)(void *user);
 
 struct atl_camera_backend {
 	const char *name;
@@ -115,6 +118,22 @@ struct atl_camera_backend {
 	void (*cancel_autofocus)(struct atl_camera *camera);
 
 	void (*set_display_orientation)(struct atl_camera *camera, int degrees);
+
+	/* Optional Camera.Parameters passthrough; NULL when the backend has no
+	 * such control. Mode strings are the AOSP parameter values
+	 * ("auto", "torch", ...); unknown ones are ignored by the backend. */
+	void (*set_zoom)(struct atl_camera *camera, int zoom);
+	void (*set_focus_mode)(struct atl_camera *camera, const char *mode);
+	void (*set_flash_mode)(struct atl_camera *camera, const char *mode);
+
+	/* Optional hardware preview-texture path: the backend renders preview
+	 * frames straight into the app's GL texture, bypassing the NV21 upload.
+	 * update_preview_texture() runs on the app's GL thread and both binds and
+	 * updates tex_name; false means the fast path is unusable and the caller
+	 * falls back to the frame-callback path. NULL when unsupported. */
+	bool (*update_preview_texture)(struct atl_camera *camera, unsigned tex_name);
+	bool (*get_preview_texture_transform)(struct atl_camera *camera, float matrix[16]);
+	void (*set_texture_callback)(struct atl_camera *camera, atl_camera_texture_cb cb, void *user);
 };
 
 /* The active backend: ATL_CAMERA_BACKEND env var selects by name (gst, hybris,
@@ -125,5 +144,9 @@ const struct atl_camera_backend *atl_camera_backend_get(void);
 
 /* camera_backend_gst.c; NULL when GStreamer fails to initialize */
 const struct atl_camera_backend *atl_camera_backend_gst_get(void);
+
+/* camera_backend_hybris.c; NULL when the libhybris camera compat layer cannot
+ * be dlopen'd (i.e. everywhere but a Halium device) */
+const struct atl_camera_backend *atl_camera_backend_hybris_get(void);
 
 #endif

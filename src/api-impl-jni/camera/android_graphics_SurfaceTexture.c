@@ -78,6 +78,9 @@ struct atl_surface_texture {
 	int default_width;
 	int default_height;
 
+	/* set when the producer fills the texture itself (hybris fast path) */
+	struct atl_surface_texture_source source;
+
 	struct st_bitmap bitmaps[ST_BITMAPS];
 	int next_bitmap;
 	int last_bitmap;
@@ -193,6 +196,43 @@ static gboolean deliver_frame_available(gpointer user)
 	return G_SOURCE_REMOVE;
 }
 
+/* queue onFrameAvailable for the main loop; call with the lock held */
+static void post_frame_available_locked(struct atl_surface_texture *texture)
+{
+	if (!texture->listener_enabled || texture->idle_queued || texture->released)
+		return;
+	texture->idle_queued = true;
+	g_atomic_int_inc(&texture->refcount);
+	g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, deliver_frame_available, texture,
+	                (GDestroyNotify)texture_unref);
+}
+
+void atl_surface_texture_set_source(struct atl_surface_texture *texture,
+                                    const struct atl_surface_texture_source *source)
+{
+	if (!texture)
+		return;
+	g_mutex_lock(&texture->lock);
+	if (source)
+		texture->source = *source;
+	else
+		memset(&texture->source, 0, sizeof(texture->source));
+	g_mutex_unlock(&texture->lock);
+}
+
+void atl_surface_texture_notify_frame_available(struct atl_surface_texture *texture)
+{
+	if (!texture)
+		return;
+	g_mutex_lock(&texture->lock);
+	texture->submitted++;
+	/* the pixels are the producer's business, but getTimestamp() still has to
+	 * move: webrtc timestamps its frames with it */
+	texture->timestamp = g_get_monotonic_time() * 1000;
+	post_frame_available_locked(texture);
+	g_mutex_unlock(&texture->lock);
+}
+
 void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8_t *nv21,
                                 int width, int height, int stride)
 {
@@ -219,12 +259,7 @@ void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8
 	texture->pending_timestamp = g_get_monotonic_time() * 1000; /* ns, like AOSP */
 	texture->submitted++;
 
-	if (texture->listener_enabled && !texture->idle_queued) {
-		texture->idle_queued = true;
-		g_atomic_int_inc(&texture->refcount);
-		g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, deliver_frame_available, texture,
-		                (GDestroyNotify)texture_unref);
-	}
+	post_frame_available_locked(texture);
 out:
 	g_mutex_unlock(&texture->lock);
 }
@@ -317,6 +352,7 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1release(JNIE
 	texture->listener_enabled = false;
 	texture->pending_valid = false;
 	texture->current_valid = false;
+	memset(&texture->source, 0, sizeof(texture->source));
 	for (int i = 0; i < ST_BITMAPS; i++)
 		bitmap_release(&texture->bitmaps[i], env);
 	if (texture->self)
@@ -374,6 +410,17 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1updateTexIma
 		return;
 	}
 
+	/* the producer owns the texture: let it pull in its own newest frame */
+	if (texture->source.update) {
+		if (texture->source.update(texture->source.user, texture->tex_name)) {
+			g_mutex_unlock(&texture->lock);
+			return;
+		}
+		fprintf(stderr, "SurfaceTexture: the producer's texture fast path failed, "
+		                "falling back to the CPU upload\n");
+		memset(&texture->source, 0, sizeof(texture->source));
+	}
+
 	take_frame_locked(texture);
 	if (!texture->current_valid || texture->uploaded_serial == texture->serial) {
 		g_mutex_unlock(&texture->lock);
@@ -425,6 +472,7 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1attachToGLCo
 JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1getTransformMatrix(JNIEnv *env, jobject this,
                                                                                        jlong texture_ptr, jfloatArray matrix)
 {
+	struct atl_surface_texture *texture = _PTR(texture_ptr);
 	/* column-major vertical flip: frames are uploaded top row first, which GL
 	 * samples at t = 1 */
 	static const jfloat vflip[16] = {
@@ -433,8 +481,17 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1getTransform
 		0, 0, 1, 0,
 		0, 1, 0, 1,
 	};
+	jfloat from_source[16];
+	bool have_source = false;
 
-	(*env)->SetFloatArrayRegion(env, matrix, 0, 16, vflip);
+	if (texture) {
+		g_mutex_lock(&texture->lock);
+		if (texture->source.get_transform)
+			have_source = texture->source.get_transform(texture->source.user, from_source);
+		g_mutex_unlock(&texture->lock);
+	}
+
+	(*env)->SetFloatArrayRegion(env, matrix, 0, 16, have_source ? from_source : vflip);
 }
 
 JNIEXPORT jlong JNICALL Java_android_graphics_SurfaceTexture_native_1getTimestamp(JNIEnv *env, jobject this, jlong texture_ptr)

@@ -12,6 +12,11 @@ void atl_camera_nv21_pack(uint8_t *dst, const uint8_t *nv21, int width, int heig
 /* BT.601 video-range NV21 -> RGBA8888 (stride = Y-plane row stride) */
 void atl_camera_nv21_to_rgba(const uint8_t *nv21, int width, int height, int stride, uint8_t *rgba);
 
+/* ATL_CAMERA_DUMP_FRAMES: <dir>/frame-count every frame, <dir>/frame-%06d.png
+ * every 30th (frames 1, 31, ...) — a backend's only view without a display */
+void atl_camera_dump_frame(const char *dir, uint64_t count, const uint8_t *nv21,
+                           int width, int height, int stride);
+
 /* camera_frame_encode.cpp (Skia) */
 bool atl_camera_write_png(const char *path, const uint8_t *rgba, int width, int height);
 /* *out is a malloc'd JPEG buffer owned by the caller */

@@ -143,6 +143,14 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_Camera_native_1setParameters
 
 /*
  * Class:     android_hardware_Camera
+ * Method:    native_setModeParameters
+ * Signature: (JLjava/lang/String;Ljava/lang/String;I)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setModeParameters
+  (JNIEnv *, jobject, jlong, jstring, jstring, jint);
+
+/*
+ * Class:     android_hardware_Camera
  * Method:    native_setDisplayOrientation
  * Signature: (JI)V
  */

@@ -113,34 +113,6 @@ static void apply_caps(struct atl_camera *camera, int width, int height)
 	gst_caps_unref(caps);
 }
 
-static void maybe_dump_frame(struct atl_camera *camera, const uint8_t *nv21, int width, int height, int stride)
-{
-	char path[512];
-	FILE *f;
-
-	if (!camera->dump_dir)
-		return;
-
-	snprintf(path, sizeof(path), "%s/frame-count", camera->dump_dir);
-	f = fopen(path, "w");
-	if (f) {
-		fprintf(f, "%" G_GUINT64_FORMAT "\n", camera->frame_count);
-		fclose(f);
-	}
-
-	if (camera->frame_count % 30 != 1)
-		return;
-
-	uint8_t *rgba = malloc((size_t)width * height * 4);
-	if (!rgba)
-		return;
-	atl_camera_nv21_to_rgba(nv21, width, height, stride, rgba);
-	snprintf(path, sizeof(path), "%s/frame-%06" G_GUINT64_FORMAT ".png", camera->dump_dir, camera->frame_count);
-	if (!atl_camera_write_png(path, rgba, width, height))
-		fprintf(stderr, "Camera gst: failed to write %s\n", path);
-	free(rgba);
-}
-
 static GstFlowReturn on_new_sample(GstAppSink *sink, gpointer user)
 {
 	struct atl_camera *camera = user;
@@ -209,7 +181,7 @@ static GstFlowReturn on_new_sample(GstAppSink *sink, gpointer user)
 	if (cb)
 		cb(nv21, width, height, stride, cb_user);
 
-	maybe_dump_frame(camera, nv21, width, height, stride);
+	atl_camera_dump_frame(camera->dump_dir, camera->frame_count, nv21, width, height, stride);
 
 	gst_video_frame_unmap(&frame);
 	gst_sample_unref(sample);

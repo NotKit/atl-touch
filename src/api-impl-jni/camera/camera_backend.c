@@ -24,16 +24,27 @@ const struct atl_camera_backend *atl_camera_backend_get(void)
 		fprintf(stderr, "Camera: backend 'none' selected, no cameras\n");
 		return NULL;
 	}
-	/* TODO: "hybris" backend (US-009) */
 	if (name && !strcmp(name, "hybris")) {
-		fprintf(stderr, "Camera: backend 'hybris' not implemented yet, no cameras\n");
-		return NULL;
+		backend = atl_camera_backend_hybris_get();
+		if (!backend)
+			fprintf(stderr, "Camera: backend 'hybris' requested but the libhybris camera "
+			                "compat layer is unavailable, no cameras\n");
+		else
+			fprintf(stderr, "Camera: using backend '%s'\n", backend->name);
+		return backend;
 	}
 	if (name && strcmp(name, "gst")) {
 		fprintf(stderr, "Camera: unknown backend '%s' (gst, hybris, none), no cameras\n", name);
 		return NULL;
 	}
-	/* explicit "gst" or auto (hybris would take precedence once it exists) */
+	/* auto: the device backend if its library is there, else gst */
+	if (!name) {
+		backend = atl_camera_backend_hybris_get();
+		if (backend) {
+			fprintf(stderr, "Camera: using backend '%s'\n", backend->name);
+			return backend;
+		}
+	}
 	backend = atl_camera_backend_gst_get();
 	if (backend)
 		fprintf(stderr, "Camera: using backend '%s'\n", backend->name);
