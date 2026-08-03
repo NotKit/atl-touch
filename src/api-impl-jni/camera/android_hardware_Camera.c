@@ -7,6 +7,7 @@
 
 #include "camera_backend.h"
 #include "camera_callbacks.h"
+#include "camera_events.h"
 #include "camera_preview.h"
 #include "surface_texture.h"
 
@@ -19,6 +20,7 @@ struct atl_camera_jni {
 	struct atl_camera *camera;
 	struct atl_camera_preview *preview;
 	struct atl_camera_callbacks *callbacks;
+	struct atl_camera_events *events;
 
 	GMutex texture_lock; /* setPreviewTexture races the backend thread */
 	struct atl_surface_texture *texture;
@@ -43,6 +45,28 @@ static void on_frame(const uint8_t *nv21, int width, int height, int stride, voi
 		atl_surface_texture_submit(texture, nv21, width, height, stride);
 		atl_surface_texture_unref(texture);
 	}
+}
+
+/* backend threads: everything below only queues work for the main loop */
+static void on_jpeg(const uint8_t *jpeg, size_t size, void *user)
+{
+	struct atl_camera_jni *camera = user;
+
+	atl_camera_events_post_picture(camera->events, jpeg, size);
+}
+
+static void on_autofocus(bool success, void *user)
+{
+	struct atl_camera_jni *camera = user;
+
+	atl_camera_events_post_autofocus(camera->events, success);
+}
+
+static void on_error(int error, void *user)
+{
+	struct atl_camera_jni *camera = user;
+
+	atl_camera_events_post_error(camera->events, error);
 }
 
 JNIEXPORT jint JNICALL Java_android_hardware_Camera_native_1getNumberOfCameras(JNIEnv *env, jclass class)
@@ -83,7 +107,9 @@ JNIEXPORT jlong JNICALL Java_android_hardware_Camera_native_1open(JNIEnv *env, j
 	g_mutex_init(&camera->texture_lock);
 	camera->preview = atl_camera_preview_new(env);
 	camera->callbacks = atl_camera_callbacks_new(env, this);
+	camera->events = atl_camera_events_new(env, this);
 	backend->set_frame_callback(session, on_frame, camera);
+	backend->set_error_callback(session, on_error, camera);
 	return _INTPTR(camera);
 }
 
@@ -95,10 +121,14 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release(JNIEnv *env,
 		return;
 	camera->backend->stop_preview(camera->camera);
 	camera->backend->set_frame_callback(camera->camera, NULL, NULL);
+	camera->backend->set_error_callback(camera->camera, NULL, NULL);
+	/* close() first: it joins any capture still in flight, so no backend
+	 * thread can reach the state freed below */
+	camera->backend->close(camera->camera);
 	atl_camera_preview_free(camera->preview, env);
 	atl_camera_callbacks_free(camera->callbacks, env);
+	atl_camera_events_free(camera->events, env);
 	atl_surface_texture_unref(camera->texture);
-	camera->backend->close(camera->camera);
 	g_mutex_clear(&camera->texture_lock);
 	free(camera);
 }
@@ -262,6 +292,38 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_Camera_native_1setParameters(JN
 	if (fps_max > 0 && !camera->backend->set_fps_range(camera->camera, fps_min, fps_max))
 		return JNI_FALSE;
 	return JNI_TRUE;
+}
+
+/* the picture lands later on Camera.dispatchPictureTaken, off the main loop */
+JNIEXPORT jboolean JNICALL Java_android_hardware_Camera_native_1takePicture(JNIEnv *env, jobject this, jlong camera_ptr,
+                                                                            jint width, jint height, jint jpeg_quality)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (!camera)
+		return JNI_FALSE;
+	if (!camera->backend->take_picture(camera->camera, width, height, jpeg_quality, on_jpeg, camera))
+		return JNI_FALSE;
+	/* AOSP fires the shutter as the frame is grabbed; both callbacks go
+	 * through the same idle queue, so this keeps shutter -> jpeg ordering */
+	atl_camera_events_post_shutter(camera->events);
+	return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1autoFocus(JNIEnv *env, jobject this, jlong camera_ptr)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (camera)
+		camera->backend->autofocus(camera->camera, on_autofocus, camera);
+}
+
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1cancelAutoFocus(JNIEnv *env, jobject this, jlong camera_ptr)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (camera)
+		camera->backend->cancel_autofocus(camera->camera);
 }
 
 JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setDisplayOrientation(JNIEnv *env, jobject this, jlong camera_ptr, jint degrees)

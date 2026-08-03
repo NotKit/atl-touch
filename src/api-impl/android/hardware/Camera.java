@@ -421,6 +421,12 @@ public class Camera {
 	private ErrorCallback errorCallback;
 	/* kept alive here as well as by the native global ref, AOSP-style */
 	private PreviewCallback previewCallback;
+	/* one-off callbacks, cleared once they have fired */
+	private ShutterCallback shutterCallback;
+	private PictureCallback rawCallback;
+	private PictureCallback postviewCallback;
+	private PictureCallback jpegCallback;
+	private AutoFocusCallback autoFocusCallback;
 	private SurfaceHolder previewHolder;
 	private android.graphics.SurfaceTexture previewTexture;
 	/* authoritative parameter state; getParameters() hands out copies */
@@ -465,6 +471,11 @@ public class Camera {
 			previewHolder = null;
 			previewTexture = null;
 			previewCallback = null;
+			shutterCallback = null;
+			rawCallback = null;
+			postviewCallback = null;
+			jpegCallback = null;
+			autoFocusCallback = null;
 			native_release(nativePtr);
 			nativePtr = 0;
 		}
@@ -532,6 +543,88 @@ public class Camera {
 		errorCallback = callback;
 	}
 
+	/**
+	 * Captures a picture at the configured picture size. The preview stops as
+	 * the frame is grabbed and only startPreview() brings it back, AOSP-style;
+	 * the callbacks arrive on the main loop in shutter, raw, postview, jpeg
+	 * order. Raw and postview data are always null: no backend produces them.
+	 */
+	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback jpeg) {
+		takePicture(shutter, raw, null, jpeg);
+	}
+
+	public final void takePicture(ShutterCallback shutter, PictureCallback raw,
+			PictureCallback postview, PictureCallback jpeg) {
+		Parameters params = getParameters();
+		Size pictureSize = params.getPictureSize();
+		if (nativePtr == 0 || pictureSize == null)
+			throw new RuntimeException("takePicture failed");
+
+		shutterCallback = shutter;
+		rawCallback = raw;
+		postviewCallback = postview;
+		jpegCallback = jpeg;
+		if (!native_takePicture(nativePtr, pictureSize.width, pictureSize.height,
+				params.getJpegQuality())) {
+			shutterCallback = null;
+			rawCallback = null;
+			postviewCallback = null;
+			jpegCallback = null;
+			throw new RuntimeException("takePicture failed");
+		}
+	}
+
+	/** Focus asynchronously; the callback lands on the main loop. */
+	public final void autoFocus(AutoFocusCallback cb) {
+		autoFocusCallback = cb;
+		if (nativePtr != 0)
+			native_autoFocus(nativePtr);
+	}
+
+	public final void cancelAutoFocus() {
+		autoFocusCallback = null;
+		if (nativePtr != 0)
+			native_cancelAutoFocus(nativePtr);
+	}
+
+	/* --- native -> app callbacks, all called on the main loop --- */
+
+	private void dispatchShutter() {
+		ShutterCallback cb = shutterCallback;
+		shutterCallback = null;
+		if (cb != null)
+			cb.onShutter();
+	}
+
+	private void dispatchPictureTaken(byte[] jpegData) {
+		PictureCallback raw = rawCallback;
+		PictureCallback postview = postviewCallback;
+		PictureCallback jpeg = jpegCallback;
+		rawCallback = null;
+		postviewCallback = null;
+		jpegCallback = null;
+
+		if (raw != null)
+			raw.onPictureTaken(null, this);
+		if (postview != null)
+			postview.onPictureTaken(null, this);
+		if (jpeg != null)
+			jpeg.onPictureTaken(jpegData, this);
+	}
+
+	private void dispatchAutoFocus(boolean success) {
+		AutoFocusCallback cb = autoFocusCallback;
+		autoFocusCallback = null;
+		if (cb != null)
+			cb.onAutoFocus(success, this);
+	}
+
+	private void dispatchError(int error) {
+		ErrorCallback cb = errorCallback;
+		if (cb != null)
+			cb.onError(error, this);
+	}
+
 	public Parameters getParameters() {
 		Parameters params = new Parameters();
 		params.unflatten(parametersFlattened);
@@ -575,6 +668,9 @@ public class Camera {
 	private native void native_setPreviewTexture(long nativePtr, android.graphics.SurfaceTexture surfaceTexture);
 	private native void native_setPreviewCallback(long nativePtr, PreviewCallback cb, int mode);
 	private native void native_addCallbackBuffer(long nativePtr, byte[] callbackBuffer);
+	private native boolean native_takePicture(long nativePtr, int width, int height, int jpegQuality);
+	private native void native_autoFocus(long nativePtr);
+	private native void native_cancelAutoFocus(long nativePtr);
 	private native void native_startPreview(long nativePtr);
 	private native void native_stopPreview(long nativePtr);
 	private native String native_getDefaultParameters(long nativePtr);

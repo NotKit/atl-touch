@@ -41,6 +41,21 @@ struct atl_camera {
 	char *dump_dir;
 	uint8_t *pack_buf; /* scratch for repacking non-contiguous frames */
 	size_t pack_buf_size;
+
+	/* takePicture: the worker thread waits for the streaming thread to hand
+	 * over one frame at picture size, then encodes it (all under lock) */
+	GCond capture_cond;
+	GThread *capture_thread;
+	bool capture_active;
+	bool capture_have_frame;
+	bool capture_abort;
+	int capture_width;
+	int capture_height;
+	int capture_quality;
+	atl_camera_jpeg_cb capture_cb;
+	void *capture_user;
+	uint8_t *capture_nv21;
+	size_t capture_nv21_size;
 };
 
 static const struct atl_camera_size gst_sizes[] = {
@@ -63,14 +78,23 @@ static const struct atl_camera_caps gst_camera_caps = {
 	.max_zoom = 0,
 };
 
-static GstCaps *make_preview_caps(struct atl_camera *camera)
+static GstCaps *make_caps(struct atl_camera *camera, int width, int height)
 {
 	return gst_caps_new_simple("video/x-raw",
 	                           "format", G_TYPE_STRING, "NV21",
-	                           "width", G_TYPE_INT, camera->width,
-	                           "height", G_TYPE_INT, camera->height,
+	                           "width", G_TYPE_INT, width,
+	                           "height", G_TYPE_INT, height,
 	                           "framerate", GST_TYPE_FRACTION, camera->fps_max / 1000, 1,
 	                           NULL);
+}
+
+/* push size/fps to the capsfilter; live pipelines renegotiate */
+static void apply_caps(struct atl_camera *camera, int width, int height)
+{
+	GstCaps *caps = make_caps(camera, width, height);
+
+	g_object_set(camera->capsfilter, "caps", caps, NULL);
+	gst_caps_unref(caps);
 }
 
 static void maybe_dump_frame(struct atl_camera *camera, const uint8_t *nv21, int width, int height, int stride)
@@ -147,7 +171,23 @@ static GstFlowReturn on_new_sample(GstAppSink *sink, gpointer user)
 		fprintf(stderr, "Camera gst: first frame (%dx%d, stride %d)\n", width, height, stride);
 
 	g_mutex_lock(&camera->lock);
-	atl_camera_frame_cb cb = camera->frame_cb;
+	/* a capture in flight owns the stream: the frames are at picture size and
+	 * the preview is about to stop anyway */
+	bool capturing = camera->capture_active;
+	if (capturing && !camera->capture_have_frame &&
+	    width == camera->capture_width && height == camera->capture_height) {
+		size_t need = (size_t)width * height * 3 / 2;
+		if (camera->capture_nv21_size < need) {
+			camera->capture_nv21 = realloc(camera->capture_nv21, need);
+			camera->capture_nv21_size = camera->capture_nv21 ? need : 0;
+		}
+		if (camera->capture_nv21) {
+			atl_camera_nv21_pack(camera->capture_nv21, nv21, width, height, stride);
+			camera->capture_have_frame = true;
+			g_cond_broadcast(&camera->capture_cond);
+		}
+	}
+	atl_camera_frame_cb cb = capturing ? NULL : camera->frame_cb;
 	void *cb_user = camera->frame_user;
 	g_mutex_unlock(&camera->lock);
 	if (cb)
@@ -165,11 +205,16 @@ static GstBusSyncReply on_bus_message(GstBus *bus, GstMessage *message, gpointer
 {
 	struct atl_camera *camera = user;
 
-	if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
-		GError *error = NULL;
-		gst_message_parse_error(message, &error, NULL);
-		fprintf(stderr, "Camera gst: pipeline error: %s\n", error ? error->message : "(no detail)");
-		g_clear_error(&error);
+	/* a source that ends is a camera that died, as far as the app is concerned */
+	if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR || GST_MESSAGE_TYPE(message) == GST_MESSAGE_EOS) {
+		if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
+			GError *error = NULL;
+			gst_message_parse_error(message, &error, NULL);
+			fprintf(stderr, "Camera gst: pipeline error: %s\n", error ? error->message : "(no detail)");
+			g_clear_error(&error);
+		} else {
+			fprintf(stderr, "Camera gst: pipeline reached end of stream\n");
+		}
 
 		g_mutex_lock(&camera->lock);
 		atl_camera_error_cb cb = camera->error_cb;
@@ -213,6 +258,7 @@ static struct atl_camera *gst_camera_open(int id)
 	camera->height = 480;
 	camera->fps_max = 30000;
 	g_mutex_init(&camera->lock);
+	g_cond_init(&camera->capture_cond);
 
 	const char *dump = getenv("ATL_CAMERA_DUMP_FRAMES");
 	if (dump && *dump) {
@@ -240,9 +286,7 @@ static struct atl_camera *gst_camera_open(int id)
 		goto fail;
 	}
 
-	GstCaps *caps = make_preview_caps(camera);
-	g_object_set(camera->capsfilter, "caps", caps, NULL);
-	gst_caps_unref(caps);
+	apply_caps(camera, camera->width, camera->height);
 	/* stay real-time: keep at most 2 queued frames, drop older ones */
 	g_object_set(camera->appsink, "max-buffers", 2, "drop", TRUE, "sync", FALSE, NULL);
 
@@ -267,15 +311,34 @@ fail:
 	return NULL;
 }
 
+/* a capture in flight would outlive the session, so wake it and wait */
+static void gst_camera_join_capture(struct atl_camera *camera, bool abort)
+{
+	if (!camera->capture_thread)
+		return;
+	if (abort) {
+		g_mutex_lock(&camera->lock);
+		camera->capture_abort = true;
+		g_cond_broadcast(&camera->capture_cond);
+		g_mutex_unlock(&camera->lock);
+	}
+	g_thread_join(camera->capture_thread);
+	camera->capture_thread = NULL;
+	camera->capture_abort = false;
+}
+
 static void gst_camera_close(struct atl_camera *camera)
 {
+	gst_camera_join_capture(camera, true);
 	if (camera->pipeline) {
 		gst_element_set_state(camera->pipeline, GST_STATE_NULL);
 		gst_object_unref(camera->pipeline);
 	}
+	g_cond_clear(&camera->capture_cond);
 	g_mutex_clear(&camera->lock);
 	g_free(camera->dump_dir);
 	free(camera->pack_buf);
+	free(camera->capture_nv21);
 	free(camera);
 }
 
@@ -284,12 +347,9 @@ static const struct atl_camera_caps *gst_camera_get_caps(struct atl_camera *came
 	return &gst_camera_caps;
 }
 
-/* push current width/height/fps to the capsfilter; live pipelines renegotiate */
 static bool gst_camera_apply_caps(struct atl_camera *camera)
 {
-	GstCaps *caps = make_preview_caps(camera);
-	g_object_set(camera->capsfilter, "caps", caps, NULL);
-	gst_caps_unref(caps);
+	apply_caps(camera, camera->width, camera->height);
 	return true;
 }
 
@@ -352,11 +412,101 @@ static void gst_camera_stop_preview(struct atl_camera *camera)
 	fprintf(stderr, "Camera gst: preview stopped\n");
 }
 
+/*
+ * Capture worker: waits for the streaming thread to hand over one frame at
+ * picture size, stops the preview (AOSP: startPreview() is needed to resume),
+ * restores the preview caps and JPEG-encodes off the streaming thread.
+ */
+static gpointer capture_worker(gpointer user)
+{
+	struct atl_camera *camera = user;
+	gint64 deadline = g_get_monotonic_time() + 5 * G_TIME_SPAN_SECOND;
+	uint8_t *nv21 = NULL, *rgba = NULL, *jpeg = NULL;
+	size_t jpeg_size = 0;
+
+	g_mutex_lock(&camera->lock);
+	while (!camera->capture_have_frame && !camera->capture_abort)
+		if (!g_cond_wait_until(&camera->capture_cond, &camera->lock, deadline))
+			break;
+	int width = camera->capture_width;
+	int height = camera->capture_height;
+	int quality = camera->capture_quality;
+	atl_camera_jpeg_cb cb = camera->capture_cb;
+	void *cb_user = camera->capture_user;
+	if (camera->capture_have_frame) {
+		nv21 = camera->capture_nv21;
+		camera->capture_nv21 = NULL;
+		camera->capture_nv21_size = 0;
+	}
+	g_mutex_unlock(&camera->lock);
+
+	gst_camera_stop_preview(camera);
+	gst_camera_apply_caps(camera);
+
+	if (nv21) {
+		rgba = malloc((size_t)width * height * 4);
+		if (rgba) {
+			atl_camera_nv21_to_rgba(nv21, width, height, width, rgba);
+			if (!atl_camera_encode_jpeg(rgba, width, height, quality, &jpeg, &jpeg_size))
+				fprintf(stderr, "Camera gst: JPEG encoding failed\n");
+		}
+	} else {
+		fprintf(stderr, "Camera gst: no frame captured at %dx%d\n", width, height);
+	}
+
+	g_mutex_lock(&camera->lock);
+	camera->capture_active = false;
+	g_mutex_unlock(&camera->lock);
+
+	if (jpeg)
+		fprintf(stderr, "Camera gst: captured %dx%d picture, %zu bytes of JPEG\n",
+		        width, height, jpeg_size);
+	cb(jpeg, jpeg_size, cb_user); /* NULL means the capture failed */
+
+	free(jpeg);
+	free(rgba);
+	free(nv21);
+	return NULL;
+}
+
 static bool gst_camera_take_picture(struct atl_camera *camera, int width, int height,
                                     int jpeg_quality, atl_camera_jpeg_cb cb, void *user)
 {
-	fprintf(stderr, "Camera gst: take_picture not implemented yet (US-007)\n");
-	return false;
+	if (width <= 0 || height <= 0 || !cb)
+		return false;
+
+	g_mutex_lock(&camera->lock);
+	bool busy = camera->capture_active;
+	g_mutex_unlock(&camera->lock);
+	if (busy) {
+		fprintf(stderr, "Camera gst: a capture is already in flight\n");
+		return false;
+	}
+	gst_camera_join_capture(camera, false); /* reap the previous capture */
+
+	g_mutex_lock(&camera->lock);
+	camera->capture_active = true;
+	camera->capture_have_frame = false;
+	camera->capture_width = width;
+	camera->capture_height = height;
+	camera->capture_quality = jpeg_quality;
+	camera->capture_cb = cb;
+	camera->capture_user = user;
+	g_mutex_unlock(&camera->lock);
+
+	/* the picture size is usually not the preview size: renegotiate, and make
+	 * sure frames are flowing at all */
+	apply_caps(camera, width, height);
+	if (!camera->previewing && !gst_camera_start_preview(camera)) {
+		g_mutex_lock(&camera->lock);
+		camera->capture_active = false;
+		g_mutex_unlock(&camera->lock);
+		gst_camera_apply_caps(camera);
+		return false;
+	}
+
+	camera->capture_thread = g_thread_new("atl-camera-capture", capture_worker, camera);
+	return true;
 }
 
 /* synthetic source: focus always succeeds immediately; the Java layer

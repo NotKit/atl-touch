@@ -2250,10 +2250,31 @@ public class PackageManager {
 				return System.getenv("ATL_IS_TELEVISION") != null;
 			case FEATURE_WATCH:
 				return System.getenv("ATL_IS_WATCH") != null;
+			case FEATURE_CAMERA:
+			case FEATURE_CAMERA_ANY:
+			case FEATURE_CAMERA_FRONT:
+				return hasCameraFeature(name);
 			default:
 				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
 				return false;
 		}
+	}
+
+	/* the camera backend decides: no backend (or no ATL_UGLY_ENABLE_CAMERA)
+	 * means no cameras and none of these features */
+	static boolean hasCameraFeature(String name) {
+		int count = android.hardware.Camera.getNumberOfCameras();
+
+		if (!FEATURE_CAMERA_FRONT.equals(name))
+			return count > 0;
+
+		android.hardware.Camera.CameraInfo info = new android.hardware.Camera.CameraInfo();
+		for (int i = 0; i < count; i++) {
+			android.hardware.Camera.getCameraInfo(i, info);
+			if (info.facing == android.hardware.Camera.CameraInfo.CAMERA_FACING_FRONT)
+				return true;
+		}
+		return false;
 	}
 
 	/**

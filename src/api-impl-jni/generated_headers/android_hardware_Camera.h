@@ -87,6 +87,30 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1addCallbackBuffer
 
 /*
  * Class:     android_hardware_Camera
+ * Method:    native_takePicture
+ * Signature: (JIII)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_hardware_Camera_native_1takePicture
+  (JNIEnv *, jobject, jlong, jint, jint, jint);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_autoFocus
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1autoFocus
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_cancelAutoFocus
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1cancelAutoFocus
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_hardware_Camera
  * Method:    native_startPreview
  * Signature: (J)V
  */
