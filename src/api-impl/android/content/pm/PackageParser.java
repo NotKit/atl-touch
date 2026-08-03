@@ -296,6 +296,10 @@ public class PackageParser {
 	                                              int gids[], int flags, long firstInstallTime, long lastUpdateTime,
 	                                              HashSet<String> grantedPermissions, PackageUserState state, int userId) {
 
+		/* no manifest was parsed, e.g. when there is no APK */
+		if (p == null) {
+			return null;
+		}
 		if (!checkUseInstalledOrBlocked(flags, state)) {
 			return null;
 		}

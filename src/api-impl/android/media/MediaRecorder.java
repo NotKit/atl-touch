@@ -18,10 +18,24 @@ public class MediaRecorder {
 	public class OutputFormat {
 		public static final int AAC_ADTS = 6;
 		public static final int DEFAULT = 0;
+		public static final int THREE_GPP = 1;
+		public static final int MPEG_4 = 2;
+		public static final int WEBM = 9;
 		public static final int OGG = 11;
 	}
-	public class VideoEncoder {}
-	public class VideoSource {}
+	public class VideoEncoder {
+		public static final int DEFAULT = 0;
+		public static final int H263 = 1;
+		public static final int H264 = 2;
+		public static final int MPEG_4_SP = 3;
+		public static final int VP8 = 4;
+		public static final int HEVC = 5;
+	}
+	public class VideoSource {
+		public static final int DEFAULT = 0;
+		public static final int CAMERA = 1;
+		public static final int SURFACE = 2;
+	}
 
 	public interface OnErrorListener {}
 	public interface OnInfoListener {}

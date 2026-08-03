@@ -73,9 +73,30 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGenTextures__I_3II(JNIEnv *e
 	(*env)->ReleaseIntArrayElements(env, textures_ref, textures, 0);
 }
 
+/*
+ * ATL has no OES external textures: SurfaceTexture uploads its frames into a
+ * plain GL_TEXTURE_2D. Map the target so apps
+ * written against the Android contract (bind the SurfaceTexture name as
+ * GL_TEXTURE_EXTERNAL_OES) hit the texture they actually get. Sampling it from
+ * a shader still needs sampler2D, not samplerExternalOES.
+ */
+#define GL_TEXTURE_EXTERNAL_OES 0x8D65
+
+static GLenum texture_target(jint target)
+{
+	return target == GL_TEXTURE_EXTERNAL_OES ? GL_TEXTURE_2D : (GLenum)target;
+}
+
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glBindTexture(JNIEnv *env, jclass, jint target, jint texture)
 {
-	glBindTexture((GLenum)target, (GLuint)texture);
+	glBindTexture(texture_target(target), (GLuint)texture);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glDeleteTextures__I_3II(JNIEnv *env, jclass, jint n, jintArray textures_ref, jint offset)
+{
+	jint *textures = (*env)->GetIntArrayElements(env, textures_ref, NULL);
+	glDeleteTextures((GLsizei)n, (GLuint *)textures + offset);
+	(*env)->ReleaseIntArrayElements(env, textures_ref, textures, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexImage2D(JNIEnv *env, jclass, jint target, jint level, jint internalformat, jint width, jint height, jint border, jint format, jint type, jobject pixels_buf)
@@ -98,7 +119,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexSubImage2D(JNIEnv *env, j
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameterf(JNIEnv *env, jclass, jint target, jint pname, jfloat param)
 {
-	glTexParameterf((GLenum)target, (GLenum)pname, (GLfloat)param);
+	glTexParameterf(texture_target(target), (GLenum)pname, (GLfloat)param);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGenBuffers__I_3II(JNIEnv *env, jclass, jint n, jintArray buffers_ref, jint offset)
@@ -325,7 +346,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glPixelStorei(JNIEnv *env, jcl
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameteri(JNIEnv *env, jclass this, jint target, jint pname, jint param)
 {
-	glTexParameteri((GLenum)target, (GLenum)pname, (GLint)param);
+	glTexParameteri(texture_target(target), (GLenum)pname, (GLint)param);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetShaderiv__IILjava_nio_IntBuffer_2(JNIEnv *env, jclass this, jint shader, jint pname, jobject params_buf)

@@ -115,16 +115,28 @@ public class ATLMediaContentProvider extends ContentProvider {
 		if (drive) {
 			List<File> result;
 			String name;
-			// content-hub first; UnsatisfiedLinkError (desktop) or null (no broker)
-			// falls through to the folder picker.
+			// A preset folder skips the pick entirely. Apps that read the media
+			// store without the user asking for it (a camera app looking for its
+			// last shot) would otherwise pop the picker out of nowhere, and
+			// headless runs have nobody to answer it.
+			String preset = System.getenv("ATL_MEDIA_FOLDER");
 			ATLContentHub.Peer[] peers = null;
-			boolean contentHub = true;
-			try {
-				peers = ATLContentHub.listSources("pictures");
-			} catch (Throwable t) {
-				contentHub = false;
+			boolean contentHub = false;
+			if (preset == null) {
+				// content-hub first; UnsatisfiedLinkError (desktop) or null (no
+				// broker) falls through to the folder picker.
+				contentHub = true;
+				try {
+					peers = ATLContentHub.listSources("pictures");
+				} catch (Throwable t) {
+					contentHub = false;
+				}
 			}
-			if (contentHub && peers != null) {
+			if (preset != null) {
+				File folder = new File(preset);
+				result = listFolder(folder);
+				name = folder.getName();
+			} else if (contentHub && peers != null) {
 				result = importViaContentHub(peers);
 				name = "Gallery";
 			} else {

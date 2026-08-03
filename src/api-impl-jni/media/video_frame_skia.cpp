@@ -29,4 +29,11 @@ void *atl_video_frame_wrap_skbitmap(uint8_t *pixels, int width, int height)
 	return bitmap;
 }
 
+/* the pixels were rewritten in place (preview buffer reuse): bump the
+ * generation id so cached SkImages of this bitmap get rebuilt */
+void atl_video_frame_skbitmap_pixels_changed(void *skbitmap)
+{
+	((SkBitmap *)skbitmap)->notifyPixelsChanged();
+}
+
 } // extern "C"

@@ -22,10 +22,26 @@ package android.opengl;
  *
  */
 public abstract class EGLObjectHandle {
-	private final int mHandle;
+	private final long mHandle;
 
+	protected EGLObjectHandle(long handle) {
+		mHandle = handle;
+	}
+
+	@Deprecated
 	protected EGLObjectHandle(int handle) {
 		mHandle = handle;
+	}
+
+	/**
+	 * @deprecated Pointers are 64-bit, use {@link #getNativeHandle()} instead.
+	 */
+	@Deprecated
+	public int getHandle() {
+		if ((mHandle & 0xffffffffL) != mHandle) {
+			throw new UnsupportedOperationException();
+		}
+		return (int)mHandle;
 	}
 
 	/**
@@ -36,12 +52,12 @@ public abstract class EGLObjectHandle {
 	 *
 	 * @return the native handle of the wrapped EGL object.
 	 */
-	public int getHandle() {
+	public long getNativeHandle() {
 		return mHandle;
 	}
 
 	@Override
 	public int hashCode() {
-		return getHandle();
+		return (int)(mHandle ^ (mHandle >>> 32));
 	}
 }

@@ -54,7 +54,9 @@ EGLDisplay bionic_eglGetDisplay(EGLNativeDisplayType native_display)
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
 	/* Wayland EGL has no pbuffer support; rewrite EGL_PBUFFER_BIT requests to
-	 * EGL_WINDOW_BIT so config selection doesn't come up empty. */
+	 * EGL_WINDOW_BIT so config selection doesn't come up empty. Only as a
+	 * fallback: on platforms that do have pbuffer configs (surfaceless, X11)
+	 * the rewrite is what would come up empty. */
 	bool has_pbuffer_bit = false;
 	int attrib_list_size = 0;
 	for (EGLint *attr = attrib_list; *attr != EGL_NONE; attr += 2) {
@@ -65,6 +67,12 @@ EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLCo
 	}
 	attrib_list_size += 1; // for EGL_NONE
 	if (has_pbuffer_bit) {
+		EGLint num = 0;
+		if (eglChooseConfig(display, attrib_list, configs, config_size, &num) && num > 0) {
+			*num_config = num;
+			return EGL_TRUE;
+		}
+
 		/* copy the list in case it's mapped read-only */
 		EGLint *new_attrib_list = malloc(sizeof(EGLint) * attrib_list_size);
 		memcpy(new_attrib_list, attrib_list, sizeof(EGLint) * attrib_list_size);
