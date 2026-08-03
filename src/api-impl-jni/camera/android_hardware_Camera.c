@@ -8,6 +8,7 @@
 #include "camera_backend.h"
 #include "camera_callbacks.h"
 #include "camera_preview.h"
+#include "surface_texture.h"
 
 #include "../generated_headers/android_hardware_Camera.h"
 
@@ -18,6 +19,9 @@ struct atl_camera_jni {
 	struct atl_camera *camera;
 	struct atl_camera_preview *preview;
 	struct atl_camera_callbacks *callbacks;
+
+	GMutex texture_lock; /* setPreviewTexture races the backend thread */
+	struct atl_surface_texture *texture;
 };
 
 /* the single backend frame callback, fanned out to every consumer */
@@ -27,6 +31,18 @@ static void on_frame(const uint8_t *nv21, int width, int height, int stride, voi
 
 	atl_camera_preview_submit(camera->preview, nv21, width, height, stride);
 	atl_camera_callbacks_submit(camera->callbacks, nv21, width, height, stride);
+
+	/* hold a reference of our own: the app may release the SurfaceTexture
+	 * while this frame is being handed over */
+	g_mutex_lock(&camera->texture_lock);
+	struct atl_surface_texture *texture = camera->texture;
+	if (texture)
+		atl_surface_texture_ref(texture);
+	g_mutex_unlock(&camera->texture_lock);
+	if (texture) {
+		atl_surface_texture_submit(texture, nv21, width, height, stride);
+		atl_surface_texture_unref(texture);
+	}
 }
 
 JNIEXPORT jint JNICALL Java_android_hardware_Camera_native_1getNumberOfCameras(JNIEnv *env, jclass class)
@@ -64,6 +80,7 @@ JNIEXPORT jlong JNICALL Java_android_hardware_Camera_native_1open(JNIEnv *env, j
 	struct atl_camera_jni *camera = calloc(1, sizeof(*camera));
 	camera->backend = backend;
 	camera->camera = session;
+	g_mutex_init(&camera->texture_lock);
 	camera->preview = atl_camera_preview_new(env);
 	camera->callbacks = atl_camera_callbacks_new(env, this);
 	backend->set_frame_callback(session, on_frame, camera);
@@ -80,7 +97,9 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release(JNIEnv *env,
 	camera->backend->set_frame_callback(camera->camera, NULL, NULL);
 	atl_camera_preview_free(camera->preview, env);
 	atl_camera_callbacks_free(camera->callbacks, env);
+	atl_surface_texture_unref(camera->texture);
 	camera->backend->close(camera->camera);
+	g_mutex_clear(&camera->texture_lock);
 	free(camera);
 }
 
@@ -107,6 +126,25 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewSurface(JN
 
 	if (camera)
 		atl_camera_preview_set_surface(camera->preview, env, surface);
+}
+
+/* surface_texture: an android.graphics.SurfaceTexture, or NULL to stop */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewTexture(JNIEnv *env, jobject this, jlong camera_ptr,
+                                                                              jobject surface_texture)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (!camera)
+		return;
+
+	struct atl_surface_texture *texture = atl_surface_texture_from_java(env, surface_texture);
+
+	g_mutex_lock(&camera->texture_lock);
+	struct atl_surface_texture *previous = camera->texture;
+	camera->texture = texture;
+	g_mutex_unlock(&camera->texture_lock);
+
+	atl_surface_texture_unref(previous);
 }
 
 /* callback: a Camera.PreviewCallback or NULL; mode: ATL_CAMERA_CB_* */

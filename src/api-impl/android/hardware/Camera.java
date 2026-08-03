@@ -422,6 +422,7 @@ public class Camera {
 	/* kept alive here as well as by the native global ref, AOSP-style */
 	private PreviewCallback previewCallback;
 	private SurfaceHolder previewHolder;
+	private android.graphics.SurfaceTexture previewTexture;
 	/* authoritative parameter state; getParameters() hands out copies */
 	private String parametersFlattened;
 	private int displayOrientation = 0;
@@ -462,6 +463,7 @@ public class Camera {
 	public final void release() {
 		if (nativePtr != 0) {
 			previewHolder = null;
+			previewTexture = null;
 			previewCallback = null;
 			native_release(nativePtr);
 			nativePtr = 0;
@@ -479,6 +481,16 @@ public class Camera {
 		Surface surface = holder != null ? holder.getSurface() : null;
 		if (nativePtr != 0)
 			native_setPreviewSurface(nativePtr, surface);
+	}
+
+	/**
+	 * Preview frames into a SurfaceTexture, the path TextureView and the
+	 * texture-capture side of webrtc use. A null texture stops delivery.
+	 */
+	public final void setPreviewTexture(android.graphics.SurfaceTexture surfaceTexture) throws IOException {
+		previewTexture = surfaceTexture;
+		if (nativePtr != 0)
+			native_setPreviewTexture(nativePtr, surfaceTexture);
 	}
 
 	/**
@@ -560,6 +572,7 @@ public class Camera {
 	private native long native_open(int cameraId);
 	private native void native_release(long nativePtr);
 	private native void native_setPreviewSurface(long nativePtr, Surface surface);
+	private native void native_setPreviewTexture(long nativePtr, android.graphics.SurfaceTexture surfaceTexture);
 	private native void native_setPreviewCallback(long nativePtr, PreviewCallback cb, int mode);
 	private native void native_addCallbackBuffer(long nativePtr, byte[] callbackBuffer);
 	private native void native_startPreview(long nativePtr);

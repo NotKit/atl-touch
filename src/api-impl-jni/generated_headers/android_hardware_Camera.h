@@ -63,6 +63,14 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewSurface
 
 /*
  * Class:     android_hardware_Camera
+ * Method:    native_setPreviewTexture
+ * Signature: (JLandroid/graphics/SurfaceTexture;)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewTexture
+  (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:     android_hardware_Camera
  * Method:    native_setPreviewCallback
  * Signature: (JLandroid/hardware/Camera/PreviewCallback;I)V
  */

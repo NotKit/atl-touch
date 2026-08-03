@@ -140,6 +140,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/audio/android_media_AudioTrack.c',
                                                                   	'src/api-impl-jni/audio/android_media_SoundPool.c',
                                                                   	'src/api-impl-jni/audio/audio.c',
+                                                                  	'src/api-impl-jni/camera/android_graphics_SurfaceTexture.c',
                                                                   	'src/api-impl-jni/camera/android_hardware_Camera.c',
                                                                   	'src/api-impl-jni/camera/camera_backend.c',
                                                                   	'src/api-impl-jni/camera/camera_backend_gst.c',
