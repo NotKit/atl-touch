@@ -27,6 +27,30 @@ The following environment variables are recognized by the main executable:
 
 ---
 
+`ATL_UGLY_ENABLE_CAMERA=` - if set, apps will be able to use `android.hardware.Camera`;
+                            without it `getNumberOfCameras()` is 0 and `open()` fails. (TODO: use bubblewrap)
+
+---
+
+`ATL_CAMERA_BACKEND=<gst|hybris|none>` - camera backend; default is hybris if its library loads, else gst.
+                                         `hybris` never falls back to gst, `none` reports zero cameras.
+
+---
+
+`ATL_CAMERA_HYBRIS_LIB=<soname or path>` - library the hybris backend dlopens, default `libcamera.so.1`
+
+---
+
+`ATL_CAMERA_GST_SRC=<gstreamer description>` - source of the gst camera backend, default `videotestsrc is-live=true`
+                                               (e.g. `v4l2src` for a real webcam)
+
+---
+
+`ATL_CAMERA_DUMP_FRAMES=<dir>` - if set, the active camera backend writes a frame counter and every 30th
+                                 preview frame as a PNG into `<dir>`; see `doc/CameraDevice.md`
+
+---
+
 `ATL_UGLY_ENABLE_WEBVIEW=` - if not set, WebView will be stubbed as a generic View; this will avoid
                              wasting resources on WebViews which are only used for fingerprinting and ads
 
