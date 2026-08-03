@@ -71,6 +71,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.security.Provider;
 import java.security.Security;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -145,7 +146,8 @@ public abstract class Context {
 
 		r.applyPackageQuirks(application_info.minSdkVersion);
 
-		for (PackageParser.Activity receiver : pkg.receivers) {
+		/* pkg stays null when no manifest could be parsed (no APK) */
+		for (PackageParser.Activity receiver : pkg != null ? pkg.receivers : new ArrayList<PackageParser.Activity>()) {
 			for (PackageParser.ActivityIntentInfo intent : receiver.intents) {
 				if (intent.matchAction("org.unifiedpush.android.connector.MESSAGE")) {
 					nativeExportUnifiedPush(application_info.packageName);

@@ -1,0 +1,27 @@
+package android.opengl;
+
+public class GLException extends RuntimeException {
+	private final int mError;
+
+	public GLException(int error) {
+		super(getErrorString(error));
+		mError = error;
+	}
+
+	public GLException(int error, String string) {
+		super(string);
+		mError = error;
+	}
+
+	public int getError() {
+		return mError;
+	}
+
+	private static String getErrorString(int error) {
+		String errorString = GLU.gluErrorString(error);
+		if (errorString == null) {
+			errorString = "Unknown error 0x" + Integer.toHexString(error);
+		}
+		return errorString;
+	}
+}

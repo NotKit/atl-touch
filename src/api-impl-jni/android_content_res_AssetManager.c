@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -149,16 +150,24 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_native_1setApkAsset
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
 	const struct ApkAssets *apk_assets[num_assets];
+	int loaded = 0;
 	for (int i = 0; i < num_assets; i++) {
 		jstring path_jstr = (jstring)((*env)->GetObjectArrayElement(env, paths, i));
 		const char *path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
+		const struct ApkAssets *assets;
 		if (path[strlen(path) - 1] == '/')
-			apk_assets[i] = ApkAssets_loadDir(strdup(path));
+			assets = ApkAssets_loadDir(strdup(path));
 		else
-			apk_assets[i] = ApkAssets_load(strdup(path), false);
+			assets = ApkAssets_load(strdup(path), false);
+		/* a path that does not exist comes back NULL, and libandroidfw
+		 * dereferences every entry it is handed */
+		if (assets)
+			apk_assets[loaded++] = assets;
+		else
+			fprintf(stderr, "AssetManager: cannot load assets from %s, skipping\n", path);
 		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
 	}
-	AssetManager_setApkAssets(asset_manager, apk_assets, num_assets, true, true);
+	AssetManager_setApkAssets(asset_manager, apk_assets, loaded, true, true);
 }
 
 JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(JNIEnv *env, jobject this, jint ident, jshort density, jobject outValue, jboolean resolve)
@@ -646,6 +655,10 @@ JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_openXmlAssetNative
 	const char *file_name = (*env)->GetStringUTFChars(env, _file_name, NULL);
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, file_name, ACCESS_BUFFER);
 	(*env)->ReleaseStringUTFChars(env, _file_name, file_name);
+
+	/* 0 is how the caller says "no such file"; it throws FileNotFoundException */
+	if (!asset)
+		return 0;
 
 	struct ResXMLTree *res_xml = ResXMLTree_new();
 	ResXMLTree_setTo(res_xml, Asset_getBuffer(asset, true), Asset_getLength(asset), true);
