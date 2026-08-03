@@ -19,8 +19,7 @@
 
 #include "../media/atl_gst.h"
 #include "camera_backend.h"
-
-bool atl_camera_write_png(const char *path, const uint8_t *rgba, int width, int height);
+#include "camera_frame.h"
 
 struct atl_camera {
 	GstElement *pipeline;
@@ -74,33 +73,6 @@ static GstCaps *make_preview_caps(struct atl_camera *camera)
 	                           NULL);
 }
 
-static inline uint8_t clamp_u8(int v)
-{
-	return v < 0 ? 0 : v > 255 ? 255 : v;
-}
-
-/* BT.601 video-range NV21 -> RGBA, good enough for dump inspection */
-static void nv21_to_rgba(const uint8_t *nv21, int width, int height, int stride, uint8_t *rgba)
-{
-	const uint8_t *y_plane = nv21;
-	const uint8_t *vu_plane = nv21 + (size_t)stride * height;
-
-	for (int row = 0; row < height; row++) {
-		const uint8_t *y_row = y_plane + (size_t)row * stride;
-		const uint8_t *vu_row = vu_plane + (size_t)(row / 2) * stride;
-		uint8_t *out = rgba + (size_t)row * width * 4;
-		for (int col = 0; col < width; col++) {
-			int c = 298 * (y_row[col] - 16);
-			int v = vu_row[(col & ~1)] - 128;
-			int u = vu_row[(col & ~1) + 1] - 128;
-			out[col * 4 + 0] = clamp_u8((c + 409 * v + 128) >> 8);
-			out[col * 4 + 1] = clamp_u8((c - 100 * u - 208 * v + 128) >> 8);
-			out[col * 4 + 2] = clamp_u8((c + 516 * u + 128) >> 8);
-			out[col * 4 + 3] = 0xff;
-		}
-	}
-}
-
 static void maybe_dump_frame(struct atl_camera *camera, const uint8_t *nv21, int width, int height, int stride)
 {
 	char path[512];
@@ -122,7 +94,7 @@ static void maybe_dump_frame(struct atl_camera *camera, const uint8_t *nv21, int
 	uint8_t *rgba = malloc((size_t)width * height * 4);
 	if (!rgba)
 		return;
-	nv21_to_rgba(nv21, width, height, stride, rgba);
+	atl_camera_nv21_to_rgba(nv21, width, height, stride, rgba);
 	snprintf(path, sizeof(path), "%s/frame-%06" G_GUINT64_FORMAT ".png", camera->dump_dir, camera->frame_count);
 	if (!atl_camera_write_png(path, rgba, width, height))
 		fprintf(stderr, "Camera gst: failed to write %s\n", path);

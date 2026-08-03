@@ -47,6 +47,14 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release
 
 /*
  * Class:     android_hardware_Camera
+ * Method:    native_setPreviewSurface
+ * Signature: (JLandroid/view/Surface;)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewSurface
+  (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:     android_hardware_Camera
  * Method:    native_startPreview
  * Signature: (J)V
  */

@@ -1,5 +1,9 @@
 package android.hardware;
 
+import android.view.Surface;
+import android.view.SurfaceHolder;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -409,6 +413,7 @@ public class Camera {
 	private long nativePtr;
 	private int cameraId = -1;
 	private ErrorCallback errorCallback;
+	private SurfaceHolder previewHolder;
 	/* authoritative parameter state; getParameters() hands out copies */
 	private String parametersFlattened;
 	private int displayOrientation = 0;
@@ -448,9 +453,23 @@ public class Camera {
 
 	public final void release() {
 		if (nativePtr != 0) {
+			previewHolder = null;
 			native_release(nativePtr);
 			nativePtr = 0;
 		}
+	}
+
+	/**
+	 * Preview frames are converted to bitmaps and posted through
+	 * Surface.postFrame, the same path MediaCodec uses for decoded video.
+	 * A null holder (or one without a surface) stops delivery, which is what
+	 * apps do from surfaceDestroyed().
+	 */
+	public final void setPreviewDisplay(SurfaceHolder holder) throws IOException {
+		previewHolder = holder;
+		Surface surface = holder != null ? holder.getSurface() : null;
+		if (nativePtr != 0)
+			native_setPreviewSurface(nativePtr, surface);
 	}
 
 	public void setErrorCallback(ErrorCallback callback) {
@@ -496,6 +515,7 @@ public class Camera {
 	private static native void native_getCameraInfo(int cameraId, CameraInfo cameraInfo);
 	private native long native_open(int cameraId);
 	private native void native_release(long nativePtr);
+	private native void native_setPreviewSurface(long nativePtr, Surface surface);
 	private native void native_startPreview(long nativePtr);
 	private native void native_stopPreview(long nativePtr);
 	private native String native_getDefaultParameters(long nativePtr);
