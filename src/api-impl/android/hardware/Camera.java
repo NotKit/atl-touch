@@ -410,9 +410,17 @@ public class Camera {
 		return 0;
 	}
 
+	/* preview callback modes, must match camera_callbacks.h */
+	private static final int PREVIEW_CB_NONE = 0;
+	private static final int PREVIEW_CB_EVERY_FRAME = 1;
+	private static final int PREVIEW_CB_ONE_SHOT = 2;
+	private static final int PREVIEW_CB_WITH_BUFFER = 3;
+
 	private long nativePtr;
 	private int cameraId = -1;
 	private ErrorCallback errorCallback;
+	/* kept alive here as well as by the native global ref, AOSP-style */
+	private PreviewCallback previewCallback;
 	private SurfaceHolder previewHolder;
 	/* authoritative parameter state; getParameters() hands out copies */
 	private String parametersFlattened;
@@ -454,6 +462,7 @@ public class Camera {
 	public final void release() {
 		if (nativePtr != 0) {
 			previewHolder = null;
+			previewCallback = null;
 			native_release(nativePtr);
 			nativePtr = 0;
 		}
@@ -470,6 +479,41 @@ public class Camera {
 		Surface surface = holder != null ? holder.getSurface() : null;
 		if (nativePtr != 0)
 			native_setPreviewSurface(nativePtr, surface);
+	}
+
+	/**
+	 * NV21 preview frames as byte arrays, delivered on the main loop. Each
+	 * callback gets a freshly allocated array; setPreviewCallbackWithBuffer()
+	 * is the variant that recycles the app's own buffers instead.
+	 */
+	public final void setPreviewCallback(PreviewCallback cb) {
+		setPreviewCallback(cb, cb != null ? PREVIEW_CB_EVERY_FRAME : PREVIEW_CB_NONE);
+	}
+
+	/** Like setPreviewCallback(), but the callback fires for one frame only. */
+	public final void setOneShotPreviewCallback(PreviewCallback cb) {
+		setPreviewCallback(cb, cb != null ? PREVIEW_CB_ONE_SHOT : PREVIEW_CB_NONE);
+	}
+
+	/**
+	 * Preview frames written into buffers the app supplies through
+	 * addCallbackBuffer(). Nothing is delivered while the queue is empty, so
+	 * the app has to re-add a buffer once it is done with it.
+	 */
+	public final void setPreviewCallbackWithBuffer(PreviewCallback cb) {
+		setPreviewCallback(cb, cb != null ? PREVIEW_CB_WITH_BUFFER : PREVIEW_CB_NONE);
+	}
+
+	private void setPreviewCallback(PreviewCallback cb, int mode) {
+		previewCallback = cb;
+		if (nativePtr != 0)
+			native_setPreviewCallback(nativePtr, cb, mode);
+	}
+
+	/** Queues a buffer for setPreviewCallbackWithBuffer(); it must hold a whole frame. */
+	public final void addCallbackBuffer(byte[] callbackBuffer) {
+		if (callbackBuffer != null && nativePtr != 0)
+			native_addCallbackBuffer(nativePtr, callbackBuffer);
 	}
 
 	public void setErrorCallback(ErrorCallback callback) {
@@ -516,6 +560,8 @@ public class Camera {
 	private native long native_open(int cameraId);
 	private native void native_release(long nativePtr);
 	private native void native_setPreviewSurface(long nativePtr, Surface surface);
+	private native void native_setPreviewCallback(long nativePtr, PreviewCallback cb, int mode);
+	private native void native_addCallbackBuffer(long nativePtr, byte[] callbackBuffer);
 	private native void native_startPreview(long nativePtr);
 	private native void native_stopPreview(long nativePtr);
 	private native String native_getDefaultParameters(long nativePtr);

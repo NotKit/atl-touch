@@ -251,15 +251,7 @@ void atl_camera_preview_submit(struct atl_camera_preview *preview, const uint8_t
 		g_mutex_unlock(&preview->lock);
 		return;
 	}
-	if (stride == width) {
-		memcpy(preview->pending, nv21, size);
-	} else {
-		for (int row = 0; row < height; row++)
-			memcpy(preview->pending + (size_t)row * width, nv21 + (size_t)row * stride, width);
-		for (int row = 0; row < height / 2; row++)
-			memcpy(preview->pending + (size_t)width * height + (size_t)row * width,
-			       nv21 + (size_t)stride * height + (size_t)row * stride, width);
-	}
+	atl_camera_nv21_pack(preview->pending, nv21, width, height, stride);
 	if (preview->pending_valid) /* the poster thread is behind: keep the newest frame only */
 		preview->dropped++;
 	preview->pending_valid = true;

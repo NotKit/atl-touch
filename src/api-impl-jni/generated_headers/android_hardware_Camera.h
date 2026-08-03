@@ -13,6 +13,14 @@ extern "C" {
 #define android_hardware_Camera_CAMERA_ERROR_EVICTED 2L
 #undef android_hardware_Camera_CAMERA_ERROR_SERVER_DIED
 #define android_hardware_Camera_CAMERA_ERROR_SERVER_DIED 100L
+#undef android_hardware_Camera_PREVIEW_CB_NONE
+#define android_hardware_Camera_PREVIEW_CB_NONE 0L
+#undef android_hardware_Camera_PREVIEW_CB_EVERY_FRAME
+#define android_hardware_Camera_PREVIEW_CB_EVERY_FRAME 1L
+#undef android_hardware_Camera_PREVIEW_CB_ONE_SHOT
+#define android_hardware_Camera_PREVIEW_CB_ONE_SHOT 2L
+#undef android_hardware_Camera_PREVIEW_CB_WITH_BUFFER
+#define android_hardware_Camera_PREVIEW_CB_WITH_BUFFER 3L
 /*
  * Class:     android_hardware_Camera
  * Method:    native_getNumberOfCameras
@@ -52,6 +60,22 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release
  */
 JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewSurface
   (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_setPreviewCallback
+ * Signature: (JLandroid/hardware/Camera/PreviewCallback;I)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewCallback
+  (JNIEnv *, jobject, jlong, jobject, jint);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_addCallbackBuffer
+ * Signature: (J[B)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1addCallbackBuffer
+  (JNIEnv *, jobject, jlong, jbyteArray);
 
 /*
  * Class:     android_hardware_Camera

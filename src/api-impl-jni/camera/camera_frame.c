@@ -1,8 +1,22 @@
 /* Pixel helpers shared by the camera backends and the preview path. */
 
 #include <stddef.h>
+#include <string.h>
 
 #include "camera_frame.h"
+
+void atl_camera_nv21_pack(uint8_t *dst, const uint8_t *nv21, int width, int height, int stride)
+{
+	if (stride == width) {
+		memcpy(dst, nv21, (size_t)width * height * 3 / 2);
+		return;
+	}
+	for (int row = 0; row < height; row++)
+		memcpy(dst + (size_t)row * width, nv21 + (size_t)row * stride, width);
+	for (int row = 0; row < height / 2; row++)
+		memcpy(dst + (size_t)width * height + (size_t)row * width,
+		       nv21 + (size_t)stride * height + (size_t)row * stride, width);
+}
 
 static inline uint8_t clamp_u8(int v)
 {

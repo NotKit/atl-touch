@@ -6,23 +6,27 @@
 #include "../defines.h"
 
 #include "camera_backend.h"
+#include "camera_callbacks.h"
 #include "camera_preview.h"
 
 #include "../generated_headers/android_hardware_Camera.h"
 
 /* what Camera.nativePtr points at: the backend session plus the JNI-side
- * state hanging off it (preview target now, callbacks in later stories) */
+ * state hanging off it */
 struct atl_camera_jni {
 	const struct atl_camera_backend *backend;
 	struct atl_camera *camera;
 	struct atl_camera_preview *preview;
+	struct atl_camera_callbacks *callbacks;
 };
 
+/* the single backend frame callback, fanned out to every consumer */
 static void on_frame(const uint8_t *nv21, int width, int height, int stride, void *user)
 {
 	struct atl_camera_jni *camera = user;
 
 	atl_camera_preview_submit(camera->preview, nv21, width, height, stride);
+	atl_camera_callbacks_submit(camera->callbacks, nv21, width, height, stride);
 }
 
 JNIEXPORT jint JNICALL Java_android_hardware_Camera_native_1getNumberOfCameras(JNIEnv *env, jclass class)
@@ -61,6 +65,7 @@ JNIEXPORT jlong JNICALL Java_android_hardware_Camera_native_1open(JNIEnv *env, j
 	camera->backend = backend;
 	camera->camera = session;
 	camera->preview = atl_camera_preview_new(env);
+	camera->callbacks = atl_camera_callbacks_new(env, this);
 	backend->set_frame_callback(session, on_frame, camera);
 	return _INTPTR(camera);
 }
@@ -74,6 +79,7 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1release(JNIEnv *env,
 	camera->backend->stop_preview(camera->camera);
 	camera->backend->set_frame_callback(camera->camera, NULL, NULL);
 	atl_camera_preview_free(camera->preview, env);
+	atl_camera_callbacks_free(camera->callbacks, env);
 	camera->backend->close(camera->camera);
 	free(camera);
 }
@@ -101,6 +107,25 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewSurface(JN
 
 	if (camera)
 		atl_camera_preview_set_surface(camera->preview, env, surface);
+}
+
+/* callback: a Camera.PreviewCallback or NULL; mode: ATL_CAMERA_CB_* */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewCallback(JNIEnv *env, jobject this, jlong camera_ptr,
+                                                                               jobject callback, jint mode)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (camera)
+		atl_camera_callbacks_set(camera->callbacks, env, callback, mode);
+}
+
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1addCallbackBuffer(JNIEnv *env, jobject this, jlong camera_ptr,
+                                                                              jbyteArray buffer)
+{
+	struct atl_camera_jni *camera = _PTR(camera_ptr);
+
+	if (camera)
+		atl_camera_callbacks_add_buffer(camera->callbacks, env, buffer);
 }
 
 static void append_size_values(GString *s, const char *key, const struct atl_camera_size *sizes, int n)
