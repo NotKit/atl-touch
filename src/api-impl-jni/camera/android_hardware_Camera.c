@@ -203,6 +203,18 @@ static void append_size_values(GString *s, const char *key, const struct atl_cam
 		g_string_append_printf(s, "%s%dx%d", i ? "," : "", sizes[i].width, sizes[i].height);
 }
 
+/* "<key>=<first mode>;<key>-values=<modes>"; nothing at all when unsupported,
+ * which is how AOSP reports a mode the HAL does not have. */
+static void append_mode_list(GString *s, const char *key, const char *modes)
+{
+	if (!modes || !*modes)
+		return;
+	const char *comma = strchr(modes, ',');
+	g_string_append_printf(s, ";%s=%.*s;%s-values=%s", key,
+	                       comma ? (int)(comma - modes) : (int)strlen(modes), modes,
+	                       key, modes);
+}
+
 /* Camera.Parameters defaults, flattened AOSP-style (key=value;key=value) */
 JNIEXPORT jstring JNICALL Java_android_hardware_Camera_native_1getDefaultParameters(JNIEnv *env, jobject this, jlong camera_ptr)
 {
@@ -255,21 +267,47 @@ JNIEXPORT jstring JNICALL Java_android_hardware_Camera_native_1getDefaultParamet
 			g_string_append_printf(s, "%s%d", n_rates++ ? "," : "", rate);
 	}
 
-	if (caps->focus_modes) {
-		const char *comma = strchr(caps->focus_modes, ',');
-		g_string_append_printf(s, ";focus-mode=%.*s;focus-mode-values=%s",
-		                       comma ? (int)(comma - caps->focus_modes) : (int)strlen(caps->focus_modes),
-		                       caps->focus_modes, caps->focus_modes);
-	}
-	if (caps->flash_modes) {
-		const char *comma = strchr(caps->flash_modes, ',');
-		g_string_append_printf(s, ";flash-mode=%.*s;flash-mode-values=%s",
-		                       comma ? (int)(comma - caps->flash_modes) : (int)strlen(caps->flash_modes),
-		                       caps->flash_modes, caps->flash_modes);
-	}
+	append_mode_list(s, "focus-mode", caps->focus_modes);
+	append_mode_list(s, "flash-mode", caps->flash_modes);
+
+	append_mode_list(s, "scene-mode", caps->scene_modes);
+	append_mode_list(s, "whitebalance", caps->white_balance_modes);
+	append_mode_list(s, "effect", caps->color_effects);
+	append_mode_list(s, "antibanding", caps->antibanding_modes);
 
 	g_string_append_printf(s, ";zoom-supported=%s;max-zoom=%d;zoom=0",
 	                       caps->zoom_supported ? "true" : "false", caps->max_zoom);
+	if (caps->zoom_supported) {
+		g_string_append(s, ";zoom-ratios=");
+		for (i = 0; i <= caps->max_zoom; i++)
+			g_string_append_printf(s, "%s%d", i ? "," : "", 100 + i * 10);
+	}
+
+	/* video sizes mirror the preview sizes: the gst pipeline is one source */
+	append_size_values(s, "video-size-values", caps->preview_sizes, caps->n_preview_sizes);
+	g_string_append_printf(s, ";video-size=%dx%d;preferred-preview-size-for-video=%dx%d",
+	                       caps->preview_sizes[0].width, caps->preview_sizes[0].height,
+	                       caps->preview_sizes[0].width, caps->preview_sizes[0].height);
+	g_string_append_printf(s, ";video-snapshot-supported=%s;video-stabilization-supported=%s",
+	                       caps->video_snapshot_supported ? "true" : "false",
+	                       caps->video_stabilization_supported ? "true" : "false");
+
+	if (caps->horizontal_view_angle > 0)
+		g_string_append_printf(s, ";horizontal-view-angle=%g", caps->horizontal_view_angle);
+	if (caps->vertical_view_angle > 0)
+		g_string_append_printf(s, ";vertical-view-angle=%g", caps->vertical_view_angle);
+
+	g_string_append_printf(s, ";exposure-compensation=0;min-exposure-compensation=%d"
+	                          ";max-exposure-compensation=%d;exposure-compensation-step=%g",
+	                       caps->min_exposure_compensation, caps->max_exposure_compensation,
+	                       caps->exposure_compensation_step);
+	g_string_append_printf(s, ";max-num-focus-areas=%d;max-num-metering-areas=%d",
+	                       caps->max_num_focus_areas, caps->max_num_metering_areas);
+	g_string_append_printf(s, ";max-num-detected-faces-hw=%d;max-num-detected-faces-sw=0",
+	                       caps->max_num_detected_faces);
+	/* no backend can lock AE/AWB, and AOSP omits the keys when unsupported */
+	g_string_append(s, ";auto-exposure-lock-supported=false;auto-whitebalance-lock-supported=false");
+
 	g_string_append(s, ";jpeg-quality=85;rotation=0");
 
 	jstring result = _JSTRING(s->str);

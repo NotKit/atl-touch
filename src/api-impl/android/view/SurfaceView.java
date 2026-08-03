@@ -70,12 +70,25 @@ public class SurfaceView extends View {
 			surfaceChanged(1 /*RGBA_8888*/, w, h);
 	}
 
+	private final Rect frameSrc = new Rect();
+	private final Rect frameDst = new Rect();
+
+	/*
+	 * On AOSP the posted frames live in a separate compositor layer below the
+	 * view, so a subclass drawing its own content in onDraw() (Open Camera puts
+	 * its whole HUD there) ends up on top of them. Blitting here rather than in
+	 * onDraw() reproduces that order, and keeps working when the subclass does
+	 * not chain to super.onDraw().
+	 */
 	@Override
-	public void onDraw(android.graphics.Canvas canvas) {
+	public void draw(android.graphics.Canvas canvas) {
 		android.graphics.Bitmap frame = frontBuffer;
-		if (frame != null)
-			canvas.drawBitmap(frame, new android.graphics.Rect(0, 0, frame.getWidth(), frame.getHeight()),
-			                  new android.graphics.Rect(0, 0, getWidth(), getHeight()), null);
+		if (frame != null) {
+			frameSrc.set(0, 0, frame.getWidth(), frame.getHeight());
+			frameDst.set(0, 0, getWidth(), getHeight());
+			canvas.drawBitmap(frame, frameSrc, frameDst, null);
+		}
+		super.draw(canvas);
 	}
 
 	void postFrame(android.graphics.Bitmap frame) {

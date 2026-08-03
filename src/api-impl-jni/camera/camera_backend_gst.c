@@ -74,8 +74,24 @@ static const struct atl_camera_caps gst_camera_caps = {
 	.n_fps_ranges = G_N_ELEMENTS(gst_fps_ranges),
 	.focus_modes = "fixed,infinity",
 	.flash_modes = "off",
+	/* a video source has no scene/white-balance/effect/antibanding control */
+	.scene_modes = NULL,
+	.white_balance_modes = NULL,
+	.color_effects = NULL,
+	.antibanding_modes = NULL,
 	.zoom_supported = false,
 	.max_zoom = 0,
+	/* nominal 4:3 webcam optics; apps use these only to size focus overlays */
+	.horizontal_view_angle = 60.0f,
+	.vertical_view_angle = 45.0f,
+	.min_exposure_compensation = 0,
+	.max_exposure_compensation = 0,
+	.exposure_compensation_step = 0.0f,
+	.max_num_focus_areas = 0,
+	.max_num_metering_areas = 0,
+	.max_num_detected_faces = 0,
+	.video_snapshot_supported = false,
+	.video_stabilization_supported = false,
 };
 
 static GstCaps *make_caps(struct atl_camera *camera, int width, int height)

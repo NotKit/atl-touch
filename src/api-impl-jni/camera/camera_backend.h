@@ -52,8 +52,24 @@ struct atl_camera_caps {
 	 * NULL means unsupported and the parameter key is omitted */
 	const char *focus_modes;
 	const char *flash_modes;
+	const char *scene_modes;
+	const char *white_balance_modes;
+	const char *color_effects;
+	const char *antibanding_modes;
 	bool zoom_supported;
 	int max_zoom; /* 0 when zoom is unsupported */
+	/* lens field of view in degrees; 0 means unknown */
+	float horizontal_view_angle;
+	float vertical_view_angle;
+	/* exposure compensation index range and EV step; all zero = unsupported */
+	int min_exposure_compensation;
+	int max_exposure_compensation;
+	float exposure_compensation_step;
+	int max_num_focus_areas;
+	int max_num_metering_areas;
+	int max_num_detected_faces;
+	bool video_snapshot_supported;
+	bool video_stabilization_supported;
 };
 
 /* Preview frame in NV21 layout (Y plane, then interleaved VU); stride is the

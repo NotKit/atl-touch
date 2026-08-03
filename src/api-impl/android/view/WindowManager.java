@@ -47,6 +47,11 @@ public interface WindowManager {
 		public static final int TYPE_TOAST = 2005;
 		public static final int TYPE_APPLICATION_OVERLAY = 2038;
 
+		public static final int ROTATION_ANIMATION_ROTATE = 0;
+		public static final int ROTATION_ANIMATION_CROSSFADE = 1;
+		public static final int ROTATION_ANIMATION_JUMPCUT = 2;
+		public static final int ROTATION_ANIMATION_SEAMLESS = 3;
+
 		public static final int SOFT_INPUT_MASK_ADJUST = 0xf0;
 		public static final int SOFT_INPUT_ADJUST_UNSPECIFIED = 0x00;
 		public static final int SOFT_INPUT_ADJUST_RESIZE = 0x10;
@@ -66,6 +71,8 @@ public interface WindowManager {
 		public IBinder token;
 		public int format;
 		public int layoutInDisplayCutoutMode;
+		/* ROTATION_ANIMATION_*; ATL never rotates the window, so it is stored only */
+		public int rotationAnimation = ROTATION_ANIMATION_ROTATE;
 		public String packageName;
 		public CharSequence title;
 
@@ -132,6 +139,7 @@ public interface WindowManager {
 			this.softInputMode = o.softInputMode;
 			this.screenBrightness = o.screenBrightness;
 			this.windowAnimations = o.windowAnimations;
+			this.rotationAnimation = o.rotationAnimation;
 			this.packageName = o.packageName;
 			this.title = o.title;
 			this.floatingWidthMajor = o.floatingWidthMajor;

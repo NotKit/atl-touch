@@ -212,9 +212,12 @@ public abstract class Context {
 	public abstract Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException;
 
 	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
-		if (receiver == null)
-			return null;
-		receiverMap.put(filter, receiver);
+		if (receiver != null)
+			receiverMap.put(filter, receiver);
+		/* AOSP hands back the matching sticky broadcast; apps that pass a null
+		 * receiver only want that (Open Camera reads the battery level this way)
+		 * and do not expect null, so return an empty Intent and let them fall
+		 * back to their own defaults. */
 		return new Intent();
 	}
 

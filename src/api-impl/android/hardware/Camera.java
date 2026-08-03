@@ -1,5 +1,6 @@
 package android.hardware;
 
+import android.graphics.Rect;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
@@ -32,6 +33,45 @@ public class Camera {
 
 	public interface ErrorCallback {
 		void onError(int error, Camera camera);
+	}
+
+	public interface AutoFocusMoveCallback {
+		void onAutoFocusMoving(boolean start, Camera camera);
+	}
+
+	public interface FaceDetectionListener {
+		void onFaceDetection(Face[] faces, Camera camera);
+	}
+
+	/** Detected face. No backend reports faces, so these are never delivered. */
+	public static class Face {
+		public Rect rect;
+		public int score;
+		public int id = -1;
+		public android.graphics.Point leftEye;
+		public android.graphics.Point rightEye;
+		public android.graphics.Point mouth;
+	}
+
+	/** A weighted rectangle in the -1000..1000 coordinate space, for focus/metering areas. */
+	public static class Area {
+		public Rect rect;
+		public int weight;
+
+		public Area(Rect rect, int weight) {
+			this.rect = rect;
+			this.weight = weight;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof Area))
+				return false;
+			Area a = (Area)obj;
+			if (rect == null ? a.rect != null : !rect.equals(a.rect))
+				return false;
+			return weight == a.weight;
+		}
 	}
 
 	public static class CameraInfo {
@@ -83,6 +123,37 @@ public class Camera {
 		public static final String FLASH_MODE_ON = "on";
 		public static final String FLASH_MODE_RED_EYE = "red-eye";
 		public static final String FLASH_MODE_TORCH = "torch";
+
+		public static final String EFFECT_NONE = "none";
+		public static final String EFFECT_MONO = "mono";
+		public static final String EFFECT_NEGATIVE = "negative";
+		public static final String EFFECT_SOLARIZE = "solarize";
+		public static final String EFFECT_SEPIA = "sepia";
+		public static final String EFFECT_POSTERIZE = "posterize";
+		public static final String EFFECT_WHITEBOARD = "whiteboard";
+		public static final String EFFECT_BLACKBOARD = "blackboard";
+		public static final String EFFECT_AQUA = "aqua";
+
+		public static final String WHITE_BALANCE_AUTO = "auto";
+		public static final String WHITE_BALANCE_INCANDESCENT = "incandescent";
+		public static final String WHITE_BALANCE_FLUORESCENT = "fluorescent";
+		public static final String WHITE_BALANCE_WARM_FLUORESCENT = "warm-fluorescent";
+		public static final String WHITE_BALANCE_DAYLIGHT = "daylight";
+		public static final String WHITE_BALANCE_CLOUDY_DAYLIGHT = "cloudy-daylight";
+		public static final String WHITE_BALANCE_TWILIGHT = "twilight";
+		public static final String WHITE_BALANCE_SHADE = "shade";
+
+		public static final String SCENE_MODE_AUTO = "auto";
+		public static final String SCENE_MODE_ACTION = "action";
+		public static final String SCENE_MODE_PORTRAIT = "portrait";
+		public static final String SCENE_MODE_LANDSCAPE = "landscape";
+		public static final String SCENE_MODE_NIGHT = "night";
+		public static final String SCENE_MODE_HDR = "hdr";
+
+		public static final String ANTIBANDING_AUTO = "auto";
+		public static final String ANTIBANDING_50HZ = "50hz";
+		public static final String ANTIBANDING_60HZ = "60hz";
+		public static final String ANTIBANDING_OFF = "off";
 
 		public static final int PREVIEW_FPS_MIN_INDEX = 0;
 		public static final int PREVIEW_FPS_MAX_INDEX = 1;
@@ -316,7 +387,225 @@ public class Camera {
 			return getInt("jpeg-quality", 85);
 		}
 
+		/* --- image adjustment modes; a null "-values" list means unsupported --- */
+
+		public void setWhiteBalance(String value) {
+			set("whitebalance", value);
+		}
+
+		public String getWhiteBalance() {
+			return get("whitebalance");
+		}
+
+		public List<String> getSupportedWhiteBalance() {
+			return splitStrings(get("whitebalance-values"));
+		}
+
+		public void setColorEffect(String value) {
+			set("effect", value);
+		}
+
+		public String getColorEffect() {
+			return get("effect");
+		}
+
+		public List<String> getSupportedColorEffects() {
+			return splitStrings(get("effect-values"));
+		}
+
+		public void setSceneMode(String value) {
+			set("scene-mode", value);
+		}
+
+		public String getSceneMode() {
+			return get("scene-mode");
+		}
+
+		public List<String> getSupportedSceneModes() {
+			return splitStrings(get("scene-mode-values"));
+		}
+
+		public void setAntibanding(String value) {
+			set("antibanding", value);
+		}
+
+		public String getAntibanding() {
+			return get("antibanding");
+		}
+
+		public List<String> getSupportedAntibanding() {
+			return splitStrings(get("antibanding-values"));
+		}
+
+		/* --- exposure --- */
+
+		public void setExposureCompensation(int value) {
+			set("exposure-compensation", value);
+		}
+
+		public int getExposureCompensation() {
+			return getInt("exposure-compensation", 0);
+		}
+
+		public int getMinExposureCompensation() {
+			return getInt("min-exposure-compensation", 0);
+		}
+
+		public int getMaxExposureCompensation() {
+			return getInt("max-exposure-compensation", 0);
+		}
+
+		public float getExposureCompensationStep() {
+			return getFloat("exposure-compensation-step", 0);
+		}
+
+		public boolean isAutoExposureLockSupported() {
+			return "true".equals(get("auto-exposure-lock-supported"));
+		}
+
+		public void setAutoExposureLock(boolean toggle) {
+			set("auto-exposure-lock", toggle ? "true" : "false");
+		}
+
+		public boolean getAutoExposureLock() {
+			return "true".equals(get("auto-exposure-lock"));
+		}
+
+		public boolean isAutoWhiteBalanceLockSupported() {
+			return "true".equals(get("auto-whitebalance-lock-supported"));
+		}
+
+		public void setAutoWhiteBalanceLock(boolean toggle) {
+			set("auto-whitebalance-lock", toggle ? "true" : "false");
+		}
+
+		public boolean getAutoWhiteBalanceLock() {
+			return "true".equals(get("auto-whitebalance-lock"));
+		}
+
+		/* --- focus / metering areas; with a max of 0 the setters are no-ops --- */
+
+		public int getMaxNumFocusAreas() {
+			return getInt("max-num-focus-areas", 0);
+		}
+
+		public List<Area> getFocusAreas() {
+			return splitAreas(get("focus-areas"));
+		}
+
+		public void setFocusAreas(List<Area> focusAreas) {
+			set("focus-areas", flattenAreas(focusAreas));
+		}
+
+		public int getMaxNumMeteringAreas() {
+			return getInt("max-num-metering-areas", 0);
+		}
+
+		public List<Area> getMeteringAreas() {
+			return splitAreas(get("metering-areas"));
+		}
+
+		public void setMeteringAreas(List<Area> meteringAreas) {
+			set("metering-areas", flattenAreas(meteringAreas));
+		}
+
+		/* --- lens / face detection --- */
+
+		public float getHorizontalViewAngle() {
+			return getFloat("horizontal-view-angle", 0);
+		}
+
+		public float getVerticalViewAngle() {
+			return getFloat("vertical-view-angle", 0);
+		}
+
+		public int getMaxNumDetectedFaces() {
+			return getInt("max-num-detected-faces-hw", 0);
+		}
+
+		/* --- video --- */
+
+		public List<Size> getSupportedVideoSizes() {
+			return splitSizes(get("video-size-values"));
+		}
+
+		public Size getPreferredPreviewSizeForVideo() {
+			return strToSize(get("preferred-preview-size-for-video"));
+		}
+
+		public boolean isVideoSnapshotSupported() {
+			return "true".equals(get("video-snapshot-supported"));
+		}
+
+		public boolean isVideoStabilizationSupported() {
+			return "true".equals(get("video-stabilization-supported"));
+		}
+
+		public void setVideoStabilization(boolean toggle) {
+			set("video-stabilization", toggle ? "true" : "false");
+		}
+
+		public boolean getVideoStabilization() {
+			return "true".equals(get("video-stabilization"));
+		}
+
+		public void setRecordingHint(boolean hint) {
+			set("recording-hint", hint ? "true" : "false");
+		}
+
+		/* --- zoom ratios --- */
+
+		public List<Integer> getZoomRatios() {
+			String str = get("zoom-ratios");
+			if (str == null)
+				return null;
+			ArrayList<Integer> ratios = new ArrayList<Integer>();
+			for (String s : str.split(","))
+				ratios.add(Integer.parseInt(s));
+			return ratios;
+		}
+
+		/* --- jpeg EXIF geotagging; stored only, no backend consumes it yet --- */
+
+		public void setGpsLatitude(double latitude) {
+			set("gps-latitude", Double.toString(latitude));
+		}
+
+		public void setGpsLongitude(double longitude) {
+			set("gps-longitude", Double.toString(longitude));
+		}
+
+		public void setGpsAltitude(double altitude) {
+			set("gps-altitude", Double.toString(altitude));
+		}
+
+		public void setGpsTimestamp(long timestamp) {
+			set("gps-timestamp", Long.toString(timestamp));
+		}
+
+		public void setGpsProcessingMethod(String processing_method) {
+			set("gps-processing-method", processing_method);
+		}
+
+		public void removeGpsData() {
+			remove("gps-latitude");
+			remove("gps-longitude");
+			remove("gps-altitude");
+			remove("gps-timestamp");
+			remove("gps-processing-method");
+		}
+
 		/* --- parsing helpers --- */
+
+		private float getFloat(String key, float defaultValue) {
+			try {
+				return Float.parseFloat(map.get(key));
+			} catch (NumberFormatException e) {
+				return defaultValue;
+			} catch (NullPointerException e) {
+				return defaultValue;
+			}
+		}
 
 		private Size strToSize(String str) {
 			if (str == null)
@@ -377,6 +666,41 @@ public class Camera {
 			}
 			return ranges;
 		}
+
+		/* "(-10,-10,10,10,1),(...)" -> list of Area */
+		private List<Area> splitAreas(String str) {
+			if (str == null || str.length() < 2 || str.charAt(0) != '('
+					|| str.charAt(str.length() - 1) != ')')
+				return null;
+			ArrayList<Area> areas = new ArrayList<Area>();
+			int fromIndex = 1;
+			int[] area = new int[5];
+			while (true) {
+				int endIndex = str.indexOf("),(", fromIndex);
+				if (endIndex == -1)
+					endIndex = str.length() - 1;
+				splitInt(str.substring(fromIndex, endIndex), area);
+				areas.add(new Area(new Rect(area[0], area[1], area[2], area[3]), area[4]));
+				if (endIndex == str.length() - 1)
+					break;
+				fromIndex = endIndex + 3;
+			}
+			return areas;
+		}
+
+		private String flattenAreas(List<Area> areas) {
+			if (areas == null || areas.isEmpty())
+				return "(0,0,0,0,0)";
+			StringBuilder sb = new StringBuilder();
+			for (Area a : areas) {
+				if (sb.length() > 0)
+					sb.append(',');
+				sb.append('(').append(a.rect.left).append(',').append(a.rect.top).append(',')
+						.append(a.rect.right).append(',').append(a.rect.bottom).append(',')
+						.append(a.weight).append(')');
+			}
+			return sb.toString();
+		}
 	}
 
 	/* AOSP mapping between ImageFormat ints and Parameters format strings */
@@ -427,6 +751,8 @@ public class Camera {
 	private PictureCallback postviewCallback;
 	private PictureCallback jpegCallback;
 	private AutoFocusCallback autoFocusCallback;
+	private AutoFocusMoveCallback autoFocusMoveCallback;
+	private FaceDetectionListener faceDetectionListener;
 	private SurfaceHolder previewHolder;
 	private android.graphics.SurfaceTexture previewTexture;
 	/* authoritative parameter state; getParameters() hands out copies */
@@ -476,6 +802,8 @@ public class Camera {
 			postviewCallback = null;
 			jpegCallback = null;
 			autoFocusCallback = null;
+			autoFocusMoveCallback = null;
+			faceDetectionListener = null;
 			native_release(nativePtr);
 			nativePtr = 0;
 		}
@@ -541,6 +869,46 @@ public class Camera {
 
 	public void setErrorCallback(ErrorCallback callback) {
 		errorCallback = callback;
+	}
+
+	/**
+	 * Continuous-focus move notifications. No backend reports focus movement,
+	 * so the callback is stored but never fires.
+	 */
+	public void setAutoFocusMoveCallback(AutoFocusMoveCallback cb) {
+		autoFocusMoveCallback = cb;
+	}
+
+	/**
+	 * Face detection. getMaxNumDetectedFaces() is 0 on every backend, so
+	 * startFaceDetection() is the AOSP error case for an app that ignores it.
+	 */
+	public void setFaceDetectionListener(FaceDetectionListener listener) {
+		faceDetectionListener = listener;
+	}
+
+	public final void startFaceDetection() {
+		throw new IllegalArgumentException("Face detection is not supported");
+	}
+
+	public final void stopFaceDetection() {}
+
+	/**
+	 * Shutter sound control. ATL plays no shutter sound, so disabling always
+	 * succeeds and enabling is a no-op.
+	 */
+	public final boolean enableShutterSound(boolean enabled) {
+		return true;
+	}
+
+	/* Camera ownership is per-process here: nothing else can grab the device. */
+	public final void lock() {}
+
+	public final void unlock() {}
+
+	public final void reconnect() throws IOException {
+		if (nativePtr == 0)
+			throw new IOException("camera is released");
 	}
 
 	/**
