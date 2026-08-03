@@ -58,6 +58,10 @@ static const struct atl_camera_caps gst_camera_caps = {
 	.n_picture_sizes = G_N_ELEMENTS(gst_sizes),
 	.fps_ranges = gst_fps_ranges,
 	.n_fps_ranges = G_N_ELEMENTS(gst_fps_ranges),
+	.focus_modes = "fixed,infinity",
+	.flash_modes = "off",
+	.zoom_supported = false,
+	.max_zoom = 0,
 };
 
 static GstCaps *make_preview_caps(struct atl_camera *camera)

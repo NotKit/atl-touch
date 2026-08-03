@@ -48,6 +48,12 @@ struct atl_camera_caps {
 	int n_picture_sizes;
 	const struct atl_camera_fps_range *fps_ranges;
 	int n_fps_ranges;
+	/* comma-joined Camera.Parameters value strings ("fixed,infinity");
+	 * NULL means unsupported and the parameter key is omitted */
+	const char *focus_modes;
+	const char *flash_modes;
+	bool zoom_supported;
+	int max_zoom; /* 0 when zoom is unsupported */
 };
 
 /* Preview frame in NV21 layout (Y plane, then interleaved VU); stride is the

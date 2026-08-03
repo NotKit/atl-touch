@@ -61,6 +61,30 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1startPreview
 JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1stopPreview
   (JNIEnv *, jobject, jlong);
 
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_getDefaultParameters
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_hardware_Camera_native_1getDefaultParameters
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_setParameters
+ * Signature: (JIIIII)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_hardware_Camera_native_1setParameters
+  (JNIEnv *, jobject, jlong, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_hardware_Camera
+ * Method:    native_setDisplayOrientation
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setDisplayOrientation
+  (JNIEnv *, jobject, jlong, jint);
+
 #ifdef __cplusplus
 }
 #endif
