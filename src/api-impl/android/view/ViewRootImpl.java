@@ -307,7 +307,15 @@ public class ViewRootImpl implements ViewParent {
 			// a panel is a window of its own size: clip like AOSP's surface would,
 			// so panel damage (the panel's bounds) covers everything it can draw
 			canvas.clipRect(0, 0, panel.view.getWidth(), panel.view.getHeight());
+			// ...and give it that surface. On AOSP a panel draws into its own
+			// transparent buffer which the compositor blends over the window, so a
+			// non-SrcOver paint in the panel never touches the layer below. Drawing
+			// straight onto the shared canvas would let it: Telegram's bottom sheets
+			// paint their dim with PorterDuff.SRC, which replaced the whole activity
+			// with black instead of shading it.
+			int layer = canvas.saveLayer(0, 0, panel.view.getWidth(), panel.view.getHeight(), null);
 			panel.view.draw(canvas);
+			canvas.restoreToCount(layer);
 			canvas.restore();
 		}
 	}
