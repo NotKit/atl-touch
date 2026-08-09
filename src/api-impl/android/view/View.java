@@ -2920,6 +2920,12 @@ public class View implements Drawable.Callback {
 		return handler;
 	}
 
+	/* Deliberately false, even though ATL draws through Skia on the GPU and its
+	 * DisplayListCanvas already says isHardwareAccelerated(). Returning true
+	 * moves Compose off ViewLayer onto its RenderNode layer path, and there a
+	 * needed redraw goes missing: LibreSudoku ends a frame early and leaves its
+	 * board text unfinished in about two runs in five. Revisit once that redraw
+	 * is reliable. */
 	public boolean isHardwareAccelerated() {
 		return false;
 	}
