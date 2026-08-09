@@ -3,6 +3,7 @@ package android.view;
 import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
+import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
 import java.util.ArrayList;
 import java.util.List;
@@ -197,6 +198,10 @@ public class RenderNode {
 		return changed;
 	}
 
+	public boolean getClipToBounds() {
+		return clipToBounds;
+	}
+
 	public boolean setClipToBounds(boolean clipToBounds) {
 		boolean changed = this.clipToBounds != clipToBounds;
 		this.clipToBounds = clipToBounds;
@@ -292,7 +297,9 @@ public class RenderNode {
 		this.height = height;
 		children.clear();
 		children_nodes.clear();
-		return new DisplayListCanvas(nativeCreateSnapshot(), true) {
+		/* a RecordingCanvas so android.graphics.RenderNode.beginRecording() can
+		 * hand out the type its own API promises */
+		return new RecordingCanvas(nativeCreateSnapshot()) {
 			/* the native recording canvas has no meaningful size (infinite cull
 			 * rect); report the node's size like AOSP's RecordingCanvas */
 			@Override

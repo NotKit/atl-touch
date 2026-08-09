@@ -271,6 +271,7 @@ srcs = [
 	'android/graphics/PorterDuffXfermode.java',
 	'android/graphics/RadialGradient.java',
 	'android/graphics/Rasterizer.java',
+	'android/graphics/RecordingCanvas.java',
 	'android/graphics/Rect.java',
 	'android/graphics/RectF.java',
 	'android/graphics/Region.java',
