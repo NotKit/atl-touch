@@ -15,6 +15,7 @@ public class SurfaceView extends View {
 	 * pixels, and the layer shows through from below - which is how anything
 	 * ATL draws afterwards (toolbars, dialogs, panels) ends up on top. */
 	private long mLayer;
+	private boolean mLayerVisible = true;
 	private boolean mZOrderOnTop;
 	private boolean mFixedSize;
 	private int mFixedWidth, mFixedHeight;
@@ -103,20 +104,26 @@ public class SurfaceView extends View {
 	@Override
 	public void draw(android.graphics.Canvas canvas) {
 		updateLayer();
-		if (mLayer != 0 && !mZOrderOnTop) {
+		android.graphics.Bitmap frame = frontBuffer;
+		if (frame != null) {
+			/* a CPU producer (camera preview, MediaCodec) posts into this view.
+			 * Nothing is presenting into the layer then, so a hole would show
+			 * the desktop instead of the frame: unmap the layer and blit. */
+			if (mLayerVisible) {
+				mLayerVisible = false;
+				if (mLayer != 0)
+					native_setLayerVisible(mLayer, false);
+			}
+			frameSrc.set(0, 0, frame.getWidth(), frame.getHeight());
+			frameDst.set(0, 0, getWidth(), getHeight());
+			canvas.drawBitmap(frame, frameSrc, frameDst, null);
+		} else if (mLayer != 0 && !mZOrderOnTop) {
 			/* the punch-hole: the scene reaches the toplevel's buffer unblended,
 			 * so this really does write alpha 0 and let the layer through */
 			int save = canvas.save();
 			canvas.clipRect(0, 0, getWidth(), getHeight());
 			canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
 			canvas.restoreToCount(save);
-		} else {
-			android.graphics.Bitmap frame = frontBuffer;
-			if (frame != null) {
-				frameSrc.set(0, 0, frame.getWidth(), frame.getHeight());
-				frameDst.set(0, 0, getWidth(), getHeight());
-				canvas.drawBitmap(frame, frameSrc, frameDst, null);
-			}
 		}
 		super.draw(canvas);
 	}
@@ -140,6 +147,8 @@ public class SurfaceView extends View {
 			}
 			if (mZOrderOnTop)
 				native_setLayerZ(mLayer, true);
+			if (!mLayerVisible)
+				native_setLayerVisible(mLayer, false);
 		}
 		locationInWindow(mLayerLocation);
 		if (mLayerLocation[0] != mLayerX || mLayerLocation[1] != mLayerY ||
