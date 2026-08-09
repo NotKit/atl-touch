@@ -70,6 +70,11 @@ public class JobScheduler {
 		return 1; //RESULT_SUCCESS
 	}
 
+	public void cancelAll() {
+		for (Integer id : new ArrayList<>(pendingJobs.keySet()))
+			cancel(id);
+	}
+
 	public void cancel(int id) {
 		JobInfo job = pendingJobs.remove(id);
 		if (job != null && job.running) {

@@ -1,6 +1,7 @@
 package android.app.job;
 
 import android.content.ComponentName;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.PersistableBundle;
 
@@ -70,6 +71,18 @@ public class JobInfo {
 			return this;
 		}
 
+		public Builder setExpedited(boolean expedited) {
+			return this;
+		}
+
+		public Builder setImportantWhileForeground(boolean importantWhileForeground) {
+			return this;
+		}
+
+		public Builder setTraceTag(String traceTag) {
+			return this;
+		}
+
 		public Builder setPeriodic(long dummy) {
 			jobInfo.periodicMillis = dummy;
 			return this;
@@ -80,6 +93,10 @@ public class JobInfo {
 		}
 
 		public Builder setRequiredNetworkType(int networkType) {
+			return this;
+		}
+
+		public Builder setRequiredNetwork(NetworkRequest networkRequest) {
 			return this;
 		}
 
@@ -100,6 +117,14 @@ public class JobInfo {
 		}
 
 		public Builder addTriggerContentUri(TriggerContentUri triggerContentUri) {
+			return this;
+		}
+
+		public Builder setTriggerContentUpdateDelay(long durationMs) {
+			return this;
+		}
+
+		public Builder setTriggerContentMaxDelay(long durationMs) {
 			return this;
 		}
 
