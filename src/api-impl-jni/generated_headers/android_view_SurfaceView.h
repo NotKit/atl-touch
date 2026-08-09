@@ -237,6 +237,78 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createSnapshot
 
 /*
  * Class:     android_view_SurfaceView
+ * Method:    native_layersAvailable
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_view_SurfaceView_native_1layersAvailable
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_createLayer
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createLayer
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_destroyLayer
+ * Signature: (JLandroid/view/Surface;)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1destroyLayer
+  (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_bindSurface
+ * Signature: (Landroid/view/Surface;JII)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1bindSurface
+  (JNIEnv *, jobject, jobject, jlong, jint, jint);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_setLayerGeometry
+ * Signature: (JIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1setLayerGeometry
+  (JNIEnv *, jobject, jlong, jint, jint, jint, jint);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_setLayerBufferSize
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1setLayerBufferSize
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_setLayerZ
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1setLayerZ
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_setLayerVisible
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1setLayerVisible
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_startTestClient
+ * Signature: (Landroid/view/Surface;)V
+ */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1startTestClient
+  (JNIEnv *, jobject, jobject);
+
+/*
+ * Class:     android_view_SurfaceView
  * Method:    native_canvas_to_bitmap
  * Signature: (J)J
  */

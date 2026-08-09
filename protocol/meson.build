@@ -9,6 +9,7 @@ wayland_scanner = find_program('wayland-scanner')
 wl_protos = [
   ['input-method-unstable-v2.xml'],
   ['virtual-keyboard-unstable-v1.xml'],
+  [wl_protocol_dir, 'stable', 'viewporter', 'viewporter.xml'],
 ]
 
 wl_proto_sources = []

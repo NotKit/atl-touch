@@ -22,6 +22,10 @@
 
 #include "generated_headers/android_view_ViewRootImpl.h"
 
+#include "viewporter-client-protocol.h"
+#include "widgets/atl_surface_layer.h"
+#include "../libandroid/native_window.h"
+
 struct ATLWindow {
 	GLFWwindow *glfw_window;
 	jobject view_root; // global ref, NULL until attached
@@ -303,6 +307,10 @@ static const struct wl_seat_listener atl_wl_seat_listener = {
 	.name = atl_wl_seat_name,
 };
 
+static struct wl_compositor *wayland_compositor;
+static struct wl_subcompositor *wayland_subcompositor;
+static struct wp_viewporter *wayland_viewporter;
+
 static void atl_wl_registry_global(void *data, struct wl_registry *registry, uint32_t name,
                                    const char *interface, uint32_t version)
 {
@@ -311,8 +319,19 @@ static void atl_wl_registry_global(void *data, struct wl_registry *registry, uin
 		seat = wl_registry_bind(registry, name, &wl_seat_interface,
 		                        version < 5 ? version : 5);
 		wl_seat_add_listener(seat, &atl_wl_seat_listener, NULL);
+	} else if (!strcmp(interface, wl_compositor_interface.name) && !wayland_compositor) {
+		wayland_compositor = wl_registry_bind(registry, name, &wl_compositor_interface,
+		                                      version < 6 ? version : 6);
+	} else if (!strcmp(interface, wl_subcompositor_interface.name) && !wayland_subcompositor) {
+		wayland_subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
+	} else if (!strcmp(interface, wp_viewporter_interface.name) && !wayland_viewporter) {
+		wayland_viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
 	}
 }
+
+struct wl_compositor *atl_wayland_compositor(void) { return wayland_compositor; }
+struct wl_subcompositor *atl_wayland_subcompositor(void) { return wayland_subcompositor; }
+struct wp_viewporter *atl_wayland_viewporter(void) { return wayland_viewporter; }
 
 static void atl_wl_registry_global_remove(void *data, struct wl_registry *registry, uint32_t name)
 {
@@ -323,7 +342,7 @@ static const struct wl_registry_listener atl_wl_registry_listener = {
 	.global_remove = atl_wl_registry_global_remove,
 };
 
-static void atl_touch_init(void)
+static void atl_wayland_init(void)
 {
 	static bool done;
 	if (done)
@@ -689,6 +708,10 @@ static void atl_window_render(ATLWindow *window)
 
 	if (window->canvas_is_gpu) {
 		atl_canvas_gpu_present(window->gpu_context, canvas, width, height);
+	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+		atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+		                               width, height, atl_window_scale(window));
+	}
 		glfwSwapBuffers(window->glfw_window);
 		window->needs_redraw = false;
 		window->full_redraw = false;
@@ -755,6 +778,10 @@ static void atl_window_render(ATLWindow *window)
 	glEnableVertexAttribArray(window->gl_attr_pos);
 	glEnableVertexAttribArray(window->gl_attr_uv);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+		atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+		                               width, height, atl_window_scale(window));
+	}
 	glfwSwapBuffers(window->glfw_window);
 
 	window->needs_redraw = false;
@@ -863,7 +890,10 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwSetFramebufferSizeCallback(window->glfw_window, on_framebuffer_size);
 	glfwSetWindowCloseCallback(window->glfw_window, on_window_close);
 	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
-		atl_touch_init();
+		atl_wayland_init();
+	/* a SurfaceView's wl_egl_window only works on the display GLFW made its
+	 * Wayland connection on, so that is the one an app's eglGetDisplay gets */
+	bionic_egl_set_primary_display(glfwGetEGLDisplay());
 	glfwMakeContextCurrent(window->glfw_window);
 	glfwSwapInterval(0); // frame pacing comes from the render tick, don't block on vsync
 
@@ -1002,6 +1032,35 @@ bool atl_screen_size(int *width, int *height)
 	*width = mode->width;
 	*height = mode->height;
 	return true;
+}
+
+/* --- what the subsurface layers need from their parent toplevel --- */
+
+struct wl_surface *atl_window_wl_surface(ATLWindow *window)
+{
+	if (!window || glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
+		return NULL;
+	return glfwGetWaylandWindow(window->glfw_window);
+}
+
+/* framebuffer pixels per logical (wayland surface-local) pixel */
+double atl_window_scale(ATLWindow *window)
+{
+	int fb_w = 0, fb_h = 0, win_w = 0, win_h = 0;
+
+	if (!window)
+		return 1;
+	glfwGetFramebufferSize(window->glfw_window, &fb_w, &fb_h);
+	glfwGetWindowSize(window->glfw_window, &win_w, &win_h);
+	return win_w > 0 ? (double)fb_w / win_w : 1;
+}
+
+void atl_window_invalidate(ATLWindow *window)
+{
+	if (window) {
+		window->needs_redraw = true;
+		window->full_redraw = true;
+	}
 }
 
 int atl_window_get_width(ATLWindow *window)

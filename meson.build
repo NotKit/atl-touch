@@ -197,6 +197,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/input/input_method.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
+                                                                  	'src/api-impl-jni/widgets/atl_surface_layer.c',
                                                                   	'src/api-impl-jni/widgets/android_webkit_WebView.cpp',
                                                                   	mpris,
                                                                   	portal_openuri,
@@ -212,7 +213,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   install_rpath: '$ORIGIN/:' + get_option('prefix') / get_option('libdir') / 'art',
                                                                   dependencies: [
                                                                         extra_deps,
-                                                                  	dependency('gio-2.0'), dependency('graphene-1.0'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
+                                                                  	dependency('gio-2.0'), dependency('graphene-1.0'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('wayland-egl'), dependency('jni'),
                                                                   	dependency('glfw3'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),

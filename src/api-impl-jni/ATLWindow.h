@@ -45,6 +45,19 @@ void atl_window_set_clipboard(ATLWindow *window, const char *text);
 const char *atl_window_get_clipboard(ATLWindow *window);
 bool atl_window_is_maximized(ATLWindow *window);
 
+/* --- Wayland objects the subsurface layers hang off (NULL off Wayland) --- */
+struct wl_compositor;
+struct wl_subcompositor;
+struct wp_viewporter;
+struct wl_surface;
+struct wl_compositor *atl_wayland_compositor(void);
+struct wl_subcompositor *atl_wayland_subcompositor(void);
+struct wp_viewporter *atl_wayland_viewporter(void);
+struct wl_surface *atl_window_wl_surface(ATLWindow *window);
+/* framebuffer pixels per logical pixel */
+double atl_window_scale(ATLWindow *window);
+void atl_window_invalidate(ATLWindow *window);
+
 /* size of the primary monitor in pixels; false if there is no monitor
  * (or GLFW is not initialized yet), in which case *width/*height are
  * left untouched */
