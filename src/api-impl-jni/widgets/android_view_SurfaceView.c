@@ -133,7 +133,9 @@ struct surface_test {
 static void *surface_test_thread(void *data)
 {
 	struct surface_test *test = data;
-	EGLDisplay display = (EGLDisplay)atl_primary_egl_display();
+	/* deliberately through the route-B entry points, so this exercises what a
+	 * natively-built (non-bionic) client has to call */
+	EGLDisplay display = ANativeWindow_getEGLDisplay();
 	EGLint config_attrs[] = {
 	    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
 	    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
@@ -151,7 +153,7 @@ static void *surface_test_thread(void *data)
 		fprintf(stderr, "ATL_SURFACE_TEST: eglChooseConfig failed 0x%x\n", eglGetError());
 		return NULL;
 	}
-	surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType)test->window->egl_window, NULL);
+	surface = ANativeWindow_createEGLSurface(test->window, display, config, NULL);
 	if (surface == EGL_NO_SURFACE) {
 		fprintf(stderr, "ATL_SURFACE_TEST: eglCreateWindowSurface failed 0x%x\n", eglGetError());
 		return NULL;

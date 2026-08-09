@@ -63,6 +63,19 @@ EGLDisplay bionic_eglGetDisplay(EGLNativeDisplayType native_display)
 	return eglGetDisplay(EGL_DEFAULT_DISPLAY);
 }
 
+EGLDisplay ANativeWindow_getEGLDisplay(void)
+{
+	return primary_display != EGL_NO_DISPLAY ? primary_display : eglGetDisplay(EGL_DEFAULT_DISPLAY);
+}
+
+EGLSurface ANativeWindow_createEGLSurface(struct ANativeWindow *native_window, EGLDisplay display,
+                                          EGLConfig config, const EGLint *attrib_list)
+{
+	if (!native_window || !native_window->egl_window)
+		return EGL_NO_SURFACE;
+	return bionic_eglCreateWindowSurface(display, config, native_window, attrib_list);
+}
+
 EGLBoolean bionic_eglTerminate(EGLDisplay display)
 {
 	/* the whole process shares one display with GLFW and Skia; an app that

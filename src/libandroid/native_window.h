@@ -31,6 +31,17 @@ struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct w
                                             void *egl_window, int width, int height);
 void atl_native_window_detach(struct ANativeWindow *native_window);
 
+/*
+ * For code that is not loaded through bionic_translation (route B: Gecko built
+ * natively against glibc), whose eglGetDisplay() goes straight to the host
+ * libEGL and would get a different display over a different connection, and
+ * whose eglCreateWindowSurface() would be handed an ANativeWindow * where the
+ * host expects a struct wl_egl_window *.
+ */
+EGLDisplay ANativeWindow_getEGLDisplay(void);
+EGLSurface ANativeWindow_createEGLSurface(struct ANativeWindow *native_window, EGLDisplay display,
+                                          EGLConfig config, const EGLint *attrib_list);
+
 /* the EGLDisplay GLFW created its Wayland connection on: a wl_egl_window is
  * only usable on that display, so app-side eglGetDisplay() must return it */
 void bionic_egl_set_primary_display(EGLDisplay display);
