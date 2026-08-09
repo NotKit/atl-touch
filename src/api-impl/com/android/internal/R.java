@@ -21902,44 +21902,44 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int use_lock_pattern_drawable = 0x0111000f;
 	}
 	public static final class color {
-		public static final int GM2_grey_800 = 0x010600cc;
+		public static final int GM2_grey_800 = 0x01060130;
 		/**  Material Cyan 300
          */
-		public static final int SIM_color_blue = 0x010600ba;
+		public static final int SIM_color_blue = 0x0106011e;
 		/**  Grey
  Multi-sim sim colors
          */
-		public static final int SIM_color_cyan = 0x010600b8;
+		public static final int SIM_color_cyan = 0x0106011c;
 		/**  Material Blue 300
          */
-		public static final int SIM_color_green = 0x010600bc;
+		public static final int SIM_color_green = 0x01060120;
 		/**  Material Pink 300
          */
-		public static final int SIM_color_orange = 0x010600c2;
+		public static final int SIM_color_orange = 0x01060126;
 		/**  Material Purple 300
          */
-		public static final int SIM_color_pink = 0x010600c0;
+		public static final int SIM_color_pink = 0x01060124;
 		/**  Material Green 300
          */
-		public static final int SIM_color_purple = 0x010600be;
+		public static final int SIM_color_purple = 0x01060122;
 		/**  Material Blue 800
          */
-		public static final int SIM_dark_mode_color_blue = 0x010600bb;
+		public static final int SIM_dark_mode_color_blue = 0x0106011f;
 		/**  Material Custom Cyan
          */
-		public static final int SIM_dark_mode_color_cyan = 0x010600b9;
+		public static final int SIM_dark_mode_color_cyan = 0x0106011d;
 		/**  Material Green 800
          */
-		public static final int SIM_dark_mode_color_green = 0x010600bd;
+		public static final int SIM_dark_mode_color_green = 0x01060121;
 		/**  Material Custom Orange
          */
-		public static final int SIM_dark_mode_color_orange = 0x010600c3;
+		public static final int SIM_dark_mode_color_orange = 0x01060127;
 		/**  Material Pink 800
          */
-		public static final int SIM_dark_mode_color_pink = 0x010600c1;
+		public static final int SIM_dark_mode_color_pink = 0x01060125;
 		/**  Material Purple 800
          */
-		public static final int SIM_dark_mode_color_purple = 0x010600bf;
+		public static final int SIM_dark_mode_color_purple = 0x01060123;
 		public static final int accent_device_default = 0x01060253;
 		/**
        accent_device_default_dark
@@ -21969,7 +21969,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Accessibility shortcut icon background color
          */
 		public static final int accessibility_feature_background = 0x0106016b;
-		public static final int accessibility_focus_highlight_color = 0x010600a5;
+		public static final int accessibility_focus_highlight_color = 0x01060109;
 		/**  Google grey 700
          */
 		public static final int accessibility_magnification_background = 0x0106016c;
@@ -21987,7 +21987,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          */
 		public static final int autofill_background_material_dark = 0x01060301;
 		public static final int autofill_background_material_light = 0x01060302;
-		public static final int autofilled_highlight = 0x010600a6;
+		public static final int autofilled_highlight = 0x0106010a;
 		public static final int background_cache_hint_selector_device_default = 0x01060306;
 		public static final int background_cache_hint_selector_holo_dark = 0x01060307;
 		public static final int background_cache_hint_selector_holo_light = 0x01060308;
@@ -22024,18 +22024,18 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  The color black, equivalent to 0xff000000
          */
 		public static final int black = 0x0106000c;
-		public static final int bright_foreground_dark = 0x01060060;
-		public static final int bright_foreground_dark_disabled = 0x01060062;
-		public static final int bright_foreground_dark_inverse = 0x01060064;
+		public static final int bright_foreground_dark = 0x010600c4;
+		public static final int bright_foreground_dark_disabled = 0x010600c6;
+		public static final int bright_foreground_dark_inverse = 0x010600c8;
 		public static final int bright_foreground_disabled_holo_dark = 0x0106027a;
 		public static final int bright_foreground_disabled_holo_light = 0x0106027b;
 		public static final int bright_foreground_holo_dark = 0x01060278;
 		public static final int bright_foreground_holo_light = 0x01060279;
 		public static final int bright_foreground_inverse_holo_dark = 0x0106027c;
 		public static final int bright_foreground_inverse_holo_light = 0x0106027d;
-		public static final int bright_foreground_light = 0x01060061;
-		public static final int bright_foreground_light_disabled = 0x01060063;
-		public static final int bright_foreground_light_inverse = 0x01060065;
+		public static final int bright_foreground_light = 0x010600c5;
+		public static final int bright_foreground_light_disabled = 0x010600c7;
+		public static final int bright_foreground_light_inverse = 0x010600c9;
 		public static final int btn_colored_background_material = 0x0106030b;
 		public static final int btn_colored_borderless_text_material = 0x0106030c;
 		public static final int btn_colored_text_material = 0x0106030d;
@@ -22060,10 +22060,10 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int button_normal_device_default_dark = 0x01060275;
 		/**  The color of the Answer action on a CallStyle notification
          */
-		public static final int call_notification_answer_color = 0x010600a0;
+		public static final int call_notification_answer_color = 0x01060104;
 		/**  The color of the Decline and Hang Up actions on a CallStyle notification
          */
-		public static final int call_notification_decline_color = 0x0106009f;
+		public static final int call_notification_decline_color = 0x01060103;
 		public static final int car_accent = 0x010601c2;
 		public static final int car_accent_dark = 0x010601c1;
 		public static final int car_accent_light = 0x010601c0;
@@ -22312,9 +22312,9 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int car_yellow_700 = 0x010601f6;
 		public static final int car_yellow_800 = 0x010601f5;
 		public static final int car_yellow_900 = 0x010601f4;
-		public static final int chooser_gradient_background = 0x010600ca;
-		public static final int chooser_gradient_highlight = 0x010600cb;
-		public static final int chooser_row_divider = 0x010600c9;
+		public static final int chooser_gradient_background = 0x0106012e;
+		public static final int chooser_gradient_highlight = 0x0106012f;
+		public static final int chooser_row_divider = 0x0106012d;
 		/**  Default color for notification LED.
          */
 		public static final int config_defaultNotificationColor = 0x01060304;
@@ -22334,7 +22334,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int control_checkable_material = 0x01060318;
 		public static final int control_default_material = 0x01060319;
 		public static final int control_highlight_material = 0x0106031a;
-		public static final int conversation_important_highlight = 0x010600cf;
+		public static final int conversation_important_highlight = 0x01060133;
 		/**  Equivalent to 0xffaaaaaa
  A dark gray, equivalent to 0xffaaaaaa
          */
@@ -22357,15 +22357,15 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int datepicker_default_view_animator_color_material_light = 0x010602ff;
 		public static final int decor_button_dark_color = 0x0106031b;
 		public static final int decor_button_light_color = 0x0106031c;
-		public static final int decor_view_status_guard = 0x01060075;
-		public static final int decor_view_status_guard_light = 0x01060076;
+		public static final int decor_view_status_guard = 0x010600d9;
+		public static final int decor_view_status_guard_light = 0x010600da;
 		/**  Magnifier
          */
-		public static final int default_magnifier_color_overlay = 0x010600c8;
-		public static final int dim_foreground_dark = 0x01060066;
-		public static final int dim_foreground_dark_disabled = 0x01060067;
-		public static final int dim_foreground_dark_inverse = 0x01060068;
-		public static final int dim_foreground_dark_inverse_disabled = 0x01060069;
+		public static final int default_magnifier_color_overlay = 0x0106012c;
+		public static final int dim_foreground_dark = 0x010600ca;
+		public static final int dim_foreground_dark_disabled = 0x010600cb;
+		public static final int dim_foreground_dark_inverse = 0x010600cc;
+		public static final int dim_foreground_dark_inverse_disabled = 0x010600cd;
 		public static final int dim_foreground_disabled_holo_dark = 0x0106027f;
 		public static final int dim_foreground_disabled_holo_light = 0x01060284;
 		public static final int dim_foreground_holo_dark = 0x0106027e;
@@ -22374,10 +22374,10 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int dim_foreground_inverse_disabled_holo_light = 0x01060286;
 		public static final int dim_foreground_inverse_holo_dark = 0x01060280;
 		public static final int dim_foreground_inverse_holo_light = 0x01060285;
-		public static final int dim_foreground_light = 0x0106006b;
-		public static final int dim_foreground_light_disabled = 0x0106006c;
-		public static final int dim_foreground_light_inverse = 0x0106006d;
-		public static final int dim_foreground_light_inverse_disabled = 0x0106006e;
+		public static final int dim_foreground_light = 0x010600cf;
+		public static final int dim_foreground_light_disabled = 0x010600d0;
+		public static final int dim_foreground_light_inverse = 0x010600d1;
+		public static final int dim_foreground_light_inverse_disabled = 0x010600d2;
 		public static final int edge_effect_device_default_dark = 0x01060274;
 		public static final int edge_effect_device_default_light = 0x01060273;
 		/**  Error color
@@ -22391,11 +22391,11 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int error_color_material_light = 0x010602cf;
 		/**  FaceLock
          */
-		public static final int facelock_spotlight_mask = 0x0106008f;
+		public static final int facelock_spotlight_mask = 0x010600f3;
 		/**  FloatingToolbar
          */
-		public static final int floating_popup_divider_dark = 0x010600c6;
-		public static final int floating_popup_divider_light = 0x010600c7;
+		public static final int floating_popup_divider_dark = 0x0106012a;
+		public static final int floating_popup_divider_light = 0x0106012b;
 		/**
        foreground_device_default_dark
          - introduced to avoid coupling to foreground_material_dark
@@ -22414,15 +22414,15 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int group_button_dialog_focused_holo_light = 0x0106029d;
 		public static final int group_button_dialog_pressed_holo_dark = 0x0106029a;
 		public static final int group_button_dialog_pressed_holo_light = 0x0106029c;
-		public static final int highlighted_text_dark = 0x01060070;
+		public static final int highlighted_text_dark = 0x010600d4;
 		public static final int highlighted_text_holo_dark = 0x01060288;
 		public static final int highlighted_text_holo_light = 0x01060289;
-		public static final int highlighted_text_light = 0x01060071;
+		public static final int highlighted_text_light = 0x010600d5;
 		public static final int highlighted_text_material = 0x0106031e;
-		public static final int hint_foreground_dark = 0x0106006a;
+		public static final int hint_foreground_dark = 0x010600ce;
 		public static final int hint_foreground_holo_dark = 0x01060282;
 		public static final int hint_foreground_holo_light = 0x01060287;
-		public static final int hint_foreground_light = 0x0106006f;
+		public static final int hint_foreground_light = 0x010600d3;
 		public static final int hint_foreground_material_dark = 0x0106031f;
 		public static final int hint_foreground_material_light = 0x01060320;
 		/**  A really bright Holo shade of blue. Equivalent to #ff00ddff.
@@ -22476,25 +22476,25 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Green 300
  Default instant app badge color
          */
-		public static final int instant_app_badge = 0x010600b7;
+		public static final int instant_app_badge = 0x0106011b;
 		/**  Keyguard colors
          */
-		public static final int keyguard_avatar_frame_color = 0x010600a1;
-		public static final int keyguard_avatar_frame_pressed_color = 0x010600a4;
-		public static final int keyguard_avatar_frame_shadow_color = 0x010600a2;
-		public static final int keyguard_avatar_nick_color = 0x010600a3;
-		public static final int keyguard_text_color_decline = 0x01060085;
+		public static final int keyguard_avatar_frame_color = 0x01060105;
+		public static final int keyguard_avatar_frame_pressed_color = 0x01060108;
+		public static final int keyguard_avatar_frame_shadow_color = 0x01060106;
+		public static final int keyguard_avatar_nick_color = 0x01060107;
+		public static final int keyguard_text_color_decline = 0x010600e9;
 		/**  keyguard tab
          */
-		public static final int keyguard_text_color_normal = 0x01060081;
-		public static final int keyguard_text_color_soundoff = 0x01060083;
-		public static final int keyguard_text_color_soundon = 0x01060084;
-		public static final int keyguard_text_color_unlock = 0x01060082;
+		public static final int keyguard_text_color_normal = 0x010600e5;
+		public static final int keyguard_text_color_soundoff = 0x010600e7;
+		public static final int keyguard_text_color_soundon = 0x010600e8;
+		public static final int keyguard_text_color_unlock = 0x010600e6;
 		/**  keyguard overscroll widget pager
          */
-		public static final int kg_multi_user_text_active = 0x0106008a;
-		public static final int kg_multi_user_text_inactive = 0x0106008b;
-		public static final int kg_widget_pager_gradient = 0x0106008c;
+		public static final int kg_multi_user_text_active = 0x010600ee;
+		public static final int kg_multi_user_text_inactive = 0x010600ef;
+		public static final int kg_widget_pager_gradient = 0x010600f0;
 		public static final int language_picker_item_selected_bg = 0x0106017a;
 		public static final int language_picker_item_selected_indicator = 0x01060179;
 		public static final int language_picker_item_selected_stroke = 0x0106017b;
@@ -22527,11 +22527,11 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int legacy_selected_highlight = 0x010602a9;
 		/**  For settings framework
          */
-		public static final int lighter_gray = 0x01060077;
-		public static final int link_text_dark = 0x01060072;
+		public static final int lighter_gray = 0x010600db;
+		public static final int link_text_dark = 0x010600d6;
 		public static final int link_text_holo_dark = 0x0106028a;
 		public static final int link_text_holo_light = 0x0106028b;
-		public static final int link_text_light = 0x01060073;
+		public static final int link_text_light = 0x010600d7;
 		public static final int list_divider_color_dark = 0x0106026c;
 		public static final int list_divider_color_light = 0x0106026b;
 		public static final int list_divider_opacity_device_default_dark = 0x0106026e;
@@ -22546,14 +22546,14 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int loading_gradient_highlight_color_light = 0x01060272;
 		/**  LockPatternView
          */
-		public static final int lock_pattern_view_regular_color = 0x0106008d;
-		public static final int lock_pattern_view_success_color = 0x0106008e;
-		public static final int lockscreen_clock_am_pm = 0x01060088;
+		public static final int lock_pattern_view_regular_color = 0x010600f1;
+		public static final int lock_pattern_view_success_color = 0x010600f2;
+		public static final int lockscreen_clock_am_pm = 0x010600ec;
 		/**  keyguard clock
          */
-		public static final int lockscreen_clock_background = 0x01060086;
-		public static final int lockscreen_clock_foreground = 0x01060087;
-		public static final int lockscreen_owner_info = 0x01060089;
+		public static final int lockscreen_clock_background = 0x010600ea;
+		public static final int lockscreen_clock_foreground = 0x010600eb;
+		public static final int lockscreen_owner_info = 0x010600ed;
 		public static final int material_blue_grey_200 = 0x010602e4;
 		public static final int material_blue_grey_700 = 0x010602e5;
 		public static final int material_blue_grey_800 = 0x010602e6;
@@ -22573,7 +22573,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int material_grey_900 = 0x010602d8;
 		public static final int material_red_A100 = 0x010602e9;
 		public static final int material_red_A700 = 0x010602ea;
-		public static final int micro_text_light = 0x01060090;
+		public static final int micro_text_light = 0x010600f4;
 		/**  Color for system bars
          */
 		public static final int navigation_bar_compatible = 0x0106017f;
@@ -22584,31 +22584,31 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int navigation_bar_divider_device_default_settings = 0x01060250;
 		/**  Gray 600
          */
-		public static final int notification_action_button_text_color = 0x0106009b;
-		public static final int notification_action_list = 0x0106009d;
-		public static final int notification_action_list_background_color = 0x0106009e;
-		public static final int notification_default_color = 0x0106009a;
-		public static final int notification_default_color_current = 0x01060099;
-		public static final int notification_default_color_dark = 0x01060095;
-		public static final int notification_default_color_light = 0x01060096;
-		public static final int notification_primary_text_color_current = 0x01060097;
-		public static final int notification_primary_text_color_dark = 0x01060092;
-		public static final int notification_primary_text_color_light = 0x01060091;
-		public static final int notification_progress_background_color = 0x0106009c;
-		public static final int notification_secondary_text_color_current = 0x01060098;
-		public static final int notification_secondary_text_color_dark = 0x01060094;
+		public static final int notification_action_button_text_color = 0x010600ff;
+		public static final int notification_action_list = 0x01060101;
+		public static final int notification_action_list_background_color = 0x01060102;
+		public static final int notification_default_color = 0x010600fe;
+		public static final int notification_default_color_current = 0x010600fd;
+		public static final int notification_default_color_dark = 0x010600f9;
+		public static final int notification_default_color_light = 0x010600fa;
+		public static final int notification_primary_text_color_current = 0x010600fb;
+		public static final int notification_primary_text_color_dark = 0x010600f6;
+		public static final int notification_primary_text_color_light = 0x010600f5;
+		public static final int notification_progress_background_color = 0x01060100;
+		public static final int notification_secondary_text_color_current = 0x010600fc;
+		public static final int notification_secondary_text_color_dark = 0x010600f8;
 		/**  Note that the primary and secondary notification text colors are, in fact, the same.
          */
-		public static final int notification_secondary_text_color_light = 0x01060093;
+		public static final int notification_secondary_text_color_light = 0x010600f7;
 		public static final int overview_background = 0x01060322;
 		public static final int overview_background_dark = 0x01060323;
 		/**  For security permissions
          */
-		public static final int perms_dangerous_grp_color = 0x01060078;
-		public static final int perms_dangerous_perm_color = 0x01060079;
+		public static final int perms_dangerous_grp_color = 0x010600dc;
+		public static final int perms_dangerous_perm_color = 0x010600dd;
 		/**  Color for personal app suspension notification button text and icon tint.
          */
-		public static final int personal_apps_suspension_notification_color = 0x010600ce;
+		public static final int personal_apps_suspension_notification_color = 0x01060132;
 		public static final int primary_dark_device_default_dark = 0x01060248;
 		public static final int primary_dark_device_default_light = 0x01060249;
 		public static final int primary_dark_device_default_settings = 0x0106024a;
@@ -22677,43 +22677,43 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  white
  Default profile badge colors
          */
-		public static final int profile_badge_1 = 0x010600b1;
+		public static final int profile_badge_1 = 0x01060115;
 		/**  Green
          */
-		public static final int profile_badge_1_dark = 0x010600b4;
+		public static final int profile_badge_1_dark = 0x01060118;
 		/**  Blue
          */
-		public static final int profile_badge_2 = 0x010600b2;
+		public static final int profile_badge_2 = 0x01060116;
 		/**  Blue 300
          */
-		public static final int profile_badge_2_dark = 0x010600b5;
+		public static final int profile_badge_2_dark = 0x01060119;
 		/**  Orange
          */
-		public static final int profile_badge_3 = 0x010600b3;
+		public static final int profile_badge_3 = 0x01060117;
 		/**  Orange 300
          */
-		public static final int profile_badge_3_dark = 0x010600b6;
+		public static final int profile_badge_3_dark = 0x0106011a;
 		public static final int quaternary_device_default_settings = 0x0106024f;
 		public static final int quaternary_material_settings = 0x010602c9;
 		public static final int ratingbar_background_material = 0x01060336;
-		public static final int red = 0x0106005f;
+		public static final int red = 0x010600c3;
 		public static final int resolver_accent_ripple = 0x01060337;
 		/**  Resolver/Chooser
          */
-		public static final int resolver_text_color_secondary_dark = 0x010600cd;
+		public static final int resolver_text_color_secondary_dark = 0x01060131;
 		public static final int ripple_material_dark = 0x01060338;
 		public static final int ripple_material_light = 0x01060339;
-		public static final int safe_mode_text = 0x0106005e;
+		public static final int safe_mode_text = 0x010600c2;
 		public static final int search_url_text = 0x0106033a;
 		public static final int search_url_text_holo = 0x0106033b;
 		public static final int search_url_text_material_dark = 0x0106033c;
 		public static final int search_url_text_material_light = 0x0106033d;
 		/**  For search-related UIs
          */
-		public static final int search_url_text_normal = 0x0106007b;
-		public static final int search_url_text_pressed = 0x0106007d;
-		public static final int search_url_text_selected = 0x0106007c;
-		public static final int search_widget_corpus_item_background = 0x0106007e;
+		public static final int search_url_text_normal = 0x010600df;
+		public static final int search_url_text_pressed = 0x010600e1;
+		public static final int search_url_text_selected = 0x010600e0;
+		public static final int search_widget_corpus_item_background = 0x010600e2;
 		public static final int secondary_device_default_settings = 0x0106024c;
 		public static final int secondary_device_default_settings_light = 0x0106024d;
 		public static final int secondary_material_settings = 0x010602c6;
@@ -22750,7 +22750,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int secondary_text_nodisable_holo_light = 0x01060344;
 		public static final int secondary_text_nofocus = 0x01060345;
 		public static final int seekbar_track_progress_material = 0x01060346;
-		public static final int shadow = 0x0106007a;
+		public static final int shadow = 0x010600de;
 		public static final int side_fps_button_color = 0x0106017e;
 		public static final int side_fps_text_color = 0x0106017d;
 		/**  Color for side fps toast light theme
@@ -22758,9 +22758,9 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int side_fps_toast_background = 0x0106017c;
 		/**  SlidingTab
          */
-		public static final int sliding_tab_text_color_active = 0x0106007f;
-		public static final int sliding_tab_text_color_shadow = 0x01060080;
-		public static final int suggestion_highlight_text = 0x01060074;
+		public static final int sliding_tab_text_color_active = 0x010600e3;
+		public static final int sliding_tab_text_color_shadow = 0x010600e4;
+		public static final int suggestion_highlight_text = 0x010600d8;
 		/**  Currently matches the "surface dark" definition for phones.
          */
 		public static final int surface_dark = 0x01060265;
@@ -22940,8 +22940,8 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
      This value can be overlaid at runtime by OverlayManager RROs.
          */
 		public static final int system_accent3_900 = 0x0106005c;
-		public static final int system_background_dark = 0x01060115;
-		public static final int system_background_light = 0x010600e9;
+		public static final int system_background_dark = 0x01060095;
+		public static final int system_background_light = 0x0106006a;
 		public static final int system_bar_background_semi_transparent = 0x0106034e;
 		public static final int system_brand_a_dark = 0x0106015e;
 		public static final int system_brand_a_light = 0x01060149;
@@ -22957,68 +22957,68 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_clock_minute_light = 0x01060143;
 		public static final int system_clock_second_dark = 0x01060159;
 		public static final int system_clock_second_light = 0x01060144;
-		public static final int system_control_activated_dark = 0x01060128;
-		public static final int system_control_activated_light = 0x010600fc;
-		public static final int system_control_highlight_dark = 0x0106012a;
-		public static final int system_control_highlight_light = 0x010600fe;
-		public static final int system_control_normal_dark = 0x01060129;
-		public static final int system_control_normal_light = 0x010600fd;
+		public static final int system_control_activated_dark = 0x010600a7;
+		public static final int system_control_activated_light = 0x0106007c;
+		public static final int system_control_highlight_dark = 0x010600a9;
+		public static final int system_control_highlight_light = 0x0106007e;
+		public static final int system_control_normal_dark = 0x010600a8;
+		public static final int system_control_normal_light = 0x0106007d;
 		/**  Lightest shade of the error color used by the system. White.
  This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_0 = 0x010600d0;
+		public static final int system_error_0 = 0x01060134;
 		/**  Shade of the error system color at 99% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_10 = 0x010600d1;
+		public static final int system_error_10 = 0x01060135;
 		/**  Shade of the error system color at 90% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_100 = 0x010600d3;
+		public static final int system_error_100 = 0x01060137;
 		/**  Darkest shade of the error color used by the system. Black.
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_1000 = 0x010600dc;
+		public static final int system_error_1000 = 0x01060140;
 		/**  Shade of the error system color at 80% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_200 = 0x010600d4;
+		public static final int system_error_200 = 0x01060138;
 		/**  Shade of the error system color at 70% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_300 = 0x010600d5;
+		public static final int system_error_300 = 0x01060139;
 		/**  Shade of the error system color at 60% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_400 = 0x010600d6;
+		public static final int system_error_400 = 0x0106013a;
 		/**  Shade of the error system color at 95% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_50 = 0x010600d2;
+		public static final int system_error_50 = 0x01060136;
 		/**  Shade of the error system color at 49% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_500 = 0x010600d7;
+		public static final int system_error_500 = 0x0106013b;
 		/**  Shade of the error system color at 40% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_600 = 0x010600d8;
+		public static final int system_error_600 = 0x0106013c;
 		/**  Shade of the error system color at 30% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_700 = 0x010600d9;
+		public static final int system_error_700 = 0x0106013d;
 		/**  Shade of the error system color at 20% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_800 = 0x010600da;
+		public static final int system_error_800 = 0x0106013e;
 		/**  Shade of the error system color at 10% perceptual luminance (L* in L*a*b* color space).
      This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_900 = 0x010600db;
-		public static final int system_error_container_dark = 0x01060126;
-		public static final int system_error_container_light = 0x010600fa;
-		public static final int system_error_dark = 0x01060124;
-		public static final int system_error_light = 0x010600f8;
+		public static final int system_error_900 = 0x0106013f;
+		public static final int system_error_container_dark = 0x010600a5;
+		public static final int system_error_container_light = 0x0106007a;
+		public static final int system_error_dark = 0x010600a3;
+		public static final int system_error_light = 0x01060078;
 		/** Lightest shade of the Neutral color used by the system. White.
      This value can be overlaid at runtime by OverlayManager RROs.
          */
@@ -23127,24 +23127,24 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          */
 		@android.annotation.SystemApi
 		public static final int system_notification_accent_color = 0x0106001c;
-		public static final int system_on_background_dark = 0x01060116;
-		public static final int system_on_background_light = 0x010600ea;
-		public static final int system_on_error_container_dark = 0x01060127;
-		public static final int system_on_error_container_light = 0x010600fb;
-		public static final int system_on_error_dark = 0x01060125;
-		public static final int system_on_error_light = 0x010600f9;
-		public static final int system_on_primary_container_dark = 0x0106010a;
-		public static final int system_on_primary_container_light = 0x010600de;
-		public static final int system_on_primary_dark = 0x0106010c;
-		public static final int system_on_primary_fixed = 0x01060137;
-		public static final int system_on_primary_fixed_variant = 0x01060138;
-		public static final int system_on_primary_light = 0x010600e0;
-		public static final int system_on_secondary_container_dark = 0x0106010e;
-		public static final int system_on_secondary_container_light = 0x010600e2;
-		public static final int system_on_secondary_dark = 0x01060110;
-		public static final int system_on_secondary_fixed = 0x0106013b;
-		public static final int system_on_secondary_fixed_variant = 0x0106013c;
-		public static final int system_on_secondary_light = 0x010600e4;
+		public static final int system_on_background_dark = 0x01060096;
+		public static final int system_on_background_light = 0x0106006b;
+		public static final int system_on_error_container_dark = 0x010600a6;
+		public static final int system_on_error_container_light = 0x0106007b;
+		public static final int system_on_error_dark = 0x010600a4;
+		public static final int system_on_error_light = 0x01060079;
+		public static final int system_on_primary_container_dark = 0x0106008a;
+		public static final int system_on_primary_container_light = 0x0106005f;
+		public static final int system_on_primary_dark = 0x0106008c;
+		public static final int system_on_primary_fixed = 0x010600b6;
+		public static final int system_on_primary_fixed_variant = 0x010600b7;
+		public static final int system_on_primary_light = 0x01060061;
+		public static final int system_on_secondary_container_dark = 0x0106008e;
+		public static final int system_on_secondary_container_light = 0x01060063;
+		public static final int system_on_secondary_dark = 0x01060090;
+		public static final int system_on_secondary_fixed = 0x010600ba;
+		public static final int system_on_secondary_fixed_variant = 0x010600bb;
+		public static final int system_on_secondary_light = 0x01060065;
 		public static final int system_on_shade_active_dark = 0x01060164;
 		public static final int system_on_shade_active_light = 0x0106014f;
 		public static final int system_on_shade_active_variant_dark = 0x01060165;
@@ -23153,99 +23153,99 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_on_shade_inactive_light = 0x01060152;
 		public static final int system_on_shade_inactive_variant_dark = 0x01060168;
 		public static final int system_on_shade_inactive_variant_light = 0x01060153;
-		public static final int system_on_surface_dark = 0x01060118;
+		public static final int system_on_surface_dark = 0x01060098;
 		public static final int system_on_surface_disabled = 0x0106034f;
-		public static final int system_on_surface_light = 0x010600ec;
-		public static final int system_on_surface_variant_dark = 0x01060121;
-		public static final int system_on_surface_variant_light = 0x010600f5;
-		public static final int system_on_tertiary_container_dark = 0x01060112;
-		public static final int system_on_tertiary_container_light = 0x010600e6;
-		public static final int system_on_tertiary_dark = 0x01060114;
-		public static final int system_on_tertiary_fixed = 0x0106013f;
-		public static final int system_on_tertiary_fixed_variant = 0x01060140;
-		public static final int system_on_tertiary_light = 0x010600e8;
+		public static final int system_on_surface_light = 0x0106006d;
+		public static final int system_on_surface_variant_dark = 0x010600a1;
+		public static final int system_on_surface_variant_light = 0x01060076;
+		public static final int system_on_tertiary_container_dark = 0x01060092;
+		public static final int system_on_tertiary_container_light = 0x01060067;
+		public static final int system_on_tertiary_dark = 0x01060094;
+		public static final int system_on_tertiary_fixed = 0x010600be;
+		public static final int system_on_tertiary_fixed_variant = 0x010600bf;
+		public static final int system_on_tertiary_light = 0x01060069;
 		public static final int system_on_theme_app_dark = 0x0106015b;
 		public static final int system_on_theme_app_light = 0x01060146;
 		public static final int system_on_theme_app_ring_dark = 0x0106015d;
 		public static final int system_on_theme_app_ring_light = 0x01060148;
-		public static final int system_outline_dark = 0x01060122;
+		public static final int system_outline_dark = 0x010600a2;
 		public static final int system_outline_disabled = 0x01060350;
-		public static final int system_outline_light = 0x010600f6;
-		public static final int system_outline_variant_dark = 0x01060123;
-		public static final int system_outline_variant_light = 0x010600f7;
+		public static final int system_outline_light = 0x01060077;
+		public static final int system_outline_variant_dark = 0x010600c1;
+		public static final int system_outline_variant_light = 0x010600c0;
 		public static final int system_overview_background_dark = 0x0106016a;
 		public static final int system_overview_background_light = 0x01060155;
-		public static final int system_palette_key_color_neutral_dark = 0x01060133;
-		public static final int system_palette_key_color_neutral_light = 0x01060107;
-		public static final int system_palette_key_color_neutral_variant_dark = 0x01060134;
-		public static final int system_palette_key_color_neutral_variant_light = 0x01060108;
-		public static final int system_palette_key_color_primary_dark = 0x01060130;
-		public static final int system_palette_key_color_primary_light = 0x01060104;
-		public static final int system_palette_key_color_secondary_dark = 0x01060131;
-		public static final int system_palette_key_color_secondary_light = 0x01060105;
-		public static final int system_palette_key_color_tertiary_dark = 0x01060132;
-		public static final int system_palette_key_color_tertiary_light = 0x01060106;
-		public static final int system_primary_container_dark = 0x01060109;
+		public static final int system_palette_key_color_neutral_dark = 0x010600b2;
+		public static final int system_palette_key_color_neutral_light = 0x01060087;
+		public static final int system_palette_key_color_neutral_variant_dark = 0x010600b3;
+		public static final int system_palette_key_color_neutral_variant_light = 0x01060088;
+		public static final int system_palette_key_color_primary_dark = 0x010600af;
+		public static final int system_palette_key_color_primary_light = 0x01060084;
+		public static final int system_palette_key_color_secondary_dark = 0x010600b0;
+		public static final int system_palette_key_color_secondary_light = 0x01060085;
+		public static final int system_palette_key_color_tertiary_dark = 0x010600b1;
+		public static final int system_palette_key_color_tertiary_light = 0x01060086;
+		public static final int system_primary_container_dark = 0x01060089;
 		/**  Colors used in Android system, from design system.
      These values can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_primary_container_light = 0x010600dd;
-		public static final int system_primary_dark = 0x0106010b;
-		public static final int system_primary_fixed = 0x01060135;
-		public static final int system_primary_fixed_dim = 0x01060136;
-		public static final int system_primary_light = 0x010600df;
-		public static final int system_secondary_container_dark = 0x0106010d;
-		public static final int system_secondary_container_light = 0x010600e1;
-		public static final int system_secondary_dark = 0x0106010f;
-		public static final int system_secondary_fixed = 0x01060139;
-		public static final int system_secondary_fixed_dim = 0x0106013a;
-		public static final int system_secondary_light = 0x010600e3;
+		public static final int system_primary_container_light = 0x0106005e;
+		public static final int system_primary_dark = 0x0106008b;
+		public static final int system_primary_fixed = 0x010600b4;
+		public static final int system_primary_fixed_dim = 0x010600b5;
+		public static final int system_primary_light = 0x01060060;
+		public static final int system_secondary_container_dark = 0x0106008d;
+		public static final int system_secondary_container_light = 0x01060062;
+		public static final int system_secondary_dark = 0x0106008f;
+		public static final int system_secondary_fixed = 0x010600b8;
+		public static final int system_secondary_fixed_dim = 0x010600b9;
+		public static final int system_secondary_light = 0x01060064;
 		public static final int system_shade_active_dark = 0x01060163;
 		public static final int system_shade_active_light = 0x0106014e;
 		public static final int system_shade_disabled_dark = 0x01060169;
 		public static final int system_shade_disabled_light = 0x01060154;
 		public static final int system_shade_inactive_dark = 0x01060166;
 		public static final int system_shade_inactive_light = 0x01060151;
-		public static final int system_surface_bright_dark = 0x0106011e;
-		public static final int system_surface_bright_light = 0x010600f2;
+		public static final int system_surface_bright_dark = 0x0106009e;
+		public static final int system_surface_bright_light = 0x01060073;
 		/**  Wear flattens the typical 5 container layers to 3; container + high & low
          */
-		public static final int system_surface_container_dark = 0x0106011b;
-		public static final int system_surface_container_high_dark = 0x0106011c;
-		public static final int system_surface_container_high_light = 0x010600f0;
-		public static final int system_surface_container_highest_dark = 0x0106011d;
-		public static final int system_surface_container_highest_light = 0x010600f1;
-		public static final int system_surface_container_light = 0x010600ef;
-		public static final int system_surface_container_low_dark = 0x01060119;
-		public static final int system_surface_container_low_light = 0x010600ed;
-		public static final int system_surface_container_lowest_dark = 0x0106011a;
-		public static final int system_surface_container_lowest_light = 0x010600ee;
+		public static final int system_surface_container_dark = 0x0106009b;
+		public static final int system_surface_container_high_dark = 0x0106009c;
+		public static final int system_surface_container_high_light = 0x01060071;
+		public static final int system_surface_container_highest_dark = 0x0106009d;
+		public static final int system_surface_container_highest_light = 0x01060072;
+		public static final int system_surface_container_light = 0x01060070;
+		public static final int system_surface_container_low_dark = 0x01060099;
+		public static final int system_surface_container_low_light = 0x0106006e;
+		public static final int system_surface_container_lowest_dark = 0x0106009a;
+		public static final int system_surface_container_lowest_light = 0x0106006f;
 		/**  With material deprecation of 'background' in favor of 'surface' we flatten these
        on watches to match the black background requirements
          */
-		public static final int system_surface_dark = 0x01060117;
-		public static final int system_surface_dim_dark = 0x0106011f;
-		public static final int system_surface_dim_light = 0x010600f3;
+		public static final int system_surface_dark = 0x01060097;
+		public static final int system_surface_dim_dark = 0x0106009f;
+		public static final int system_surface_dim_light = 0x01060074;
 		public static final int system_surface_disabled = 0x01060351;
-		public static final int system_surface_light = 0x010600eb;
-		public static final int system_surface_variant_dark = 0x01060120;
-		public static final int system_surface_variant_light = 0x010600f4;
-		public static final int system_tertiary_container_dark = 0x01060111;
-		public static final int system_tertiary_container_light = 0x010600e5;
-		public static final int system_tertiary_dark = 0x01060113;
-		public static final int system_tertiary_fixed = 0x0106013d;
-		public static final int system_tertiary_fixed_dim = 0x0106013e;
-		public static final int system_tertiary_light = 0x010600e7;
-		public static final int system_text_hint_inverse_dark = 0x0106012f;
-		public static final int system_text_hint_inverse_light = 0x01060103;
-		public static final int system_text_primary_inverse_dark = 0x0106012b;
-		public static final int system_text_primary_inverse_disable_only_dark = 0x0106012d;
-		public static final int system_text_primary_inverse_disable_only_light = 0x01060101;
-		public static final int system_text_primary_inverse_light = 0x010600ff;
-		public static final int system_text_secondary_and_tertiary_inverse_dark = 0x0106012c;
-		public static final int system_text_secondary_and_tertiary_inverse_disabled_dark = 0x0106012e;
-		public static final int system_text_secondary_and_tertiary_inverse_disabled_light = 0x01060102;
-		public static final int system_text_secondary_and_tertiary_inverse_light = 0x01060100;
+		public static final int system_surface_light = 0x0106006c;
+		public static final int system_surface_variant_dark = 0x010600a0;
+		public static final int system_surface_variant_light = 0x01060075;
+		public static final int system_tertiary_container_dark = 0x01060091;
+		public static final int system_tertiary_container_light = 0x01060066;
+		public static final int system_tertiary_dark = 0x01060093;
+		public static final int system_tertiary_fixed = 0x010600bc;
+		public static final int system_tertiary_fixed_dim = 0x010600bd;
+		public static final int system_tertiary_light = 0x01060068;
+		public static final int system_text_hint_inverse_dark = 0x010600ae;
+		public static final int system_text_hint_inverse_light = 0x01060083;
+		public static final int system_text_primary_inverse_dark = 0x010600aa;
+		public static final int system_text_primary_inverse_disable_only_dark = 0x010600ac;
+		public static final int system_text_primary_inverse_disable_only_light = 0x01060081;
+		public static final int system_text_primary_inverse_light = 0x0106007f;
+		public static final int system_text_secondary_and_tertiary_inverse_dark = 0x010600ab;
+		public static final int system_text_secondary_and_tertiary_inverse_disabled_dark = 0x010600ad;
+		public static final int system_text_secondary_and_tertiary_inverse_disabled_light = 0x01060082;
+		public static final int system_text_secondary_and_tertiary_inverse_light = 0x01060080;
 		public static final int system_theme_app_dark = 0x0106015a;
 		public static final int system_theme_app_light = 0x01060145;
 		public static final int system_theme_app_ring_dark = 0x0106015c;
@@ -23293,41 +23293,41 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int timepicker_default_text_color_material = 0x010602ec;
 		/**  Material Orange 300
          */
-		public static final int tooltip_background_dark = 0x010600c4;
-		public static final int tooltip_background_light = 0x010600c5;
+		public static final int tooltip_background_dark = 0x01060128;
+		public static final int tooltip_background_light = 0x01060129;
 		/**  Fully transparent, equivalent to 0x00000000
          */
 		public static final int transparent = 0x0106000d;
 		/**  Default user icon colors
          */
-		public static final int user_icon_1 = 0x010600a7;
+		public static final int user_icon_1 = 0x0106010b;
 		/**  red
          */
-		public static final int user_icon_2 = 0x010600a8;
+		public static final int user_icon_2 = 0x0106010c;
 		/**  purple
          */
-		public static final int user_icon_3 = 0x010600a9;
+		public static final int user_icon_3 = 0x0106010d;
 		/**  blue
          */
-		public static final int user_icon_4 = 0x010600aa;
+		public static final int user_icon_4 = 0x0106010e;
 		/**  pink
          */
-		public static final int user_icon_5 = 0x010600ab;
+		public static final int user_icon_5 = 0x0106010f;
 		/**  green
          */
-		public static final int user_icon_6 = 0x010600ac;
+		public static final int user_icon_6 = 0x01060110;
 		/**  cyan
          */
-		public static final int user_icon_7 = 0x010600ad;
+		public static final int user_icon_7 = 0x01060111;
 		/**  yellow
          */
-		public static final int user_icon_8 = 0x010600ae;
+		public static final int user_icon_8 = 0x01060112;
 		/**  orange
          */
-		public static final int user_icon_default_gray = 0x010600af;
+		public static final int user_icon_default_gray = 0x01060113;
 		/**  gray 500
          */
-		public static final int user_icon_default_white = 0x010600b0;
+		public static final int user_icon_default_white = 0x01060114;
 		/**  The color white, equivalent to 0xffffffff
          */
 		public static final int white = 0x0106000b;
