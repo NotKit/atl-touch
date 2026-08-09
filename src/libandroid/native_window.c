@@ -89,40 +89,78 @@ typedef struct ANativeWindow_Buffer {
 
 void ANativeWindow_acquire(struct ANativeWindow *native_window)
 {
-	native_window->refcount++;
+	/* every entry point tolerates the NULL window ATL used to be the only
+	 * source of, and an app that got one is entitled to release it */
+	if (!native_window)
+		return;
+	__atomic_add_fetch(&native_window->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
 void ANativeWindow_release(struct ANativeWindow *native_window)
 {
-	native_window->refcount--;
-	if (native_window->refcount == 0) {
-		if (native_window->wayland_display) {
-			wl_egl_window_destroy((struct wl_egl_window *)native_window->egl_window);
-			wl_surface_destroy(native_window->wayland_surface);
-		}
+	if (!native_window)
+		return;
+	/* the Wayland objects belong to the ATLSurfaceLayer, which destroys them
+	 * on the main thread after surfaceDestroyed(); this can run on any thread */
+	if (__atomic_sub_fetch(&native_window->refcount, 1, __ATOMIC_SEQ_CST) == 0)
 		free(native_window);
-	}
+}
+
+struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct wl_surface *surface,
+                                            void *egl_window, int width, int height)
+{
+	struct ANativeWindow *window = calloc(1, sizeof(*window));
+
+	if (!window)
+		return NULL;
+	/* one reference for the android.view.Surface that owns it */
+	window->refcount = 1;
+	window->wayland_display = display;
+	window->wayland_surface = surface;
+	window->egl_window = (EGLNativeWindowType)egl_window;
+	window->width = width;
+	window->height = height;
+	return window;
+}
+
+void atl_native_window_detach(struct ANativeWindow *native_window)
+{
+	if (!native_window)
+		return;
+	native_window->egl_window = (EGLNativeWindowType)NULL;
+	native_window->wayland_display = NULL;
+	native_window->wayland_surface = NULL;
 }
 
 int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window)
 {
-	return native_window->width;
+	return native_window ? native_window->width : -1;
 }
 
 int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
 {
-	return native_window->height;
+	return native_window ? native_window->height : -1;
 }
 
 int32_t ANativeWindow_getFormat(ANativeWindow *window)
 {
-	return -1;
+	return window ? 1 /* WINDOW_FORMAT_RGBA_8888 */ : -1;
 }
 
 int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
                                          int32_t width, int32_t height, int32_t format)
 {
-	return -1;
+	if (!window)
+		return -1;
+	/* 0x0 means "whatever the window system picked", which is what the layer
+	 * already sized the wl_egl_window to */
+	if (width > 0 && height > 0) {
+		window->width = width;
+		window->height = height;
+		if (window->egl_window)
+			wl_egl_window_resize((struct wl_egl_window *)window->egl_window, width, height, 0, 0);
+	}
+	return 0;
 }
 
 typedef void ARect;
@@ -148,13 +186,40 @@ int32_t ANativeWindow_setBuffersTransform(ANativeWindow *window, int32_t transfo
 	return -1;
 }
 
+/*
+ * The window behind an android.view.Surface. The SurfaceView built it when its
+ * layer came up and cached it in the Surface's own field, so the several
+ * fromSurface() calls an app makes about one surface are about one window -
+ * which is also AOSP's identity, where the Surface *is* the ANativeWindow.
+ */
 ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 {
-	/* Native (NDK GL) rendering needs a wl_subsurface + wl_egl_window over the
-	 * GLFW toplevel; that bring-up hasn't happened yet in the GTK-free
-	 * windowing stack, so NativeActivity/SurfaceView EGL apps get no window. */
-	fprintf(stderr, "ANativeWindow_fromSurface: native window rendering is not currently supported\n");
-	return NULL;
+	struct ANativeWindow *window;
+	jclass class;
+	jfieldID field;
+
+	if (!env || !surface)
+		return NULL;
+	class = (*env)->GetObjectClass(env, surface);
+	field = class ? (*env)->GetFieldID(env, class, "nativeWindow", "J") : NULL;
+	if (!field) {
+		(*env)->ExceptionClear(env);
+		fprintf(stderr, "ANativeWindow_fromSurface: android.view.Surface has no window field\n");
+		return NULL;
+	}
+
+	/* an app asks about one surface from more than one thread; the field is
+	 * written on the main thread while the layer is being created */
+	if ((*env)->MonitorEnter(env, surface) != JNI_OK)
+		return NULL;
+	window = (struct ANativeWindow *)(intptr_t)(*env)->GetLongField(env, surface, field);
+	ANativeWindow_acquire(window);
+	(*env)->MonitorExit(env, surface);
+
+	if (!window)
+		fprintf(stderr, "ANativeWindow_fromSurface: this surface has no layer behind it "
+		                "(no wl_subcompositor, or the view is not attached yet)\n");
+	return window;
 }
 
 ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceTexture)

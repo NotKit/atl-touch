@@ -40,15 +40,36 @@ void (*bionic_eglGetProcAddress(char const *procname))(void)
 	return eglGetProcAddress(procname);
 }
 
+static EGLDisplay primary_display = EGL_NO_DISPLAY;
+
+/* GLFW made its display with eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND, its
+ * own wl_display); a wl_egl_window on that connection is only usable there,
+ * and eglGetDisplay(EGL_DEFAULT_DISPLAY) is a different display over a
+ * different connection. Called from atl_window_new. */
+void bionic_egl_set_primary_display(EGLDisplay display)
+{
+	primary_display = display;
+}
+
 EGLDisplay bionic_eglGetDisplay(EGLNativeDisplayType native_display)
 {
 	/*
 	 * On android, at least SDL passes 0 (EGL_DISPLAY_DEFAULT) to eglGetDisplay
-	 * and uses the resulting display. The wl_egl_window bring-up will hand out
-	 * the GLFW window's wl_display here; until then the EGL default display is
-	 * the best available answer.
+	 * and uses the resulting display; an app that gets the default display
+	 * cannot present through a SurfaceView's wl_egl_window.
 	 */
+	if (primary_display != EGL_NO_DISPLAY)
+		return primary_display;
 	return eglGetDisplay(EGL_DEFAULT_DISPLAY);
+}
+
+EGLBoolean bionic_eglTerminate(EGLDisplay display)
+{
+	/* the whole process shares one display with GLFW and Skia; an app that
+	 * tears down its own EGL must not take theirs with it */
+	if (display == primary_display)
+		return EGL_TRUE;
+	return eglTerminate(display);
 }
 
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
