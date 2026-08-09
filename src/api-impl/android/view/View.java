@@ -3222,7 +3222,7 @@ public class View implements Drawable.Callback {
 	public void clearViewTranslationCallback() {}
 	public void transformMatrixToGlobal(Matrix matrix) {}
 	public boolean isShowingLayoutBounds() {
-		return true;
+		return false;
 	}
 
 	public boolean callOnClick() {
