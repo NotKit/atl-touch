@@ -7,7 +7,6 @@ import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class RenderNode {
 
@@ -262,13 +261,14 @@ public class RenderNode {
 	}
 
 	public boolean setOutline(Outline outline) {
-		boolean changed = Objects.equals(this.outline, outline);
-		if (changed && transformed_node != 0) {
+		/* Outline is mutable and has no value equality, so a set is always
+		 * treated as a change; only the clip actually depends on it */
+		this.outline = outline;
+		if (clipToOutline && transformed_node != 0) {
 			nativeUnref(transformed_node);
 			transformed_node = 0;
 		}
-		this.outline = outline;
-		return changed;
+		return true;
 	}
 
 	public long getGskNode() {
@@ -283,7 +283,7 @@ public class RenderNode {
 		if (transformed_node == 0 || old_render_node != render_node) {
 			nativeUnref(transformed_node);
 			transformed_node = nativeTransform(render_node, scaleX, scaleY, translationX, translationY, rotation, pivotX, pivotY);
-			if (clipToOutline) {
+			if (clipToOutline && outline != null) {
 				Rect bounds = new Rect();
 				outline.getRect(bounds);
 				transformed_node = nativeClip(transformed_node, bounds.left, bounds.top, bounds.right, bounds.bottom);
