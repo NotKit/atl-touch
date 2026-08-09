@@ -47,7 +47,7 @@ JNIEXPORT jboolean JNICALL Java_android_opengl_EGL14_native_1eglInitialize(JNIEn
 
 JNIEXPORT jboolean JNICALL Java_android_opengl_EGL14_native_1eglTerminate(JNIEnv *env, jclass this, jlong dpy)
 {
-	return eglTerminate(_PTR(dpy));
+	return bionic_eglTerminate(_PTR(dpy));
 }
 
 JNIEXPORT jstring JNICALL Java_android_opengl_EGL14_native_1eglQueryString(JNIEnv *env, jclass this, jlong dpy, jint name)

@@ -49,6 +49,7 @@ void bionic_egl_set_primary_display(EGLDisplay display);
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);
 EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, struct ANativeWindow *native_window, EGLint const *attrib_list);
 EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface);
+EGLBoolean bionic_eglTerminate(EGLDisplay display);
 EGLDisplay bionic_eglGetDisplay(NativeDisplayType native_display);
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
 EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, EGLint const *attrib_list);
