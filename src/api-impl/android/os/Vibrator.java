@@ -13,6 +13,20 @@ public class Vibrator {
 		return true;
 	}
 
+	public boolean hasAmplitudeControl() {
+		return false;
+	}
+
+	/* ATL drives the motor with a plain on/off duration, so none of the
+	 * composition primitives are available */
+	public boolean areAllPrimitivesSupported(int... primitiveIds) {
+		return false;
+	}
+
+	public boolean[] arePrimitivesSupported(int... primitiveIds) {
+		return new boolean[primitiveIds.length];
+	}
+
 	public void vibrate(long millis) {
 		if (fd != -1)
 			native_vibrate(fd, millis);
