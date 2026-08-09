@@ -123,6 +123,16 @@ struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct w
 	return window;
 }
 
+/* the view (and so the layer's buffer) resized under a window the app may
+ * already hold; the wl_egl_window itself is resized by the layer */
+void atl_native_window_set_size(struct ANativeWindow *native_window, int width, int height)
+{
+	if (!native_window || width <= 0 || height <= 0)
+		return;
+	native_window->width = width;
+	native_window->height = height;
+}
+
 void atl_native_window_detach(struct ANativeWindow *native_window)
 {
 	if (!native_window)

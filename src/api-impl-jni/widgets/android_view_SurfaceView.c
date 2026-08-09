@@ -63,13 +63,19 @@ JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1bindSurface(JNIEnv 
 		(*env)->ExceptionClear(env);
 		return;
 	}
-	window = atl_native_window_new(glfwGetWaylandDisplay(), atl_surface_layer_wl_surface(layer),
-	                               atl_surface_layer_egl_window(layer), width, height);
-	if (!window)
-		return;
 	if ((*env)->MonitorEnter(env, surface) != JNI_OK)
 		return;
-	(*env)->SetLongField(env, surface, field, _INTPTR(window));
+	/* the surface keeps the same window across a resize: the app may already
+	 * be holding it, and its size is what ANativeWindow_getWidth reports */
+	window = _PTR((*env)->GetLongField(env, surface, field));
+	if (window) {
+		atl_native_window_set_size(window, width, height);
+	} else {
+		window = atl_native_window_new(glfwGetWaylandDisplay(), atl_surface_layer_wl_surface(layer),
+		                               atl_surface_layer_egl_window(layer), width, height);
+		if (window)
+			(*env)->SetLongField(env, surface, field, _INTPTR(window));
+	}
 	(*env)->MonitorExit(env, surface);
 }
 

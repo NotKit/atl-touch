@@ -159,11 +159,16 @@ public class SurfaceView extends View {
 			mLayerH = height;
 			native_setLayerGeometry(mLayer, mLayerX, mLayerY, width, height);
 		}
-		mSurfaceWidth = mFixedSize ? mFixedWidth : width;
-		mSurfaceHeight = mFixedSize ? mFixedHeight : height;
-		if (mSurface.nativeWindow == 0) {
-			native_bindSurface(mSurface, mLayer, mSurfaceWidth, mSurfaceHeight);
-			native_startTestClient(mSurface);
+		int surfaceWidth = mFixedSize ? mFixedWidth : width;
+		int surfaceHeight = mFixedSize ? mFixedHeight : height;
+		boolean bound = mSurface.nativeWindow != 0;
+		if (!bound || surfaceWidth != mSurfaceWidth || surfaceHeight != mSurfaceHeight) {
+			mSurfaceWidth = surfaceWidth;
+			mSurfaceHeight = surfaceHeight;
+			// also refreshes the size an already-bound ANativeWindow reports
+			native_bindSurface(mSurface, mLayer, surfaceWidth, surfaceHeight);
+			if (!bound)
+				native_startTestClient(mSurface);
 		}
 	}
 
@@ -275,6 +280,7 @@ public class SurfaceView extends View {
 				native_setLayerBufferSize(mLayer, width, height);
 				mSurfaceWidth = mFixedSize ? width : getWidth();
 				mSurfaceHeight = mFixedSize ? height : getHeight();
+				native_bindSurface(mSurface, mLayer, mSurfaceWidth, mSurfaceHeight);
 				if (reportedCreated)
 					surfaceChanged(1 /*RGBA_8888*/, mSurfaceWidth, mSurfaceHeight);
 			}

@@ -29,6 +29,7 @@ struct ANativeWindow {
  */
 struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct wl_surface *surface,
                                             void *egl_window, int width, int height);
+void atl_native_window_set_size(struct ANativeWindow *native_window, int width, int height);
 void atl_native_window_detach(struct ANativeWindow *native_window);
 
 /*
