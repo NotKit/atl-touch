@@ -3121,6 +3121,18 @@ public class View implements Drawable.Callback {
 	public android.view.contentcapture.ContentCaptureSession getContentCaptureSession() { return null; }
 	public void setContentCaptureSession(android.view.contentcapture.ContentCaptureSession session) {}
 
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_AUTO = 0;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES = 1;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO = 2;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS = 4;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS = 8;
+
+	private int importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_AUTO;
+
+	public int getImportantForContentCapture() { return importantForContentCapture; }
+	public void setImportantForContentCapture(int mode) { importantForContentCapture = mode; }
+	public boolean isImportantForContentCapture() { return false; }
+
 	public AccessibilityDelegate getAccessibilityDelegate() { return null; }
 
 	public void setScrollX(int value) {
