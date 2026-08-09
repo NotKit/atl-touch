@@ -13,6 +13,26 @@ extern "C" {
 #define android_app_Activity_RESULT_CANCELED 0L
 #undef android_app_Activity_RESULT_OK
 #define android_app_Activity_RESULT_OK -1L
+#undef android_app_Activity_LIFECYCLE_PRE
+#define android_app_Activity_LIFECYCLE_PRE 0L
+#undef android_app_Activity_LIFECYCLE_ON
+#define android_app_Activity_LIFECYCLE_ON 1L
+#undef android_app_Activity_LIFECYCLE_POST
+#define android_app_Activity_LIFECYCLE_POST 2L
+#undef android_app_Activity_LIFECYCLE_CREATE
+#define android_app_Activity_LIFECYCLE_CREATE 0L
+#undef android_app_Activity_LIFECYCLE_START
+#define android_app_Activity_LIFECYCLE_START 1L
+#undef android_app_Activity_LIFECYCLE_RESUME
+#define android_app_Activity_LIFECYCLE_RESUME 2L
+#undef android_app_Activity_LIFECYCLE_PAUSE
+#define android_app_Activity_LIFECYCLE_PAUSE 3L
+#undef android_app_Activity_LIFECYCLE_STOP
+#define android_app_Activity_LIFECYCLE_STOP 4L
+#undef android_app_Activity_LIFECYCLE_DESTROY
+#define android_app_Activity_LIFECYCLE_DESTROY 5L
+#undef android_app_Activity_LIFECYCLE_SAVE_INSTANCE_STATE
+#define android_app_Activity_LIFECYCLE_SAVE_INSTANCE_STATE 6L
 /*
  * Class:     android_app_Activity
  * Method:    isTaskRoot

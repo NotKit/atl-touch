@@ -649,7 +649,118 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void registerForContextMenu(View view) {}
 	public native boolean isInMultiWindowMode();
 
-	public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {}
+	private final List<Application.ActivityLifecycleCallbacks> activityLifecycleCallbacks =
+	    new java.util.concurrent.CopyOnWriteArrayList<>();
+
+	public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
+		activityLifecycleCallbacks.add(callback);
+	}
+
+	public void unregisterActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
+		activityLifecycleCallbacks.remove(callback);
+	}
+
+	private static final int LIFECYCLE_PRE = 0, LIFECYCLE_ON = 1, LIFECYCLE_POST = 2;
+	private static final int LIFECYCLE_CREATE = 0, LIFECYCLE_START = 1, LIFECYCLE_RESUME = 2,
+	    LIFECYCLE_PAUSE = 3, LIFECYCLE_STOP = 4, LIFECYCLE_DESTROY = 5,
+	    LIFECYCLE_SAVE_INSTANCE_STATE = 6;
+
+	/* AOSP order: the application's callbacks run before the activity's own. */
+	private void dispatchLifecycle(int state, int phase, Bundle bundle) {
+		Application application = getApplication();
+		if (application != null) {
+			for (Application.ActivityLifecycleCallbacks callback : application.getActivityLifecycleCallbacks())
+				dispatchLifecycle(callback, state, phase, bundle);
+		}
+		for (Application.ActivityLifecycleCallbacks callback : activityLifecycleCallbacks)
+			dispatchLifecycle(callback, state, phase, bundle);
+	}
+
+	private void dispatchLifecycle(Application.ActivityLifecycleCallbacks callback, int state,
+	                               int phase, Bundle bundle) {
+		switch (state) {
+		case LIFECYCLE_CREATE:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPreCreated(this, bundle);
+			else if (phase == LIFECYCLE_ON) callback.onActivityCreated(this, bundle);
+			else callback.onActivityPostCreated(this, bundle);
+			break;
+		case LIFECYCLE_START:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPreStarted(this);
+			else if (phase == LIFECYCLE_ON) callback.onActivityStarted(this);
+			else callback.onActivityPostStarted(this);
+			break;
+		case LIFECYCLE_RESUME:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPreResumed(this);
+			else if (phase == LIFECYCLE_ON) callback.onActivityResumed(this);
+			else callback.onActivityPostResumed(this);
+			break;
+		case LIFECYCLE_PAUSE:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPrePaused(this);
+			else if (phase == LIFECYCLE_ON) callback.onActivityPaused(this);
+			else callback.onActivityPostPaused(this);
+			break;
+		case LIFECYCLE_STOP:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPreStopped(this);
+			else if (phase == LIFECYCLE_ON) callback.onActivityStopped(this);
+			else callback.onActivityPostStopped(this);
+			break;
+		case LIFECYCLE_DESTROY:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPreDestroyed(this);
+			else if (phase == LIFECYCLE_ON) callback.onActivityDestroyed(this);
+			else callback.onActivityPostDestroyed(this);
+			break;
+		case LIFECYCLE_SAVE_INSTANCE_STATE:
+			if (phase == LIFECYCLE_PRE) callback.onActivityPreSaveInstanceState(this, bundle);
+			else if (phase == LIFECYCLE_ON) callback.onActivitySaveInstanceState(this, bundle);
+			else callback.onActivityPostSaveInstanceState(this, bundle);
+			break;
+		}
+	}
+
+	/* The lifecycle entry points the native side calls; they wrap the protected
+	 * onX() an app may override, so that ActivityLifecycleCallbacks see the same
+	 * pre/on/post sequence AOSP produces. */
+	void performCreate(Bundle savedInstanceState) {
+		dispatchLifecycle(LIFECYCLE_CREATE, LIFECYCLE_PRE, savedInstanceState);
+		onCreate(savedInstanceState);
+		dispatchLifecycle(LIFECYCLE_CREATE, LIFECYCLE_ON, savedInstanceState);
+		dispatchLifecycle(LIFECYCLE_CREATE, LIFECYCLE_POST, savedInstanceState);
+	}
+
+	void performStart() {
+		dispatchLifecycle(LIFECYCLE_START, LIFECYCLE_PRE, null);
+		onStart();
+		dispatchLifecycle(LIFECYCLE_START, LIFECYCLE_ON, null);
+		dispatchLifecycle(LIFECYCLE_START, LIFECYCLE_POST, null);
+	}
+
+	void performResume() {
+		dispatchLifecycle(LIFECYCLE_RESUME, LIFECYCLE_PRE, null);
+		onResume();
+		dispatchLifecycle(LIFECYCLE_RESUME, LIFECYCLE_ON, null);
+		dispatchLifecycle(LIFECYCLE_RESUME, LIFECYCLE_POST, null);
+	}
+
+	void performPause() {
+		dispatchLifecycle(LIFECYCLE_PAUSE, LIFECYCLE_PRE, null);
+		onPause();
+		dispatchLifecycle(LIFECYCLE_PAUSE, LIFECYCLE_ON, null);
+		dispatchLifecycle(LIFECYCLE_PAUSE, LIFECYCLE_POST, null);
+	}
+
+	void performStop() {
+		dispatchLifecycle(LIFECYCLE_STOP, LIFECYCLE_PRE, null);
+		onStop();
+		dispatchLifecycle(LIFECYCLE_STOP, LIFECYCLE_ON, null);
+		dispatchLifecycle(LIFECYCLE_STOP, LIFECYCLE_POST, null);
+	}
+
+	void performDestroy() {
+		dispatchLifecycle(LIFECYCLE_DESTROY, LIFECYCLE_PRE, null);
+		onDestroy();
+		dispatchLifecycle(LIFECYCLE_DESTROY, LIFECYCLE_ON, null);
+		dispatchLifecycle(LIFECYCLE_DESTROY, LIFECYCLE_POST, null);
+	}
 
 	public void setDisablePreviewScreenshots(boolean disable) {}
 	public final View requireViewById(int id) {

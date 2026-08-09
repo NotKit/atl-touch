@@ -52,6 +52,24 @@ public class Application extends ContextWrapper {
 		void onActivityStopped(Activity activity);
 		void onActivitySaveInstanceState(Activity activity, Bundle outState);
 		void onActivityDestroyed(Activity activity);
+
+		/* API 29 pre/post variants. androidx.lifecycle's ReportFragment routes the
+		 * whole LifecycleRegistry through these from SDK 29 on, so they have to
+		 * actually fire or every androidx lifecycle stays at INITIALIZED. */
+		default void onActivityPreCreated(Activity activity, Bundle savedInstanceState) {}
+		default void onActivityPostCreated(Activity activity, Bundle savedInstanceState) {}
+		default void onActivityPreStarted(Activity activity) {}
+		default void onActivityPostStarted(Activity activity) {}
+		default void onActivityPreResumed(Activity activity) {}
+		default void onActivityPostResumed(Activity activity) {}
+		default void onActivityPrePaused(Activity activity) {}
+		default void onActivityPostPaused(Activity activity) {}
+		default void onActivityPreStopped(Activity activity) {}
+		default void onActivityPostStopped(Activity activity) {}
+		default void onActivityPreSaveInstanceState(Activity activity, Bundle outState) {}
+		default void onActivityPostSaveInstanceState(Activity activity, Bundle outState) {}
+		default void onActivityPreDestroyed(Activity activity) {}
+		default void onActivityPostDestroyed(Activity activity) {}
 	}
 	/**
 	 * Callback interface for use with {@link Application#registerOnProvideAssistDataListener}
@@ -100,9 +118,18 @@ public class Application extends ContextWrapper {
 	}
 	public void unregisterComponentCallbacks(ComponentCallbacks callback) {
 	}*/
+	private final java.util.List<ActivityLifecycleCallbacks> activityLifecycleCallbacks =
+	    new java.util.concurrent.CopyOnWriteArrayList<>();
+
 	public void registerActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
+		activityLifecycleCallbacks.add(callback);
 	}
 	public void unregisterActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
+		activityLifecycleCallbacks.remove(callback);
+	}
+
+	java.util.List<ActivityLifecycleCallbacks> getActivityLifecycleCallbacks() {
+		return activityLifecycleCallbacks;
 	}
 	public void registerOnProvideAssistDataListener(OnProvideAssistDataListener callback) {
 	}
