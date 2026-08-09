@@ -2251,5 +2251,14 @@ public class Canvas extends BaseCanvas {
         nDrawRenderNode(mNativeCanvasWrapper, renderNode.getGskNode());
     }
 
+    /**
+     * Draws the given RenderNode, API 29 flavour.
+     *
+     * @param renderNode The RenderNode to draw, must be non-null.
+     */
+    public void drawRenderNode(@NonNull RenderNode renderNode) {
+        drawRenderNode(renderNode.getDelegate());
+    }
+
     private static native void nDrawRenderNode(long nativeCanvas, long renderNode);
 }
