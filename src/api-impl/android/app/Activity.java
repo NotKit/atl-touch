@@ -305,6 +305,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		Slog.i(TAG, "invalidateOptionsMenu() called, should we do something?");
 	}
 
+	/* AOSP tears the view hierarchy down after onDestroy, and a SurfaceView's
+	 * layer depends on the synchronous surfaceDestroyed that comes with it:
+	 * without it an app's render thread keeps presenting into a wl_egl_window
+	 * whose EGLDisplay is about to go away. Called from activity_close. */
+	void detachWindowViews() {
+		if (window != null && window.getViewRootImpl() != null)
+			window.getViewRootImpl().setView(null);
+	}
+
 	public Window getWindow() {
 		return this.window;
 	}

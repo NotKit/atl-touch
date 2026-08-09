@@ -25,6 +25,19 @@ static void activity_close(JNIEnv *env, jobject activity)
 	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onDestroy);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+
+	/* then detach the view hierarchy, as AOSP does: this is what delivers
+	 * SurfaceHolder.surfaceDestroyed, which apps rendering natively into a
+	 * SurfaceView block in until their GL thread is gone */
+	jclass activity_class = (*env)->GetObjectClass(env, activity);
+	jmethodID detach = (*env)->GetMethodID(env, activity_class, "detachWindowViews", "()V");
+	if (detach) {
+		(*env)->CallVoidMethod(env, activity, detach);
+		if ((*env)->ExceptionCheck(env))
+			(*env)->ExceptionDescribe(env);
+	} else {
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void activity_unfocus(JNIEnv *env, jobject activity)
