@@ -250,8 +250,10 @@ jobject intent_deserialize(JNIEnv *env, GVariant *variant)
 			GVariantIter parcel_iter;
 			g_variant_iter_init(&parcel_iter, value);
 			jobject parcel = (*env)->NewObject(env, handle_cache.iter_parcel.class, handle_cache.iter_parcel.constructor, _INTPTR(&parcel_iter));
-			jmethodID getClassLoader = _METHOD((*env)->FindClass(env, "java/lang/Class"), "getClassLoader", "()Ljava/lang/ClassLoader;");
-			jobject class_loader = (*env)->CallObjectMethod(env, handle_cache.parcel.class, getClassLoader);
+			/* the app's classes are on the class path, ours are on the boot class path */
+			jclass class_loader_class = (*env)->FindClass(env, "java/lang/ClassLoader");
+			jobject class_loader = (*env)->CallStaticObjectMethod(env, class_loader_class,
+			                                                      _STATIC_METHOD(class_loader_class, "getSystemClassLoader", "()Ljava/lang/ClassLoader;"));
 			jobject parcelable = (*env)->CallObjectMethod(env, parcel, handle_cache.parcel.readParcelable, class_loader);
 			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);

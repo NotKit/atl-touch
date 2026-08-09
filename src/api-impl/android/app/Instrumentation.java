@@ -48,7 +48,7 @@ public class Instrumentation {
 
 			patchClassLoader(DexClassLoader.getSystemClassLoader(), new File(target_path));
 
-			Class<? extends Instrumentation> cls = Class.forName(className).asSubclass(Instrumentation.class);
+			Class<? extends Instrumentation> cls = ClassLoader.getSystemClassLoader().loadClass(className).asSubclass(Instrumentation.class);
 			Constructor<? extends Instrumentation> constructor = cls.getConstructor();
 			Instrumentation i = constructor.newInstance();
 			i.onCreate(arguments.getExtras());

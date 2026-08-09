@@ -28,7 +28,7 @@ public abstract class ContentProvider {
 			try {
 				String providerName = provider_parsed.className;
 				System.out.println("creating " + providerName);
-				Class<? extends ContentProvider> providerCls = Class.forName(providerName).asSubclass(ContentProvider.class);
+				Class<? extends ContentProvider> providerCls = ClassLoader.getSystemClassLoader().loadClass(providerName).asSubclass(ContentProvider.class);
 				ContentProvider provider = providerCls.getConstructor().newInstance();
 				provider.attachInfo(Context.this_application, provider_parsed.info);
 				provider.onCreate();

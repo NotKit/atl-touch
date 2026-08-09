@@ -58,7 +58,7 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 */
 	public Bundle() {
 		super();
-		mClassLoader = getClass().getClassLoader();
+		mClassLoader = ClassLoader.getSystemClassLoader(); // app classes live on the class path, we live on the boot class path
 	}
 
 	/**
@@ -81,7 +81,7 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 */
 	public Bundle(int capacity) {
 		mMap = new ArrayMap<String, Object>(capacity);
-		mClassLoader = getClass().getClassLoader();
+		mClassLoader = ClassLoader.getSystemClassLoader(); // app classes live on the class path, we live on the boot class path
 	}
 
 	/**
@@ -101,7 +101,7 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 
 	public Bundle(PersistableBundle b) {
 		mMap = new ArrayMap<String, Object>(b.mMap);
-		mClassLoader = getClass().getClassLoader();
+		mClassLoader = ClassLoader.getSystemClassLoader(); // app classes live on the class path, we live on the boot class path
 	}
 
 	/**

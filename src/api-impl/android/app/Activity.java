@@ -73,7 +73,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		theme_res = Resources.selectDefaultTheme(theme_res,
 		                                         Math.min(pkg.applicationInfo.targetSdkVersion, Build.VERSION.SDK_INT));
 
-		Class<? extends Activity> cls = Class.forName(className).asSubclass(Activity.class);
+		Class<? extends Activity> cls = ClassLoader.getSystemClassLoader().loadClass(className).asSubclass(Activity.class);
 		Constructor<? extends Activity> constructor = cls.getConstructor();
 		Activity activity = constructor.newInstance();
 		intent.setComponent(new ComponentName(pkg.packageName, className));

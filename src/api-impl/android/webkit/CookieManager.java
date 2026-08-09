@@ -11,7 +11,7 @@ public class CookieManager {
 			throw new RuntimeException("CookieManager not yet fully implemented");
 		}
 		try { // also handle NewPipe forks which can have a different packagename
-			Class.forName("org.schabi.newpipe.util.potoken.PoTokenWebView");
+			ClassLoader.getSystemClassLoader().loadClass("org.schabi.newpipe.util.potoken.PoTokenWebView");
 			throw new RuntimeException("CookieManager not yet fully implemented");
 		} catch (ClassNotFoundException e) {
 		}

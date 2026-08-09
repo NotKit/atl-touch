@@ -51,7 +51,7 @@ public class JobScheduler {
 			public void run() {
 				try {
 					String className = job.getService().getClassName();
-					Class<? extends JobService> cls = Class.forName(className).asSubclass(JobService.class);
+					Class<? extends JobService> cls = ClassLoader.getSystemClassLoader().loadClass(className).asSubclass(JobService.class);
 					if (!runningServices.containsKey(cls)) {
 						JobService service = cls.getConstructor().newInstance();
 						service.attachBaseContext(new ContextImpl(

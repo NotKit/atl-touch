@@ -172,7 +172,7 @@ public abstract class Context {
 		ATLTimeZone.init();
 
 		if (pkg.applicationInfo.className != null) {
-			Class<? extends Application> cls = Class.forName(pkg.applicationInfo.className).asSubclass(Application.class);
+			Class<? extends Application> cls = ClassLoader.getSystemClassLoader().loadClass(pkg.applicationInfo.className).asSubclass(Application.class);
 			Constructor<? extends Application> constructor = cls.getConstructor();
 			application = constructor.newInstance();
 		} else {
@@ -183,7 +183,7 @@ public abstract class Context {
 		application.attachBaseContext(new ContextImpl(r, application_info, pkg.applicationInfo.theme));
 		// HACK: Set WhatsApp's custom logging mechanism to verbose for easier debugging. Should be removed again once WhatsApp is fully supported
 		try {
-			Class.forName("com.whatsapp.util.Log").getField("level").setInt(null, 5);
+			ClassLoader.getSystemClassLoader().loadClass("com.whatsapp.util.Log").getField("level").setInt(null, 5);
 		} catch (Exception e) {
 		} // ignore for other apps
 		return application;
@@ -461,7 +461,7 @@ public abstract class Context {
 			@Override
 			public void run() {
 				try {
-					Class<? extends Service> cls = Class.forName(className).asSubclass(Service.class);
+					Class<? extends Service> cls = ClassLoader.getSystemClassLoader().loadClass(className).asSubclass(Service.class);
 					if (!runningServices.containsKey(cls)) {
 						Service service = cls.getConstructor().newInstance();
 						service.attachBaseContext(new ContextImpl(getResources(), getApplicationInfo(), getTheme()));
@@ -524,7 +524,7 @@ public abstract class Context {
 			@Override
 			public void run() {
 				try {
-					Class<? extends Service> cls = Class.forName(intent.getComponent().getClassName()).asSubclass(Service.class);
+					Class<? extends Service> cls = ClassLoader.getSystemClassLoader().loadClass(intent.getComponent().getClassName()).asSubclass(Service.class);
 					if (!runningServices.containsKey(cls)) {
 						Service service = cls.getConstructor().newInstance();
 						service.attachBaseContext(new ContextImpl(getResources(), getApplicationInfo(), getTheme()));
@@ -676,7 +676,7 @@ public abstract class Context {
 			public void run() {
 				try {
 					if ((intent_.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0 && intent_.getComponent() != null) {
-						boolean found = Activity.nativeResumeActivity(Class.forName(intent_.getComponent().getClassName()).asSubclass(Activity.class), intent_);
+						boolean found = Activity.nativeResumeActivity(ClassLoader.getSystemClassLoader().loadClass(intent_.getComponent().getClassName()).asSubclass(Activity.class), intent_);
 						if (found)
 							return;
 					}
@@ -754,7 +754,7 @@ public abstract class Context {
 			for (PackageParser.IntentInfo intentInfo : receiver.intents) {
 				if (intentInfo.matchAction(intent.getAction())) {
 					try {
-						Class<? extends BroadcastReceiver> cls = Class.forName(receiver.className).asSubclass(BroadcastReceiver.class);
+						Class<? extends BroadcastReceiver> cls = ClassLoader.getSystemClassLoader().loadClass(receiver.className).asSubclass(BroadcastReceiver.class);
 						BroadcastReceiver receiverInstance = cls.newInstance();
 						receiverInstance.onReceive(this, intent);
 					} catch (ReflectiveOperationException e) {
@@ -766,7 +766,7 @@ public abstract class Context {
 	}
 
 	public boolean stopService(Intent intent) throws ClassNotFoundException {
-		Class<? extends Service> cls = Class.forName(intent.getComponent().getClassName()).asSubclass(Service.class);
+		Class<? extends Service> cls = ClassLoader.getSystemClassLoader().loadClass(intent.getComponent().getClassName()).asSubclass(Service.class);
 		Service service = runningServices.remove(cls);
 		if (service != null) {
 			service.onDestroy();

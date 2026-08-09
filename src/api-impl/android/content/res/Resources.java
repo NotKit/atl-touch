@@ -215,12 +215,12 @@ public class Resources {
 	/**
 	 * Returns the drawable inflater used by this resources object.
 	 *
-	 * ATL: the app APK and api-impl.jar share one classpath, so this class'
-	 * classloader can load app-defined custom drawable classes too.
+	 * ATL: the system classloader loads the app APK, so it can also find
+	 * app-defined custom drawable classes.
 	 */
 	public android.graphics.drawable.DrawableInflater getDrawableInflater() {
 		if (mDrawableInflater == null) {
-			mDrawableInflater = new android.graphics.drawable.DrawableInflater(this, Resources.class.getClassLoader());
+			mDrawableInflater = new android.graphics.drawable.DrawableInflater(this, ClassLoader.getSystemClassLoader());
 		}
 		return mDrawableInflater;
 	}

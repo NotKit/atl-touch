@@ -20,7 +20,7 @@ public class ATLKeyboardViewer extends Activity {
 		InputMethodService ims = null;
 
 		try {
-			Class<? extends InputMethodService> cls = Class.forName(kb_class).asSubclass(InputMethodService.class);
+			Class<? extends InputMethodService> cls = ClassLoader.getSystemClassLoader().loadClass(kb_class).asSubclass(InputMethodService.class);
 			Constructor<? extends InputMethodService> constructor = cls.getConstructor();
 			ims = constructor.newInstance();
 		} catch (ReflectiveOperationException e) {
