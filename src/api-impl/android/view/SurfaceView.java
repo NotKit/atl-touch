@@ -10,6 +10,19 @@ public class SurfaceView extends View {
 
 	final ArrayList<SurfaceHolder.Callback> mCallbacks = new ArrayList<SurfaceHolder.Callback>();
 
+	/* the wl_subsurface this view's content presents through, if the platform
+	 * has one. While it is live the view draws a transparent hole instead of
+	 * pixels, and the layer shows through from below - which is how anything
+	 * ATL draws afterwards (toolbars, dialogs, panels) ends up on top. */
+	private long mLayer;
+	private boolean mZOrderOnTop;
+	private boolean mFixedSize;
+	private int mFixedWidth, mFixedHeight;
+	private int mSurfaceWidth, mSurfaceHeight;
+	private final int[] mLayerLocation = new int[2];
+	private int mLayerX = -1, mLayerY = -1, mLayerW = -1, mLayerH = -1;
+	private static int sLayersAvailable; // 0 unknown, 1 yes, -1 no
+
 	public SurfaceView(Context context) {
 		super(context);
 
@@ -53,6 +66,7 @@ public class SurfaceView extends View {
 		post(new Runnable() {
 			@Override
 			public void run() {
+				updateLayer(); // holder.getSurface() must be backed before the callbacks
 				if (!reportedCreated) {
 					reportedCreated = true;
 					surfaceCreated();
@@ -66,6 +80,7 @@ public class SurfaceView extends View {
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
 		super.onSizeChanged(w, h, oldw, oldh);
+		updateLayer();
 		if (reportedCreated && w > 0 && h > 0)
 			surfaceChanged(1 /*RGBA_8888*/, w, h);
 	}
@@ -74,6 +89,11 @@ public class SurfaceView extends View {
 	private final Rect frameDst = new Rect();
 
 	/*
+	 * draw(), not onDraw(): onDraw is recorded into the view's display list and
+	 * replayed, so a layout or scroll that moves the view without changing a
+	 * pixel of it would never re-run it - and both the hole and the layer's
+	 * position have to follow the view every frame.
+	 *
 	 * On AOSP the posted frames live in a separate compositor layer below the
 	 * view, so a subclass drawing its own content in onDraw() (Open Camera puts
 	 * its whole HUD there) ends up on top of them. Blitting here rather than in
@@ -82,13 +102,107 @@ public class SurfaceView extends View {
 	 */
 	@Override
 	public void draw(android.graphics.Canvas canvas) {
-		android.graphics.Bitmap frame = frontBuffer;
-		if (frame != null) {
-			frameSrc.set(0, 0, frame.getWidth(), frame.getHeight());
-			frameDst.set(0, 0, getWidth(), getHeight());
-			canvas.drawBitmap(frame, frameSrc, frameDst, null);
+		updateLayer();
+		if (mLayer != 0 && !mZOrderOnTop) {
+			/* the punch-hole: the scene reaches the toplevel's buffer unblended,
+			 * so this really does write alpha 0 and let the layer through */
+			int save = canvas.save();
+			canvas.clipRect(0, 0, getWidth(), getHeight());
+			canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
+			canvas.restoreToCount(save);
+		} else {
+			android.graphics.Bitmap frame = frontBuffer;
+			if (frame != null) {
+				frameSrc.set(0, 0, frame.getWidth(), frame.getHeight());
+				frameDst.set(0, 0, getWidth(), getHeight());
+				canvas.drawBitmap(frame, frameSrc, frameDst, null);
+			}
 		}
 		super.draw(canvas);
+	}
+
+	/* --- the layer's lifecycle, mirroring AOSP's --- */
+
+	private void updateLayer() {
+		if (sLayersAvailable == 0)
+			sLayersAvailable = native_layersAvailable() ? 1 : -1;
+		if (sLayersAvailable < 0)
+			return;
+		ViewRootImpl root = getViewRootImpl();
+		int width = getWidth(), height = getHeight();
+		if (root == null || root.scene == 0 || width <= 0 || height <= 0)
+			return;
+		if (mLayer == 0) {
+			mLayer = native_createLayer(root.scene);
+			if (mLayer == 0) {
+				sLayersAvailable = -1;
+				return;
+			}
+			if (mZOrderOnTop)
+				native_setLayerZ(mLayer, true);
+		}
+		locationInWindow(mLayerLocation);
+		if (mLayerLocation[0] != mLayerX || mLayerLocation[1] != mLayerY ||
+		    width != mLayerW || height != mLayerH) {
+			mLayerX = mLayerLocation[0];
+			mLayerY = mLayerLocation[1];
+			mLayerW = width;
+			mLayerH = height;
+			native_setLayerGeometry(mLayer, mLayerX, mLayerY, width, height);
+		}
+		mSurfaceWidth = mFixedSize ? mFixedWidth : width;
+		mSurfaceHeight = mFixedSize ? mFixedHeight : height;
+		if (mSurface.nativeWindow == 0) {
+			native_bindSurface(mSurface, mLayer, mSurfaceWidth, mSurfaceHeight);
+			native_startTestClient(mSurface);
+		}
+	}
+
+	/* View.getLocationInWindow() goes through getGlobalVisibleRect(), which is
+	 * only right once everything above has been laid out; the layer's position
+	 * has to be exact from the first frame, so walk the parents like AOSP does */
+	private void locationInWindow(int[] out) {
+		View v = this;
+		int x = 0, y = 0;
+		while (true) {
+			x += v.getLeft();
+			y += v.getTop();
+			ViewParent parent = v.getParent();
+			if (!(parent instanceof View))
+				break;
+			v = (View)parent;
+			x -= v.getScrollX();
+			y -= v.getScrollY();
+		}
+		out[0] = x;
+		out[1] = y;
+	}
+
+	private void destroyLayer() {
+		if (mLayer == 0)
+			return;
+		/* AOSP's contract: the app tears its EGLSurface down inside this call,
+		 * so nothing is using the wl_egl_window by the time it is destroyed */
+		for (SurfaceHolder.Callback c : mCallbacks)
+			c.surfaceDestroyed(mSurfaceHolder);
+		reportedCreated = false;
+		native_destroyLayer(mLayer, mSurface);
+		mLayer = 0;
+		mLayerX = mLayerY = mLayerW = mLayerH = -1;
+	}
+
+	@Override
+	protected void onDetachedFromWindow() {
+		destroyLayer();
+		super.onDetachedFromWindow();
+	}
+
+	int getSurfaceWidth() {
+		return mSurfaceWidth > 0 ? mSurfaceWidth : getWidth();
+	}
+
+	int getSurfaceHeight() {
+		return mSurfaceHeight > 0 ? mSurfaceHeight : getHeight();
 	}
 
 	void postFrame(android.graphics.Bitmap frame) {
@@ -97,6 +211,16 @@ public class SurfaceView extends View {
 	}
 
 	protected native long native_createSnapshot(int width, int height);
+	private static native boolean native_layersAvailable();
+	private native long native_createLayer(long windowPtr);
+	private native void native_destroyLayer(long layer, Surface surface);
+	private native void native_bindSurface(Surface surface, long layer, int width, int height);
+	private native void native_setLayerGeometry(long layer, int x, int y, int width, int height);
+	private native void native_setLayerBufferSize(long layer, int width, int height);
+	private native void native_setLayerZ(long layer, boolean above);
+	private native void native_setLayerVisible(long layer, boolean visible);
+	/** debug: a colour-cycling GL client on the layer, only with ATL_SURFACE_TEST set */
+	private native void native_startTestClient(Surface surface);
 	/** detach the canvas's backing bitmap (frees the canvas) */
 	protected static native long native_canvas_to_bitmap(long canvas);
 
@@ -133,11 +257,18 @@ public class SurfaceView extends View {
 
 		@Override
 		public void setFixedSize(int width, int height) {
-			/*		if (mRequestedWidth != width || mRequestedHeight != height) {
-					mRequestedWidth = width;
-					mRequestedHeight = height;
-					requestLayout();
-					}*/
+			if (mFixedSize && mFixedWidth == width && mFixedHeight == height)
+				return;
+			mFixedSize = width > 0 && height > 0;
+			mFixedWidth = width;
+			mFixedHeight = height;
+			if (mLayer != 0) {
+				native_setLayerBufferSize(mLayer, width, height);
+				mSurfaceWidth = mFixedSize ? width : getWidth();
+				mSurfaceHeight = mFixedSize ? height : getHeight();
+				if (reportedCreated)
+					surfaceChanged(1 /*RGBA_8888*/, mSurfaceWidth, mSurfaceHeight);
+			}
 		}
 
 		@Override
@@ -273,16 +404,23 @@ public class SurfaceView extends View {
 
 		@Override
 		public Rect getSurfaceFrame() {
-			//		return mSurfaceFrame;
-			return new Rect(0, 0, 400, 400);
+			return new Rect(0, 0, getSurfaceWidth(), getSurfaceHeight());
 		}
 	};
 
 	public void setZOrderOnTop(boolean onTop) {
-		/* TODO */
+		if (mZOrderOnTop == onTop)
+			return;
+		mZOrderOnTop = onTop;
+		if (mLayer != 0) {
+			native_setLayerZ(mLayer, onTop);
+			invalidate(); // the hole becomes (or stops being) opaque content
+		}
 	}
 
 	public void setZOrderMediaOverlay(boolean mediaOverlay) {
-		/* TODO */
+		/* both media overlays and plain content sit below the parent here;
+		 * ordering between two layers of the same window is their creation
+		 * order, which is what AOSP's default gives too */
 	}
 }
