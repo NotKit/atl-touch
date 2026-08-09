@@ -73,10 +73,64 @@ char *construct_classpath(char *prefix, char **cp_array, size_t len)
 	return result;
 }
 
+/* alphabetical, except that core-oj (java.lang and friends) sorts first */
+static int compare_boot_jars(gconstpointer a, gconstpointer b)
+{
+	const char *jar_a = *(const char **)a, *jar_b = *(const char **)b;
+	int core_a = g_str_has_prefix(jar_a, "core-oj"), core_b = g_str_has_prefix(jar_b, "core-oj");
+
+	return core_a != core_b ? core_b - core_a : strcmp(jar_a, jar_b);
+}
+
+/*
+ * api-impl.jar belongs on the boot class path, not next to the app: apps built against a
+ * new SDK ship synthetic android.* classes whose <clinit> throws NoClassDefFoundError and
+ * expect the platform copy to shadow them, which only the boot class path does. It also
+ * keeps our classes out of ART's app duplicate-class check, which would otherwise reject
+ * the app's oat file and run the whole app interpreted.
+ *
+ * It has to go through the environment rather than -Xbootclasspath: dex2oat runs as a
+ * child process and takes its boot class path from there, and it refuses to start if the
+ * boot image has more components than its own boot class path.
+ */
+static void set_up_boot_class_path(const char *art_jar_dir, const char *api_impl_jar)
+{
+	const char *inherited = getenv("BOOTCLASSPATH");
+	GString *bcp = g_string_new(inherited ? inherited : "");
+
+	if (!inherited) {
+		/* the same jars ART would have defaulted to, sorted so that the boot image we
+		 * generate stays valid across runs; core-oj holds java.lang, so it goes first */
+		GDir *dir = g_dir_open(art_jar_dir, 0, NULL);
+		if (!dir) {
+			fprintf(stderr, "error: can't list ART's boot jar directory %s\n", art_jar_dir);
+			exit(1);
+		}
+		GPtrArray *jars = g_ptr_array_new_with_free_func(g_free);
+		const char *name;
+		while ((name = g_dir_read_name(dir))) {
+			if (g_str_has_suffix(name, ".jar"))
+				g_ptr_array_add(jars, g_strdup(name));
+		}
+		g_dir_close(dir);
+		g_ptr_array_sort(jars, compare_boot_jars);
+		for (guint i = 0; i < jars->len; i++)
+			g_string_append_printf(bcp, "%s%s/%s", i ? ":" : "", art_jar_dir, (char *)g_ptr_array_index(jars, i));
+		g_ptr_array_free(jars, TRUE);
+	}
+
+	if (bcp->len)
+		g_string_append_c(bcp, ':');
+	g_string_append(bcp, api_impl_jar);
+
+	setenv("BOOTCLASSPATH", bcp->str, 1);
+	g_string_free(bcp, TRUE);
+}
+
 #define JDWP_ARG    "-XjdwpOptions:transport=dt_socket,server=y,suspend=y,address="
 #define SDK_INT_ARG "-DBuild.VERSION.SDK_INT="
 
-JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options)
+JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options)
 {
 	JavaVM *jvm;
 	JNIEnv *env;
@@ -111,7 +165,10 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){api_impl_natives_dir, app_lib_dir}, 2);
 	}
 
-	options[1].optionString = construct_classpath("-Djava.class.path=", (char *[]){api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar}, 4);
+	/* api-impl.jar is on the boot class path (see set_up_boot_class_path); framework-res.apk
+	 * stays here because it holds no classes and AssetManager finds it by scanning the
+	 * system class loader's resources */
+	options[1].optionString = construct_classpath("-Djava.class.path=", (char *[]){apk_classpath, framework_res_apk, test_runner_jar}, 3);
 	if (getenv("ATL_CHECK_JNI"))
 		options[option_counter++].optionString = "-Xcheck:jni";
 	if (jdwp_port) {
@@ -349,6 +406,10 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 
 	char *api_impl_natives_dir = g_strdup_printf("%s/%s", dex_install_dir, REL_API_IMPL_NATIVES_INSTALL_PATH);
 
+	char *art_jar_dir = g_strdup_printf("%s/art", dex_install_dir);
+	set_up_boot_class_path(art_jar_dir, api_impl_jar);
+	g_free(art_jar_dir);
+
 	char *app_lib_dir = malloc(strlen(app_data_dir) + strlen("/lib") + 1); // +1 for NULL
 	strcpy(app_lib_dir, app_data_dir);
 	strcat(app_lib_dir, "/lib");
@@ -363,7 +424,7 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	dl_parse_library_path(ld_path, ":");
 	g_free(ld_path);
 
-	JNIEnv *env = create_vm(api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options);
+	JNIEnv *env = create_vm(apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options);
 
 	free(app_lib_dir);
 
@@ -373,18 +434,17 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 
 	/* -- register our JNI library under the appropriate classloader -- */
 
-	/* 'android/view/View' is part of the "hax.dex" package, any other function from that package would serve just as well */
-	jmethodID getClassLoader = _METHOD((*env)->FindClass(env, "java/lang/Class"), "getClassLoader", "()Ljava/lang/ClassLoader;");
-	jobject class_loader = (*env)->CallObjectMethod(env, (*env)->FindClass(env, "android/view/View"), getClassLoader);
-
 	jclass java_runtime_class = (*env)->FindClass(env, "java/lang/Runtime");
 
 	jmethodID getRuntime = _STATIC_METHOD(java_runtime_class, "getRuntime", "()Ljava/lang/Runtime;");
 	jobject java_runtime = (*env)->CallStaticObjectMethod(env, java_runtime_class, getRuntime);
 
-	/* this method is private, but it seems we get away with calling it from C */
+	/* ART only resolves a native method against libraries loaded by the declaring class'
+	 * loader, and api-impl.jar is on the boot class path, so pass the null (boot) loader;
+	 * that also makes it search java.library.path instead of a class loader's lib dirs.
+	 * This method is private, but it seems we get away with calling it from C. */
 	jmethodID loadLibrary_with_classloader = _METHOD(java_runtime_class, "loadLibrary", "(Ljava/lang/String;Ljava/lang/ClassLoader;)V");
-	(*env)->CallVoidMethod(env, java_runtime, loadLibrary_with_classloader, _JSTRING("translation_layer_main"), class_loader);
+	(*env)->CallVoidMethod(env, java_runtime, loadLibrary_with_classloader, _JSTRING("translation_layer_main"), NULL);
 
 	// some apps need the apk path since they directly read their apk
 	apk_path = strdup(apk_classpath);
