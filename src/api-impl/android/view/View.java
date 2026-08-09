@@ -3116,6 +3116,11 @@ public class View implements Drawable.Callback {
 
 	public AutofillId getAutofillId() { return new AutofillId(); }
 
+	/* null means content capture is disabled, which is what androidx and
+	 * Compose expect when there is no content-capture service. */
+	public android.view.contentcapture.ContentCaptureSession getContentCaptureSession() { return null; }
+	public void setContentCaptureSession(android.view.contentcapture.ContentCaptureSession session) {}
+
 	public AccessibilityDelegate getAccessibilityDelegate() { return null; }
 
 	public void setScrollX(int value) {
