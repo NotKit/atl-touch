@@ -708,10 +708,10 @@ static void atl_window_render(ATLWindow *window)
 
 	if (window->canvas_is_gpu) {
 		atl_canvas_gpu_present(window->gpu_context, canvas, width, height);
-	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
-		atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
-		                               width, height, atl_window_scale(window));
-	}
+		if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+			atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+			                               width, height, atl_window_scale(window));
+		}
 		glfwSwapBuffers(window->glfw_window);
 		window->needs_redraw = false;
 		window->full_redraw = false;
