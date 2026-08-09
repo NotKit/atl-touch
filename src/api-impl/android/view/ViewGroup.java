@@ -611,6 +611,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	    ? Float.parseFloat(System.getenv("ATL_DEBUG_DRAWTIME")) : -1;
 
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
+		/* A hardware-accelerated Canvas with no native peer is AOSP's placeholder:
+		 * the no-arg Canvas() skips nInitRaster when isHardwareAccelerated() is
+		 * overridden to true. AOSP's render-node path hands such a canvas straight
+		 * to RecordingCanvas.drawRenderNode without ever saving or painting on it,
+		 * and Compose's GraphicsViewLayer (used at SDK 28) relies on that to make a
+		 * layer re-record without drawing. So there is nothing to draw here. */
+		if (canvas.getNativeCanvasWrapper() == 0)
+			return false;
 		child.computeScroll();
 		/* Follows AOSP View.draw(Canvas, ViewGroup, long): the child's own scroll is
 		 * applied here and compensated for by the clip (and by drawBackground), so a
