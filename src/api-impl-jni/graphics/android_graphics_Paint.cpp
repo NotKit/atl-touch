@@ -388,16 +388,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_nSetTextSkewX(JNIEnv *env, jc
 
 JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_nGetLetterSpacing(JNIEnv *env, jclass, jlong paint_ptr)
 {
-	AndroidPaint *paint = PAINT(paint_ptr);
-	float size = paint->font.getSize();
-	return size != 0 ? paint->letter_spacing / size : 0;
+	return PAINT(paint_ptr)->letter_spacing;
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_nSetLetterSpacing(JNIEnv *env, jclass, jlong paint_ptr, jfloat spacing)
 {
-	/* Android's unit is EMs; minikin wants pixels */
-	AndroidPaint *paint = PAINT(paint_ptr);
-	paint->letter_spacing = spacing * paint->font.getSize();
+	/* both Android and minikin measure letter spacing in EMs (minikin multiplies
+	 * by the font size itself in LayoutCore) */
+	PAINT(paint_ptr)->letter_spacing = spacing;
 }
 
 JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_nGetWordSpacing(JNIEnv *env, jclass, jlong paint_ptr)
