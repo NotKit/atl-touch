@@ -832,6 +832,7 @@ srcs = [
 	'android/widget/ZoomButtonsController.java',
 	'android/window/OnBackInvokedCallback.java',
 	'android/window/OnBackInvokedDispatcher.java',
+	'android/window/SplashScreenView.java',
 	'com/android/internal/Manifest.java',
 	'com/android/internal/annotations/GuardedBy.java',
 	'com/android/internal/annotations/VisibleForTesting.java',
