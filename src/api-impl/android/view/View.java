@@ -1270,6 +1270,16 @@ public class View implements Drawable.Callback {
 	 * themselves; skip recording and replaying empty display lists for them */
 	private static final Map<Class<?>, Boolean> overridesOnDrawCache = new HashMap<>();
 
+	/* An ahead-of-time image answers getDeclaredMethod for a class with no
+	 * reflection metadata as if the method did not exist, so this optimisation
+	 * would silently decide that every unregistered view draws nothing. Give it
+	 * up there and record unconditionally. The key is GraalVM's own
+	 * ImageInfo.PROPERTY_IMAGE_CODE_KEY; any value means an image (it reads
+	 * "buildtime" during the build and "runtime" after), and it is unset on ART
+	 * and on a stock JVM, so those keep the optimisation. */
+	private static final boolean IN_NATIVE_IMAGE =
+		System.getProperty("org.graalvm.nativeimage.imagecode") != null;
+
 	private boolean overridesOnDraw() {
 		Class<?> cls = getClass();
 		synchronized (overridesOnDrawCache) {
@@ -1297,7 +1307,7 @@ public class View implements Drawable.Callback {
 		// clear the flag before drawing: an invalidate() from inside onDraw
 		// (self-animating views) must dirty the new recording, not this one
 		displayListDirty = false;
-		if (background == null && !overridesOnDraw()) {
+		if (!IN_NATIVE_IMAGE && background == null && !overridesOnDraw()) {
 			if (contentDisplayList != null) {
 				contentDisplayList.discardDisplayList();
 				contentDisplayList = null;
