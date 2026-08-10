@@ -64,6 +64,12 @@ void extract_from_apk(const char *path, const char *target)
 {
 	JNIEnv *env = get_jni_env();
 	(*env)->CallStaticVoidMethod(env, handle_cache.asset_manager.class, handle_cache.asset_manager.extractFromAPK, _JSTRING(apk_path), _JSTRING(path), _JSTRING(target));
+	/* extractFromAPK throws if the copy itself fails; clear it here, or it would
+	 * be delivered at whatever JNI call this caller makes next */
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 /* logging with fallback to stderr */

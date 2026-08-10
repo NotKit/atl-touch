@@ -670,7 +670,8 @@ public final class AssetManager {
 	 * The caller's apk is tried first, then the other registered ones, because a
 	 * framework resource (android.R.drawable.*) lives in framework-res.apk. A path
 	 * no apk holds is a no-op: callers pass names that need not exist (SoundPool
-	 * passes a bare resource entry name).
+	 * passes a bare resource entry name), and so is an apk that cannot be opened.
+	 * Only a failure to write the copy throws.
 	 */
 	public static void extractFromAPK(String apk_path, String path, String target) throws IOException {
 		if (extract(apk_path, path, target))
@@ -683,11 +684,36 @@ public final class AssetManager {
 
 	/** Returns whether the apk held the path at all. */
 	private static boolean extract(String apk_path, String path, String target) throws IOException {
-		/* no verification: this only copies data out, and verifying a v1-signed
-		 * apk hashes every entry that is read */
-		try (JarFile apk = new JarFile(apk_path, false)) {
-			return extract(apk, path, target);
+		JarFile apk = openApk(apk_path);
+		return apk != null && extract(apk, path, target);
+	}
+
+	/**
+	 * The apks {@link #extractFromAPK} reads, opened once and kept open for the
+	 * process: every miss walks all of them, and a miss is the common case
+	 * (SoundPool and MediaPlayer pass bare resource entry names), so opening per
+	 * call re-parsed the 62 MB app apk's central directory on every notification
+	 * sound. Null means "cannot be opened", cached too so it is not retried.
+	 */
+	private static final HashMap<String, JarFile> open_apks = new HashMap<String, JarFile>();
+
+	private static synchronized JarFile openApk(String apk_path) {
+		if (apk_path == null)
+			return null;
+		if (open_apks.containsKey(apk_path))
+			return open_apks.get(apk_path);
+
+		JarFile apk = null;
+		try {
+			/* no verification: this only copies data out, and verifying a v1-signed
+			 * apk hashes every entry that is read */
+			apk = new JarFile(apk_path, false);
+		} catch (IOException e) {
+			// not fatal: a launcher may name an apk that is not there
+			Log.w(TAG, "cannot read apk " + apk_path + ": " + e);
 		}
+		open_apks.put(apk_path, apk);
+		return apk;
 	}
 
 	private static boolean extract(JarFile apk, String path, String target) throws IOException {
