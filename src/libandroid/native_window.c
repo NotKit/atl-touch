@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +47,7 @@
 #include "../api-impl-jni/defines.h"
 
 #include "native_window.h"
+#include "window_frame.h"
 
 /**
  * Transforms that can be applied to buffers as they are displayed to a window.
@@ -87,6 +89,17 @@ typedef struct ANativeWindow_Buffer {
 	uint32_t reserved[6];
 } ANativeWindow_Buffer;
 
+static void window_free(struct ANativeWindow *native_window)
+{
+	JNIEnv *env;
+
+	if (native_window->surface && native_window->vm &&
+	    (*native_window->vm)->GetEnv(native_window->vm, (void **)&env, JNI_VERSION_1_6) == JNI_OK)
+		(*env)->DeleteWeakGlobalRef(env, native_window->surface);
+	free(native_window->lock_pixels);
+	free(native_window);
+}
+
 void ANativeWindow_acquire(struct ANativeWindow *native_window)
 {
 	/* every entry point tolerates the NULL window ATL used to be the only
@@ -103,7 +116,7 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 	/* the Wayland objects belong to the ATLSurfaceLayer, which destroys them
 	 * on the main thread after surfaceDestroyed(); this can run on any thread */
 	if (__atomic_sub_fetch(&native_window->refcount, 1, __ATOMIC_SEQ_CST) == 0)
-		free(native_window);
+		window_free(native_window);
 }
 
 struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct wl_surface *surface,
@@ -120,7 +133,21 @@ struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct w
 	window->egl_window = (EGLNativeWindowType)egl_window;
 	window->width = width;
 	window->height = height;
+	window->format = ATL_WINDOW_FORMAT_RGBA_8888;
 	return window;
+}
+
+/*
+ * The Surface a CPU producer's frames go to. A weak reference on purpose: the
+ * Surface owns the window (its nativeWindow field holds the only reference the
+ * layer path drops), so a strong one would be a cycle that outlives the view.
+ */
+void atl_native_window_bind_surface(struct ANativeWindow *window, JNIEnv *env, jobject surface)
+{
+	if (!window || !env || !surface || window->surface)
+		return;
+	(*env)->GetJavaVM(env, &window->vm);
+	window->surface = (*env)->NewWeakGlobalRef(env, surface);
 }
 
 /* the view (and so the layer's buffer) resized under a window the app may
@@ -154,7 +181,7 @@ int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
 
 int32_t ANativeWindow_getFormat(ANativeWindow *window)
 {
-	return window ? 1 /* WINDOW_FORMAT_RGBA_8888 */ : -1;
+	return window ? window->format : -1;
 }
 
 int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
@@ -162,6 +189,9 @@ int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
 {
 	if (!window)
 		return -1;
+	/* the app is still holding the buffer this would resize under it */
+	if (window->locked)
+		return -EBUSY;
 	/* 0x0 means "whatever the window system picked", which is what the layer
 	 * already sized the wl_egl_window to */
 	if (width > 0 && height > 0) {
@@ -170,20 +200,91 @@ int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
 		if (window->egl_window)
 			wl_egl_window_resize((struct wl_egl_window *)window->egl_window, width, height, 0, 0);
 	}
+	if (format) {
+		if (!atl_window_format_readable(format)) {
+			fprintf(stderr, "ANativeWindow_setBuffersGeometry: format %d is not one ATL can "
+			                "present\n", format);
+			return -EINVAL;
+		}
+		window->format = format;
+	}
+	/* the buffer no longer describes the window */
+	free(window->lock_pixels);
+	window->lock_pixels = NULL;
+	window->lock_size = 0;
 	return 0;
 }
 
-typedef void ARect;
+typedef struct ARect {
+	int32_t left;
+	int32_t top;
+	int32_t right;
+	int32_t bottom;
+} ARect;
 
+/*
+ * The CPU producer contract: lock hands out a writable buffer of the window's
+ * geometry, unlockAndPost presents it. The GL path (a wl_egl_window on the
+ * SurfaceView's subsurface) cannot serve this - there is no buffer to hand out
+ * - so a locked frame takes the road a decoded video frame takes instead:
+ * Surface.postFrame(Bitmap), which SurfaceView.draw() blits and which unmaps
+ * the layer, so the two producers never fight over one view.
+ */
 int32_t ANativeWindow_lock(ANativeWindow *window, ANativeWindow_Buffer *outBuffer,
                            ARect *inOutDirtyBounds)
 {
-	return -1;
+	size_t bpp, size;
+
+	if (!window || !outBuffer)
+		return -EINVAL;
+	if (window->locked)
+		return -EBUSY;
+
+	bpp = atl_window_format_bpp(window->format);
+	if (!bpp || window->width <= 0 || window->height <= 0)
+		return -EINVAL;
+
+	size = (size_t)window->width * window->height * bpp;
+	if (window->lock_size != size) {
+		free(window->lock_pixels);
+		window->lock_pixels = calloc(1, size);
+		window->lock_size = window->lock_pixels ? size : 0;
+	}
+	if (!window->lock_pixels)
+		return -ENOMEM;
+
+	/* ATL has no partial posts: the caller redraws the whole buffer, which
+	 * is what a NULL dirty rectangle asks of it anyway */
+	if (inOutDirtyBounds)
+		*inOutDirtyBounds = (ARect){0, 0, window->width, window->height};
+
+	*outBuffer = (ANativeWindow_Buffer){
+	    .width = window->width,
+	    .height = window->height,
+	    .stride = window->width,
+	    .format = window->format,
+	    .bits = window->lock_pixels,
+	};
+	window->locked = true;
+	return 0;
 }
 
 int32_t ANativeWindow_unlockAndPost(ANativeWindow *window)
 {
-	return -1;
+	struct atl_window_frame frame = {0};
+
+	if (!window || !window->locked)
+		return -EINVAL;
+	window->locked = false;
+
+	frame.pixels = window->lock_pixels;
+	frame.width = window->width;
+	frame.height = window->height;
+	frame.stride = (size_t)window->width * atl_window_format_bpp(window->format);
+	frame.format = window->format;
+	if (!atl_native_window_present(window, &frame, NULL, window->transform))
+		return -ENODEV;
+	return 0;
 }
 
 int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_t compatibility)
@@ -193,7 +294,83 @@ int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_
 
 int32_t ANativeWindow_setBuffersTransform(ANativeWindow *window, int32_t transform)
 {
-	return -1;
+	if (!window || (transform & ~(ANATIVEWINDOW_TRANSFORM_MIRROR_HORIZONTAL |
+	                              ANATIVEWINDOW_TRANSFORM_MIRROR_VERTICAL |
+	                              ANATIVEWINDOW_TRANSFORM_ROTATE_90)))
+		return -EINVAL;
+	/* only the CPU path honours it: a GL producer draws into the buffer
+	 * already transformed */
+	window->transform = transform;
+	return 0;
+}
+
+/*
+ * A frame the app finished with, into the Surface. The Bitmap is built by the
+ * main library, which owns Skia; this one is loaded for an app's native code
+ * and does not link against it, so the entry point is resolved by name.
+ */
+bool atl_native_window_present(struct ANativeWindow *window, const struct atl_window_frame *frame,
+                               const int32_t *crop, int transform)
+{
+	static int (*present)(JNIEnv *, jobject, uint8_t *, int, int);
+	static bool resolved;
+	int out_width, out_height, ret;
+	uint8_t *rgba;
+	jobject surface;
+	JNIEnv *env;
+
+	if (!window || !window->surface || !window->vm || !frame)
+		return false;
+	if (!atl_window_format_readable(frame->format))
+		return false;
+	if (!resolved) {
+		resolved = true;
+		present = dlsym(RTLD_DEFAULT, "atl_surface_post_rgba");
+		if (!present) {
+			/* ART loads a JNI library into a scope of its own, so the
+			 * global one need not have the main library in it */
+			void *main_lib = dlopen("libtranslation_layer_main.so", RTLD_LAZY | RTLD_NOLOAD);
+
+			if (main_lib)
+				present = dlsym(main_lib, "atl_surface_post_rgba");
+		}
+		if (!present)
+			fprintf(stderr, "ANativeWindow: no atl_surface_post_rgba, so a posted frame "
+			                "has nowhere to go\n");
+	}
+	if (!present)
+		return false;
+
+	atl_window_frame_out_size(frame, crop, transform, &out_width, &out_height);
+	if (out_width <= 0 || out_height <= 0)
+		return false;
+	rgba = malloc((size_t)out_width * out_height * 4);
+	if (!rgba)
+		return false;
+	if (!atl_window_frame_to_rgba(frame, crop, transform, rgba)) {
+		free(rgba);
+		return false;
+	}
+
+	if ((*window->vm)->GetEnv(window->vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) {
+		JavaVMAttachArgs args = {JNI_VERSION_1_6, "atl-native-window", NULL};
+
+		if ((*window->vm)->AttachCurrentThreadAsDaemon(window->vm, (void **)&env, &args) != JNI_OK) {
+			free(rgba);
+			return false;
+		}
+	}
+	/* the Surface may be gone: it owns the window, and an app can outlive the
+	 * view it got one from */
+	surface = (*env)->NewLocalRef(env, window->surface);
+	if (!surface) {
+		free(rgba);
+		return false;
+	}
+	/* the main library takes the pixels whether or not it can post them */
+	ret = present(env, surface, rgba, out_width, out_height);
+	(*env)->DeleteLocalRef(env, surface);
+	return ret == 0;
 }
 
 /*

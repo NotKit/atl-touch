@@ -1,3 +1,5 @@
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include <EGL/egl.h>
@@ -15,6 +17,17 @@ struct ANativeWindow {
 	int refcount;
 	int width;
 	int height;
+
+	/* the CPU producer path (ANativeWindow_lock/unlockAndPost), which does not
+	 * go through the layer at all: the finished buffer becomes a Bitmap and is
+	 * posted into the Surface, like a decoded video frame */
+	JavaVM *vm;
+	jweak surface; /* weak global ref to the android.view.Surface, or NULL */
+	int format;
+	int transform;
+	uint8_t *lock_pixels;
+	size_t lock_size;
+	bool locked;
 };
 
 /*
@@ -30,6 +43,9 @@ struct ANativeWindow {
 struct ANativeWindow *atl_native_window_new(struct wl_display *display, struct wl_surface *surface,
                                             void *egl_window, int width, int height);
 void atl_native_window_set_size(struct ANativeWindow *native_window, int width, int height);
+/* remember which Surface this window presents into, so a CPU producer's frames
+ * have somewhere to go; safe to call more than once for the same surface */
+void atl_native_window_bind_surface(struct ANativeWindow *native_window, JNIEnv *env, jobject surface);
 void atl_native_window_detach(struct ANativeWindow *native_window);
 
 /*
@@ -65,3 +81,10 @@ void ANativeWindow_release(struct ANativeWindow *native_window);
 int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window);
 int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window);
 int32_t ANativeWindow_getFormat(struct ANativeWindow *native_window);
+
+struct atl_window_frame;
+/* present one finished CPU frame into the window's Surface, honouring an
+ * optional left/top/right/bottom crop and an ANATIVEWINDOW_TRANSFORM_* set */
+bool atl_native_window_present(struct ANativeWindow *native_window,
+                               const struct atl_window_frame *frame, const int32_t *crop,
+                               int transform);

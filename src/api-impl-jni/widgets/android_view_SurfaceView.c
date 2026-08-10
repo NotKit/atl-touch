@@ -73,8 +73,10 @@ JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1bindSurface(JNIEnv 
 	} else {
 		window = atl_native_window_new(glfwGetWaylandDisplay(), atl_surface_layer_wl_surface(layer),
 		                               atl_surface_layer_egl_window(layer), width, height);
-		if (window)
+		if (window) {
+			atl_native_window_bind_surface(window, env, surface);
 			(*env)->SetLongField(env, surface, field, _INTPTR(window));
+		}
 	}
 	(*env)->MonitorExit(env, surface);
 }
