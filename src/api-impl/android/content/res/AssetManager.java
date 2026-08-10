@@ -95,6 +95,9 @@ public final class AssetManager {
 
 	private ArrayList<String> asset_paths = new ArrayList<String>();
 
+	/** the apks resources are read from; see {@link #findApkPaths} */
+	private static ArrayList<String> apk_paths = null;
+
 	/**
 	 * Create a new AssetManager containing only the basic system assets.
 	 * Applications will not generally use this method, instead retrieving the
@@ -112,6 +115,34 @@ public final class AssetManager {
 			if (localLOGV)
 				Log.v(TAG, "New asset manager: " + this);
 			//            ensureSystemAssets()
+			asset_paths.addAll(findApkPaths());
+			asset_paths.add(android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/");
+			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
+			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
+		}
+	}
+
+	/**
+	 * The apks resources come from, framework-res.apk first so the app's own
+	 * resources override the framework's.
+	 *
+	 * The launcher names them in system properties. Only the dex launcher, which
+	 * sets none, still has to be asked through the class path — a jar-based
+	 * runtime need not have the apks on it at all, and a native image has no
+	 * class path to scan.
+	 */
+	private static synchronized ArrayList<String> findApkPaths() {
+		if (apk_paths != null)
+			return apk_paths;
+
+		ArrayList<String> found = new ArrayList<String>();
+		String apk_path = System.getProperty("atl.apk.path");
+		if (apk_path != null) {
+			String framework_res = System.getProperty("atl.framework.res.path");
+			if (framework_res != null)
+				found.add(framework_res);
+			found.add(apk_path);
+		} else {
 			try {
 				Enumeration<URL> resources = ClassLoader.getSystemClassLoader().getResources("AndroidManifest.xml");
 				ArrayList<String> paths = new ArrayList<String>();
@@ -127,16 +158,16 @@ public final class AssetManager {
 				for (String path : paths) {
 					if (path != null) {
 						path = path.substring(path.indexOf("file:") + 5, path.indexOf("!/AndroidManifest.xml"));
-						asset_paths.add(path);
+						found.add(path);
 					}
 				}
 			} catch (IOException e) {
 				Log.e(TAG, "failed to load resources.arsc" + e);
 			}
-			asset_paths.add(android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/");
-			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
-			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
 		}
+
+		apk_paths = found;
+		return apk_paths;
 	}
 
 	private static void ensureSystemAssets() {
@@ -634,39 +665,56 @@ public final class AssetManager {
 
 	/**
 	 * Copy an apk entry (or a whole directory of them) into the app's data dir.
-	 * Both the listing and the bytes come from the named apk; a path the apk does
-	 * not hold is a no-op, because callers pass names that need not exist
-	 * (SoundPool passes a bare resource entry name).
+	 * Both the listing and the bytes come from an apk, never from the class path.
+	 *
+	 * The caller's apk is tried first, then the other registered ones, because a
+	 * framework resource (android.R.drawable.*) lives in framework-res.apk. A path
+	 * no apk holds is a no-op: callers pass names that need not exist (SoundPool
+	 * passes a bare resource entry name).
 	 */
 	public static void extractFromAPK(String apk_path, String path, String target) throws IOException {
-		/* no verification: this only copies data out, and verifying a v1-signed
-		 * apk hashes every entry that is read */
-		try (JarFile apk = new JarFile(apk_path, false)) {
-			extractFromAPK(apk, path, target);
+		if (extract(apk_path, path, target))
+			return;
+		for (String other : findApkPaths()) {
+			if (!other.equals(apk_path) && extract(other, path, target))
+				return;
 		}
 	}
 
-	private static void extractFromAPK(JarFile apk, String path, String target) throws IOException {
+	/** Returns whether the apk held the path at all. */
+	private static boolean extract(String apk_path, String path, String target) throws IOException {
+		/* no verification: this only copies data out, and verifying a v1-signed
+		 * apk hashes every entry that is read */
+		try (JarFile apk = new JarFile(apk_path, false)) {
+			return extract(apk, path, target);
+		}
+	}
+
+	private static boolean extract(JarFile apk, String path, String target) throws IOException {
 		if (path.endsWith("/")) { // directory
+			boolean found = false;
 			Enumeration<JarEntry> entries = apk.entries();
 			while (entries.hasMoreElements()) {
 				JarEntry entry = entries.nextElement();
 				if (entry.getName().startsWith(path)) {
-					extractFromAPK(apk, entry.getName(), entry.getName().replace(path, target));
+					found |= extract(apk, entry.getName(), entry.getName().replace(path, target));
 				}
 			}
-		} else { // single file
-			JarEntry entry = apk.getJarEntry(path);
-			if (entry == null)
-				return;
-			Path file = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), target);
-			if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(Paths.get(apk.getName())).toMillis()) {
-				Files.createDirectories(file.getParent());
-				try (InputStream inputStream = apk.getInputStream(entry)) {
-					Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
-				}
+			return found;
+		}
+
+		// single file
+		JarEntry entry = apk.getJarEntry(path);
+		if (entry == null)
+			return false;
+		Path file = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), target);
+		if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(Paths.get(apk.getName())).toMillis()) {
+			Files.createDirectories(file.getParent());
+			try (InputStream inputStream = apk.getInputStream(entry)) {
+				Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
 			}
 		}
+		return true;
 	}
 
 	/**

@@ -212,6 +212,8 @@ static JNIEnv *create_vm(struct launcher_options *d, const char *apk, const char
 	add_option(options, "-DBuild.VERSION.SDK_INT=%d", d->sdk_int);
 	/* what the ART launcher keeps in C globals; a jar-based runtime wants them from Java too */
 	add_option(options, "-Datl.apk.path=%s", apk);
+	if (d->framework_res_apk)
+		add_option(options, "-Datl.framework.res.path=%s", d->framework_res_apk);
 	add_option(options, "-Datl.data.dir=%s", app_data_dir);
 	add_option(options, "-Datl.app.id=%s", g_application_get_application_id(g_application_get_default()));
 	/* the framework reads java.io.FileDescriptor's private fd where a JVM has no libcore equivalent */
