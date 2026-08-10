@@ -632,25 +632,38 @@ public final class AssetManager {
 
 	private native final int addAssetPathNative(String path);
 
+	/**
+	 * Copy an apk entry (or a whole directory of them) into the app's data dir.
+	 * Both the listing and the bytes come from the named apk; a path the apk does
+	 * not hold is a no-op, because callers pass names that need not exist
+	 * (SoundPool passes a bare resource entry name).
+	 */
 	public static void extractFromAPK(String apk_path, String path, String target) throws IOException {
+		/* no verification: this only copies data out, and verifying a v1-signed
+		 * apk hashes every entry that is read */
+		try (JarFile apk = new JarFile(apk_path, false)) {
+			extractFromAPK(apk, path, target);
+		}
+	}
+
+	private static void extractFromAPK(JarFile apk, String path, String target) throws IOException {
 		if (path.endsWith("/")) { // directory
-			try (JarFile apk = new JarFile(apk_path)) {
-				Enumeration<JarEntry> entries = apk.entries();
-				while (entries.hasMoreElements()) {
-					JarEntry entry = entries.nextElement();
-					if (entry.getName().startsWith(path)) {
-						extractFromAPK(apk_path, entry.getName(), entry.getName().replace(path, target));
-					}
+			Enumeration<JarEntry> entries = apk.entries();
+			while (entries.hasMoreElements()) {
+				JarEntry entry = entries.nextElement();
+				if (entry.getName().startsWith(path)) {
+					extractFromAPK(apk, entry.getName(), entry.getName().replace(path, target));
 				}
 			}
 		} else { // single file
+			JarEntry entry = apk.getJarEntry(path);
+			if (entry == null)
+				return;
 			Path file = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), target);
-			if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(Paths.get(apk_path)).toMillis()) {
-				try (InputStream inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream(path)) {
-					if (inputStream != null) {
-						Files.createDirectories(file.getParent());
-						Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
-					}
+			if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(Paths.get(apk.getName())).toMillis()) {
+				Files.createDirectories(file.getParent());
+				try (InputStream inputStream = apk.getInputStream(entry)) {
+					Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
 				}
 			}
 		}
