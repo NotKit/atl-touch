@@ -47,6 +47,10 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createLayer(JNIEnv
  * ANativeWindow_fromSurface() and hand it to the Surface, which owns it. This
  * is the opposite direction from AOSP (there the Surface makes the window),
  * because only the main library has the wl_compositor the layer needs.
+ *
+ * A NULL layer is not an error: a compositor without wl_subcompositor still
+ * gets a window, because ANativeWindow_lock()/unlockAndPost() present through
+ * the Surface rather than through the layer.
  */
 JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1bindSurface(JNIEnv *env, jobject this, jobject surface, jlong layer_ptr, jint width, jint height)
 {
@@ -55,7 +59,7 @@ JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1bindSurface(JNIEnv 
 	jfieldID field;
 	jclass class;
 
-	if (!layer || !surface)
+	if (!surface)
 		return;
 	class = (*env)->GetObjectClass(env, surface);
 	field = (*env)->GetFieldID(env, class, "nativeWindow", "J");
@@ -71,7 +75,8 @@ JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1bindSurface(JNIEnv 
 	if (window) {
 		atl_native_window_set_size(window, width, height);
 	} else {
-		window = atl_native_window_new(glfwGetWaylandDisplay(), atl_surface_layer_wl_surface(layer),
+		window = atl_native_window_new(layer ? glfwGetWaylandDisplay() : NULL,
+		                               atl_surface_layer_wl_surface(layer),
 		                               atl_surface_layer_egl_window(layer), width, height);
 		if (window) {
 			atl_native_window_bind_surface(window, env, surface);

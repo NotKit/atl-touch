@@ -133,31 +133,33 @@ public class SurfaceView extends View {
 	private void updateLayer() {
 		if (sLayersAvailable == 0)
 			sLayersAvailable = native_layersAvailable() ? 1 : -1;
-		if (sLayersAvailable < 0)
-			return;
 		ViewRootImpl root = getViewRootImpl();
 		int width = getWidth(), height = getHeight();
 		if (root == null || root.scene == 0 || width <= 0 || height <= 0)
 			return;
-		if (mLayer == 0) {
+		if (mLayer == 0 && sLayersAvailable > 0) {
 			mLayer = native_createLayer(root.scene);
-			if (mLayer == 0) {
+			if (mLayer == 0)
 				sLayersAvailable = -1;
-				return;
+			else {
+				if (mZOrderOnTop)
+					native_setLayerZ(mLayer, true);
+				if (!mLayerVisible)
+					native_setLayerVisible(mLayer, false);
 			}
-			if (mZOrderOnTop)
-				native_setLayerZ(mLayer, true);
-			if (!mLayerVisible)
-				native_setLayerVisible(mLayer, false);
 		}
-		locationInWindow(mLayerLocation);
-		if (mLayerLocation[0] != mLayerX || mLayerLocation[1] != mLayerY ||
-		    width != mLayerW || height != mLayerH) {
-			mLayerX = mLayerLocation[0];
-			mLayerY = mLayerLocation[1];
-			mLayerW = width;
-			mLayerH = height;
-			native_setLayerGeometry(mLayer, mLayerX, mLayerY, width, height);
+		/* without a layer there is still a window to bind: a CPU producer
+		 * (ANativeWindow_lock) posts through the Surface, not the layer */
+		if (mLayer != 0) {
+			locationInWindow(mLayerLocation);
+			if (mLayerLocation[0] != mLayerX || mLayerLocation[1] != mLayerY ||
+			    width != mLayerW || height != mLayerH) {
+				mLayerX = mLayerLocation[0];
+				mLayerY = mLayerLocation[1];
+				mLayerW = width;
+				mLayerH = height;
+				native_setLayerGeometry(mLayer, mLayerX, mLayerY, width, height);
+			}
 		}
 		int surfaceWidth = mFixedSize ? mFixedWidth : width;
 		int surfaceHeight = mFixedSize ? mFixedHeight : height;
@@ -193,7 +195,7 @@ public class SurfaceView extends View {
 	}
 
 	private void destroyLayer() {
-		if (mLayer == 0)
+		if (mLayer == 0 && mSurface.nativeWindow == 0)
 			return;
 		/* AOSP's contract: the app tears its EGLSurface down inside this call,
 		 * so nothing is using the wl_egl_window by the time it is destroyed */
