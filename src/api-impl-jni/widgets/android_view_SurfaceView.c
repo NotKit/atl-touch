@@ -1,4 +1,6 @@
+#include <dlfcn.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -200,11 +202,50 @@ static void *surface_test_thread(void *data)
 	return NULL;
 }
 
+/*
+ * ATL_SURFACE_CLIENT=<path to a .so>: hand the live Surface to a client that
+ * was built outside ATL and linked against libandroid.so.0 directly, i.e. a
+ * plain glibc consumer of the NDK contract with no bionic_translation under it.
+ * That library cannot be loaded on its own (68 undefined symbols whose
+ * providers are libutils/libandroidfw/libtranslation_layer_main), so the only
+ * place such a client can run is inside an ATL process, in ATL's symbol scope -
+ * which is what this does.
+ *
+ * The client exports:
+ *   void atl_surface_client_start(JNIEnv *env, jobject surface);
+ * and is expected to call ANativeWindow_fromSurface() itself and to return
+ * promptly, doing its drawing on a thread of its own.
+ */
+static void start_external_client(JNIEnv *env, jobject surface)
+{
+	static bool started;
+	void (*start)(JNIEnv *, jobject);
+	const char *path = getenv("ATL_SURFACE_CLIENT");
+	void *lib;
+
+	if (!path || !*path || started)
+		return;
+	started = true;
+	lib = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+	if (!lib) {
+		fprintf(stderr, "ATL_SURFACE_CLIENT: dlopen(%s) failed: %s\n", path, dlerror());
+		return;
+	}
+	start = dlsym(lib, "atl_surface_client_start");
+	if (!start) {
+		fprintf(stderr, "ATL_SURFACE_CLIENT: %s has no atl_surface_client_start\n", path);
+		return;
+	}
+	fprintf(stderr, "ATL_SURFACE_CLIENT: %s loaded, handing it the Surface\n", path);
+	start(env, surface);
+}
+
 JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1startTestClient(JNIEnv *env, jobject this, jobject surface)
 {
 	struct surface_test *test;
 	pthread_t thread;
 
+	start_external_client(env, surface);
 	if (!getenv("ATL_SURFACE_TEST"))
 		return;
 	test = calloc(1, sizeof(*test));
