@@ -123,4 +123,8 @@ public class AudioManager {
 	public void startBluetoothSco() { }
 
 	public android.media.AudioDeviceInfo[] getDevices(int a0) { return null; }
+
+	public static final int MODE_IN_CALL = 2;
+
+	public static final int MODE_NORMAL = 0;
 }

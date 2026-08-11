@@ -1,6 +1,6 @@
 package android.hardware.camera2;
 
-public class CameraCharacteristics {
+public class CameraCharacteristics extends CameraMetadata<CameraCharacteristics.Key<?>> {
 
 	public static final class Key<T> { }
 

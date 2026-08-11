@@ -1,6 +1,6 @@
 package android.hardware.camera2;
 
-public class CaptureRequest {
+public class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> {
 
 	public static final class Key<T> { }
 
@@ -9,6 +9,8 @@ public class CaptureRequest {
 	public void addTarget(android.view.Surface a0) { }
 
 	public <T> void set(android.hardware.camera2.CaptureRequest.Key<T> a0, T a1) { }
+
+	public android.hardware.camera2.CaptureRequest build() { return null; }
 }
 
 	public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Boolean> CONTROL_AE_LOCK = null;

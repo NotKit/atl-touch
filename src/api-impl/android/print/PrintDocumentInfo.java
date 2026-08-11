@@ -8,5 +8,9 @@ public class PrintDocumentInfo {
 
 	public static class Builder { 
 	public Builder(java.lang.String a0) { }
+
+	public android.print.PrintDocumentInfo build() { return null; }
+
+	public android.print.PrintDocumentInfo.Builder setContentType(int a0) { return null; }
 }
 }

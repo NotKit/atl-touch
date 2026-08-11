@@ -58,4 +58,12 @@ public class TextToSpeech {
 	public static final int SUCCESS = 0;
 
 	public int speak(java.lang.String a0, int a1, java.util.HashMap a2) { return 0; }
+
+	public static class Engine { 
+	public static final java.lang.String KEY_FEATURE_EMBEDDED_SYNTHESIS = "embeddedTts";
+
+	public static final java.lang.String KEY_PARAM_UTTERANCE_ID = "utteranceId";
+
+	public static final java.lang.String KEY_PARAM_VOLUME = "volume";
+}
 }

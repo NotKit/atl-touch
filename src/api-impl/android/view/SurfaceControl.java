@@ -12,7 +12,13 @@ public class SurfaceControl {
 
 	public boolean isValid() { return false; }
 
-	public static class Builder { }
+	public static class Builder { 
+	public android.view.SurfaceControl.Builder setParent(android.view.SurfaceControl a0) { return null; }
+
+	public android.view.SurfaceControl.Builder setName(java.lang.String a0) { return null; }
+
+	public android.view.SurfaceControl build() { return null; }
+}
 
 	public static class Transaction { 
 	public android.view.SurfaceControl.Transaction reparent(android.view.SurfaceControl a0, android.view.SurfaceControl a1) { return null; }

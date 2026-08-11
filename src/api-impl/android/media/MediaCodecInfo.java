@@ -93,6 +93,10 @@ public class MediaCodecInfo {
 	public static final int VP9Profile3HDR = 8192;
 
 	public static final int VP9Profile3HDR10Plus = 32768;
+
+	public static final int AVCLevel3 = 256;
+
+	public static final int AVCProfileHigh = 8;
 }
 
 	public static class AudioCapabilities {
@@ -110,7 +114,9 @@ public class MediaCodecInfo {
 
 	public boolean isSoftwareOnly() { return false; }
 
-	public static class EncoderCapabilities { }
+	public static class EncoderCapabilities { 
+	public static final int BITRATE_MODE_CBR = 2;
+}
 
 	public static class VideoCapabilities { 
 	public boolean isSizeSupported(int a0, int a1) { return false; }

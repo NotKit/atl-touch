@@ -15,4 +15,6 @@ public abstract class CameraCaptureSession {
 }
 
 	public void close() { }
+
+	public int setRepeatingRequest(android.hardware.camera2.CaptureRequest a0, android.hardware.camera2.CameraCaptureSession.CaptureCallback a1, android.os.Handler a2) throws android.hardware.camera2.CameraAccessException { return 0; }
 }

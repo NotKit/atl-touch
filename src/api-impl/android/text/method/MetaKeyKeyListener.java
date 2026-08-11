@@ -15,4 +15,6 @@ public abstract class MetaKeyKeyListener {
 	public static int getMetaState(java.lang.CharSequence a0) { return 0; }
 
 	public static int getMetaState(long a0) { return 0; }
+
+	public static int getMetaState(java.lang.CharSequence a0, int a1) { return 0; }
 }

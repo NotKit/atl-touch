@@ -10,6 +10,10 @@ public class CursorAnchorInfo {
 	public android.view.inputmethod.CursorAnchorInfo.Builder addCharacterBounds(int a0, float a1, float a2, float a3, float a4, int a5) { return null; }
 
 	public android.view.inputmethod.CursorAnchorInfo.Builder setInsertionMarkerLocation(float a0, float a1, float a2, float a3, int a4) { return null; }
+
+	public android.view.inputmethod.CursorAnchorInfo build() { return null; }
+
+	public android.view.inputmethod.CursorAnchorInfo.Builder setMatrix(android.graphics.Matrix a0) { return null; }
 }
 
 	public static final int FLAG_HAS_VISIBLE_REGION = 1;
