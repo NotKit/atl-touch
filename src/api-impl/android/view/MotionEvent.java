@@ -376,6 +376,47 @@ public final class MotionEvent extends InputEvent {
 	public static final int ACTION_POINTER_ID_SHIFT = 8;
 
 	/**
+	 * Classification constant: None.
+	 *
+	 * No additional information is available about the current motion event stream.
+	 *
+	 * @see #getClassification
+	 */
+	public static final int CLASSIFICATION_NONE = 0; // API 29
+
+	/**
+	 * Classification constant: Ambiguous gesture.
+	 *
+	 * The user's intent with respect to the current event stream is not yet determined.
+	 *
+	 * @see #getClassification
+	 */
+	public static final int CLASSIFICATION_AMBIGUOUS_GESTURE = 1; // API 29
+
+	/**
+	 * Classification constant: Deep press.
+	 *
+	 * The current event stream represents the user intentionally pressing harder on the screen.
+	 *
+	 * @see #getClassification
+	 */
+	public static final int CLASSIFICATION_DEEP_PRESS = 2; // API 29
+
+	/**
+	 * Classification constant: touchpad two finger swipe.
+	 *
+	 * @see #getClassification
+	 */
+	public static final int CLASSIFICATION_TWO_FINGER_SWIPE = 3; // API 34
+
+	/**
+	 * Classification constant: touchpad pinch.
+	 *
+	 * @see #getClassification
+	 */
+	public static final int CLASSIFICATION_PINCH = 5; // API 34
+
+	/**
 	 * This flag indicates that the window that received this motion event is partly
 	 * or wholly obscured by another visible window above it.  This flag is set to true
 	 * even if the event did not directly pass through the obscured area.
@@ -1784,6 +1825,20 @@ public final class MotionEvent extends InputEvent {
 	 */
 	public final int getActionIndex() {
 		return (action & ACTION_POINTER_INDEX_MASK) >> ACTION_POINTER_INDEX_SHIFT;
+	}
+
+	/**
+	 * Returns the classification for the current gesture.
+	 * The classification may change as more events become available for the same gesture.
+	 *
+	 * ATL has no gesture classifier, so every stream is unclassified. Compose's
+	 * pointer-input converter calls this behind an SDK >= 29 gate, and without it
+	 * every touch was lost to a NoSuchMethodError out of dispatchTouchEvent.
+	 *
+	 * @see #CLASSIFICATION_NONE
+	 */
+	public int getClassification() {
+		return CLASSIFICATION_NONE;
 	}
 
 	/**
