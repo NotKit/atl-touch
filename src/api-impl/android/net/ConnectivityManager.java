@@ -48,4 +48,18 @@ public class ConnectivityManager {
 	public void registerDefaultNetworkCallback(NetworkCallback cb) {}
 
 	public ProxyInfo getDefaultProxy() { return null; }
+
+	public android.net.LinkProperties getLinkProperties(android.net.Network a0) { return null; }
+
+	public static final int TYPE_BLUETOOTH = 7;
+
+	public static final int TYPE_ETHERNET = 9;
+
+	public static final int TYPE_MOBILE = 0;
+
+	public static final int TYPE_WIFI = 1;
+
+	public static final int TYPE_WIMAX = 6;
+
+	public static final java.lang.String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
 }

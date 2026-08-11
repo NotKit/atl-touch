@@ -20,4 +20,6 @@ public class InputManager {
 	public InputDevice getInputDevice(int id) {
 		return InputDevice.getDevice(id);
 	}
+
+	public void unregisterInputDeviceListener(android.hardware.input.InputManager.InputDeviceListener a0) { }
 }

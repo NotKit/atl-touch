@@ -75,4 +75,16 @@ public final class Display {
 	public DisplayCutout getCutout() {
 		return DisplayCutout.NO_CUTOUT;
 	}
+
+	public android.view.Display.HdrCapabilities getHdrCapabilities() { return null; }
+
+	public boolean isHdr() { return false; }
+
+	public float getHdrSdrRatio() { return 0.0f; }
+
+	public int getPixelFormat() { return 0; }
+
+	public static class HdrCapabilities { }
+
+	public static final int DEFAULT_DISPLAY = 0;
 }

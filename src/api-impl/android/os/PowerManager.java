@@ -34,4 +34,10 @@ public final class PowerManager {
 	public boolean isIgnoringBatteryOptimizations(String packageName) {
 		return true;
 	}
+
+	public static final int ON_AFTER_RELEASE = 536870912;
+
+	public static final int PARTIAL_WAKE_LOCK = 1;
+
+	public static final int SCREEN_BRIGHT_WAKE_LOCK = 10;
 }

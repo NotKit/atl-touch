@@ -873,4 +873,8 @@ public class TextUtils {
 			throw new UnsupportedOperationException();
 		}
 	}
+
+	public static final android.os.Parcelable.Creator CHAR_SEQUENCE_CREATOR = null;
+
+	public static void writeToParcel(java.lang.CharSequence a0, android.os.Parcel a1, int a2) { }
 }

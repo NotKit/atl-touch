@@ -84,4 +84,10 @@ public class Location {
 	public String getProvider() {
 		return "fused";
 	}
+
+	public boolean hasVerticalAccuracy() { return false; }
+
+	public float getVerticalAccuracyMeters() { return 0.0f; }
+
+	public long getElapsedRealtimeNanos() { return 0L; }
 }

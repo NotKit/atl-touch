@@ -83,4 +83,6 @@ public interface MenuItem {
 	public boolean isActionViewExpanded();
 
 	public MenuItem setIntent(Intent intent);
+
+	public default android.content.Intent getIntent() { return null; }
 }

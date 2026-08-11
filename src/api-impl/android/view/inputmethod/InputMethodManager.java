@@ -71,4 +71,6 @@ public class InputMethodManager {
 	private static native long nativeInit();
 	private native boolean nativeShowSoftInput(long im_context, long widget, InputConnection ic, int inputType);
 	private static native void nativeHideSoftInput(long im_context);
+
+	public void updateCursorAnchorInfo(android.view.View a0, android.view.inputmethod.CursorAnchorInfo a1) { }
 }

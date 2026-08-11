@@ -3673,4 +3673,6 @@ public class PackageManager {
 	public PackageInstaller getPackageInstaller() {
 		return new PackageInstaller();
 	}
+
+	public static final java.lang.String FEATURE_CREDENTIALS = "android.software.credentials";
 }

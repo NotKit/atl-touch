@@ -28,4 +28,6 @@ public class ImageFormat {
 	public static final int YUV_444_888 = 40;
 	public static final int YUY2 = 20;
 	public static final int YV12 = 842094169;
+
+	public static int getBitsPerPixel(int a0) { return 0; }
 }

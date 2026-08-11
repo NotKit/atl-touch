@@ -15,4 +15,6 @@ public class TextKeyListener {
 	public static int getMetaState(CharSequence text, int meta) {
 		return 0;
 	}
+
+	public static android.text.method.TextKeyListener getInstance() { return null; }
 }

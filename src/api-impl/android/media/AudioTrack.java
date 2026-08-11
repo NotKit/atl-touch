@@ -219,4 +219,26 @@ public class AudioTrack {
 			return this;
 		}
 	}
+
+	public int getBufferCapacityInFrames() { return 0; }
+
+	public int getBufferSizeInFrames() { return 0; }
+
+	public int getChannelCount() { return 0; }
+
+	public int getPlaybackRate() { return 0; }
+
+	public int getUnderrunCount() { return 0; }
+
+	public int setBufferSizeInFrames(int a0) { return 0; }
+
+	public static final int MODE_STREAM = 1;
+
+	public static final int PERFORMANCE_MODE_LOW_LATENCY = 1;
+
+	public static final int STATE_INITIALIZED = 1;
+
+	public static final int WRITE_BLOCKING = 0;
+
+	public static float getMaxVolume() { return 0.0f; }
 }

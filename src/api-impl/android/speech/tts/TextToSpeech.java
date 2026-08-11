@@ -38,4 +38,22 @@ public class TextToSpeech {
 	public static interface OnUtteranceCompletedListener {
 		public abstract void onUtteranceCompleted(String utteranceId);
 	}
+
+	public int isLanguageAvailable(java.util.Locale a0) { return 0; }
+
+	public int setLanguage(java.util.Locale a0) { return 0; }
+
+	public int setPitch(float a0) { return 0; }
+
+	public int setSpeechRate(float a0) { return 0; }
+
+	public java.util.Locale getDefaultLanguage() { return null; }
+
+	public java.util.Set getAvailableLanguages() { return null; }
+
+	public java.util.Set getFeatures(java.util.Locale a0) { return null; }
+
+	public static final int QUEUE_FLUSH = 0;
+
+	public static final int SUCCESS = 0;
 }

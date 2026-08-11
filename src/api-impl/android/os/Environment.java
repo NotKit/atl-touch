@@ -806,4 +806,6 @@ public class Environment {
 
 	public static boolean isExternalStorageManager() { return false; }
 	public static boolean isExternalStorageManager(File path) { return false; }
+
+	public static java.io.File getStorageDirectory() { return null; }
 }

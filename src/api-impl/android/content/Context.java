@@ -877,4 +877,45 @@ public abstract class Context {
 	}
 
 	public abstract int getThemeResId();
+
+	public android.content.ComponentName startForegroundService(android.content.Intent a0) { return null; }
+
+	public android.content.Context createWindowContext(android.view.Display a0, int a1, android.os.Bundle a2) { return null; }
+
+	public android.view.Display getDisplay() { return null; }
+
+
+	public boolean bindIsolatedService(android.content.Intent a0, int a1, java.lang.String a2, java.util.concurrent.Executor a3, android.content.ServiceConnection a4) { return false; }
+
+	public java.util.concurrent.Executor getMainExecutor() { return null; }
+
+	public static final int BIND_AUTO_CREATE = 1;
+
+	public static final int BIND_IMPORTANT = 64;
+
+	public static final int BIND_WAIVE_PRIORITY = 32;
+
+	public static final java.lang.String ACCESSIBILITY_SERVICE = "accessibility";
+
+	public static final java.lang.String CAMERA_SERVICE = "camera";
+
+	public static final java.lang.String CONNECTIVITY_SERVICE = "connectivity";
+
+	public static final java.lang.String CREDENTIAL_SERVICE = "credential";
+
+	public static final java.lang.String INPUT_SERVICE = "input";
+
+	public static final java.lang.String MEDIA_PROJECTION_SERVICE = "media_projection";
+
+	public static final java.lang.String PRINT_SERVICE = "print";
+
+	public static final java.lang.String SENSOR_SERVICE = "sensor";
+
+	public static final java.lang.String UI_MODE_SERVICE = "uimode";
+
+	public static final java.lang.String USER_SERVICE = "user";
+
+	public static final java.lang.String WIFI_SERVICE = "wifi";
+
+	public void updateServiceGroup(android.content.ServiceConnection a0, int a1, int a2) { }
 }

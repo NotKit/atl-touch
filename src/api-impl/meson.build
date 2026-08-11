@@ -402,6 +402,7 @@ srcs = [
 	'android/media/MediaRouter.java',
 	'android/media/MediaScannerConnection.java',
 	'android/media/NotProvisionedException.java',
+	'android/media/ResourceBusyException.java',
 	'android/media/Ringtone.java',
 	'android/media/RingtoneManager.java',
 	'android/media/SoundPool.java',

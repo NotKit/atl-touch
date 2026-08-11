@@ -390,4 +390,6 @@ public final class Bitmap {
 	private static native byte[] native_save_to_webp(long bitmap, int quality, boolean lossless);
 	private static native void native_set_pixels(long bitmap, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native long native_get_pixels_ptr(long bitmap);
+
+	public void copyPixelsFromBuffer(java.nio.Buffer a0) { }
 }

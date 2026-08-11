@@ -54,11 +54,13 @@ public class AccessibilityNodeInfo {
 		public int getId() { return 0; }
 	}
 
-	public class RangeInfo {
+	public static class RangeInfo {
 		public static final int RANGE_TYPE_INT = 0;
 		public static final int RANGE_TYPE_FLOAT = 1;
 		public static final int RANGE_TYPE_PERCENT = 2;
-	}
+	
+	public static android.view.accessibility.AccessibilityNodeInfo.RangeInfo obtain(int a0, float a1, float a2, float a3) { return null; }
+}
 
 	public static AccessibilityNodeInfo obtain() { return null; }
 
@@ -89,4 +91,106 @@ public class AccessibilityNodeInfo {
 	public void setTextSelection(int start, int end) {}
 
 	public void setRangeInfo(RangeInfo info) {}
+
+	public android.os.Bundle getExtras() { return null; }
+
+	public boolean removeAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction a0) { return false; }
+
+	public static class CollectionInfo { }
+
+	public static class CollectionItemInfo { }
+
+	public static final int ACTION_ACCESSIBILITY_FOCUS = 64;
+
+	public static final int ACTION_CLEAR_ACCESSIBILITY_FOCUS = 128;
+
+	public static final int ACTION_CLICK = 16;
+
+	public static final int ACTION_COLLAPSE = 524288;
+
+	public static final int ACTION_COPY = 16384;
+
+	public static final int ACTION_CUT = 65536;
+
+	public static final int ACTION_EXPAND = 262144;
+
+	public static final int ACTION_LONG_CLICK = 32;
+
+	public static final int ACTION_NEXT_AT_MOVEMENT_GRANULARITY = 256;
+
+	public static final int ACTION_NEXT_HTML_ELEMENT = 1024;
+
+	public static final int ACTION_PASTE = 32768;
+
+	public static final int ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY = 512;
+
+	public static final int ACTION_PREVIOUS_HTML_ELEMENT = 2048;
+
+	public static final int ACTION_SCROLL_BACKWARD = 8192;
+
+	public static final int ACTION_SCROLL_FORWARD = 4096;
+
+	public static final int ACTION_SELECT = 4;
+
+	public static final int ACTION_SET_SELECTION = 131072;
+
+	public static final int ACTION_SET_TEXT = 2097152;
+
+	public static final int FOCUS_ACCESSIBILITY = 2;
+
+	public static final int FOCUS_INPUT = 1;
+
+	public static final int MOVEMENT_GRANULARITY_CHARACTER = 1;
+
+	public static final int MOVEMENT_GRANULARITY_LINE = 4;
+
+	public static final int MOVEMENT_GRANULARITY_PARAGRAPH = 8;
+
+	public static final int MOVEMENT_GRANULARITY_WORD = 2;
+
+	public static final java.lang.String ACTION_ARGUMENT_EXTEND_SELECTION_BOOLEAN = "ACTION_ARGUMENT_EXTEND_SELECTION_BOOLEAN";
+
+	public static final java.lang.String ACTION_ARGUMENT_HTML_ELEMENT_STRING = "ACTION_ARGUMENT_HTML_ELEMENT_STRING";
+
+	public static final java.lang.String ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT = "ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT";
+
+	public static final java.lang.String ACTION_ARGUMENT_SELECTION_END_INT = "ACTION_ARGUMENT_SELECTION_END_INT";
+
+	public static final java.lang.String ACTION_ARGUMENT_SELECTION_START_INT = "ACTION_ARGUMENT_SELECTION_START_INT";
+
+	public static final java.lang.String ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE = "ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE";
+
+	public void addChild(android.view.View a0, int a1) { }
+
+	public void getBoundsInParent(android.graphics.Rect a0) { }
+
+	public void setAccessibilityFocused(boolean a0) { }
+
+	public void setBoundsInParent(android.graphics.Rect a0) { }
+
+	public void setBoundsInScreen(android.graphics.Rect a0) { }
+
+	public void setContentInvalid(boolean a0) { }
+
+	public void setContextClickable(boolean a0) { }
+
+	public void setHintText(java.lang.CharSequence a0) { }
+
+	public void setInputType(int a0) { }
+
+	public void setLongClickable(boolean a0) { }
+
+	public void setMultiLine(boolean a0) { }
+
+	public void setPackageName(java.lang.CharSequence a0) { }
+
+	public void setParent(android.view.View a0, int a1) { }
+
+	public void setPassword(boolean a0) { }
+
+	public void setSelected(boolean a0) { }
+
+	public void setText(java.lang.CharSequence a0) { }
+
+	public void setViewIdResourceName(java.lang.String a0) { }
 }

@@ -440,4 +440,6 @@ public class SurfaceView extends View {
 		 * ordering between two layers of the same window is their creation
 		 * order, which is what AOSP's default gives too */
 	}
+
+	public android.view.SurfaceControl getSurfaceControl() { return null; }
 }

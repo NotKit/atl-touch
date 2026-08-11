@@ -26,4 +26,18 @@ public class Surface {
 		if (view != null)
 			view.postFrame(frame);
 	}
+
+	public static final android.os.Parcelable.Creator CREATOR = null;
+
+	public static final int ROTATION_0 = 0;
+
+	public static final int ROTATION_180 = 2;
+
+	public static final int ROTATION_270 = 3;
+
+	public static final int ROTATION_90 = 1;
+
+	public void release() { }
+
+	public void writeToParcel(android.os.Parcel a0, int a1) { }
 }

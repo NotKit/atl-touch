@@ -18,4 +18,8 @@ public final class DisplayManager {
 	public Display[] getDisplays() {
 		return new Display[0];
 	}
+
+	public static final int VIRTUAL_DISPLAY_FLAG_PRESENTATION = 2;
+
+	public static final int VIRTUAL_DISPLAY_FLAG_PUBLIC = 1;
 }

@@ -1019,4 +1019,6 @@ public class ParcelFileDescriptor implements Closeable {
 			}
 		}
 	}
+
+	public static final android.os.Parcelable.Creator CREATOR = null;
 }

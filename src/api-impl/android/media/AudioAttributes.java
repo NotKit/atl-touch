@@ -30,4 +30,16 @@ public class AudioAttributes {
 			return new AudioAttributes();
 		}
 	}
+
+	public int getAllowedCapturePolicy() { return 0; }
+
+	public int getContentType() { return 0; }
+
+	public static final int CONTENT_TYPE_SPEECH = 1;
+
+	public static final int CONTENT_TYPE_UNKNOWN = 0;
+
+	public static final int USAGE_UNKNOWN = 0;
+
+	public static final int USAGE_VOICE_COMMUNICATION = 2;
 }

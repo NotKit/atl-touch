@@ -95,4 +95,30 @@ public class AudioManager {
 	public int generateAudioSessionId() {
 		return 0;
 	}
+
+	public boolean isVolumeFixed() { return false; }
+
+	public java.util.List getActiveRecordingConfigurations() { return null; }
+
+	public static final int AUDIO_SESSION_ID_GENERATE = 0;
+
+	public static final int GET_DEVICES_ALL = 3;
+
+	public static final int MODE_IN_COMMUNICATION = 3;
+
+	public static final int MODE_RINGTONE = 1;
+
+	public static final int STREAM_ALARM = 4;
+
+	public static final int STREAM_NOTIFICATION = 5;
+
+	public static final int STREAM_RING = 2;
+
+	public static final int STREAM_SYSTEM = 1;
+
+	public static final int STREAM_VOICE_CALL = 0;
+
+	public void dispatchMediaKeyEvent(android.view.KeyEvent a0) { }
+
+	public void startBluetoothSco() { }
 }

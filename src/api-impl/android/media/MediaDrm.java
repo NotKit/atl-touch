@@ -51,4 +51,38 @@ public class MediaDrm {
 
 	public interface OnKeyStatusChangeListener {
 	}
+
+	public android.media.MediaDrm.KeyRequest getKeyRequest(byte[] a0, byte[] a1, java.lang.String a2, int a3, java.util.HashMap a4) throws android.media.NotProvisionedException { return null; }
+
+	public android.media.MediaDrm.ProvisionRequest getProvisionRequest() { return null; }
+
+	public byte[] openSession() throws android.media.NotProvisionedException, android.media.ResourceBusyException { return null; }
+
+	public byte[] provideKeyResponse(byte[] a0, byte[] a1) throws android.media.DeniedByServerException, android.media.NotProvisionedException { return null; }
+
+	public java.util.HashMap queryKeyStatus(byte[] a0) { return null; }
+
+	public static boolean isCryptoSchemeSupported(java.util.UUID a0) { return false; }
+
+	public static boolean isCryptoSchemeSupported(java.util.UUID a0, java.lang.String a1) { return false; }
+
+	public static class KeyStatus { }
+
+	public static class ProvisionRequest { }
+
+	public void closeSession(byte[] a0) { }
+
+	public void provideProvisionResponse(byte[] a0) throws android.media.DeniedByServerException { }
+
+	public void release() { }
+
+	public void setOnEventListener(android.media.MediaDrm.OnEventListener a0) { }
+
+	public void setOnKeyStatusChangeListener(android.media.MediaDrm.OnKeyStatusChangeListener a0, android.os.Handler a1) { }
+
+	public void setOnKeyStatusChangeListener(java.util.concurrent.Executor a0, android.media.MediaDrm.OnKeyStatusChangeListener a1) { }
+
+	public void setPropertyByteArray(java.lang.String a0, byte[] a1) { }
+
+	public void setPropertyString(java.lang.String a0, java.lang.String a1) { }
 }

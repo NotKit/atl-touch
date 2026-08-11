@@ -88,5 +88,27 @@ public class InputDevice {
 		public int getAxis() {
 			return this.axis;
 		}
-	};
+	
+	public float getFlat() { return 0.0f; }
+
+	public float getFuzz() { return 0.0f; }
+};
+
+	public static final int SOURCE_BLUETOOTH_STYLUS = 49154;
+
+	public static final int SOURCE_CLASS_POSITION = 8;
+
+	public static final int SOURCE_CLASS_TRACKBALL = 4;
+
+	public static final int SOURCE_GAMEPAD = 1025;
+
+	public static final int SOURCE_JOYSTICK = 16777232;
+
+	public static final int SOURCE_MOUSE = 8194;
+
+	public static final int SOURCE_STYLUS = 16386;
+
+	public static final int SOURCE_TOUCHPAD = 1048584;
+
+	public static final int SOURCE_TRACKBALL = 65540;
 }

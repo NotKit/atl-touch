@@ -67,4 +67,8 @@ public class LocationManager {
 
 	public void unregisterGnssStatusCallback(GnssStatus.Callback callback) {
 	}
+
+	public static final java.lang.String GPS_PROVIDER = "gps";
+
+	public static final java.lang.String NETWORK_PROVIDER = "network";
 }

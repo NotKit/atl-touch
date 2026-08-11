@@ -3362,4 +3362,6 @@ public class KeyEvent extends InputEvent implements Parcelable {
 
 	private native boolean native_isSystemKey(int keyCode);
 	private native boolean native_hasDefaultAction(int keyCode);
+
+	public static final android.os.Parcelable.Creator CREATOR = null;
 }

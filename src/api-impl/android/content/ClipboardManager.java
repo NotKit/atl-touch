@@ -132,4 +132,6 @@ public class ClipboardManager extends android.text.ClipboardManager {
 
 	public static native void native_set_clipboard(String text);
 	public static native String native_get_clipboard();
+
+	public void clearPrimaryClip() { }
 }

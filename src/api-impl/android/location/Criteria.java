@@ -20,4 +20,6 @@ public class Criteria {
 	public void setCostAllowed(boolean allowed) {}
 
 	public void setPowerRequirement(int powerRequirement) {}
+
+	public void setSpeedRequired(boolean a0) { }
 }

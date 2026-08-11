@@ -11,4 +11,8 @@ public class KeyChain {
 	public static final String EXTRA_NAME = "name";
 	public static final String EXTRA_PKCS12 = "PKCS12";
 	public static final String KEY_ALIAS_SELECTION_DENIED = "android:alias-selection-denied";
+
+	public static java.security.PrivateKey getPrivateKey(android.content.Context a0, java.lang.String a1) throws java.lang.InterruptedException, android.security.KeyChainException { return null; }
+
+	public static java.security.cert.X509Certificate[] getCertificateChain(android.content.Context a0, java.lang.String a1) throws java.lang.InterruptedException, android.security.KeyChainException { return null; }
 }

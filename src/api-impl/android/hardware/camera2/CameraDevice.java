@@ -12,5 +12,21 @@ public abstract class CameraDevice {
 	public static final int TEMPLATE_ZERO_SHUTTER_LAG = 5;
 
 	public static abstract class StateCallback {
-	}
+	
+	public static final int ERROR_CAMERA_DEVICE = 4;
+
+	public static final int ERROR_CAMERA_DISABLED = 3;
+
+	public static final int ERROR_CAMERA_IN_USE = 1;
+
+	public static final int ERROR_CAMERA_SERVICE = 5;
+
+	public static final int ERROR_MAX_CAMERAS_IN_USE = 2;
+}
+
+	public android.hardware.camera2.CaptureRequest.Builder createCaptureRequest(int a0) throws android.hardware.camera2.CameraAccessException { return null; }
+
+	public void close() { }
+
+	public void createCaptureSession(java.util.List a0, android.hardware.camera2.CameraCaptureSession.StateCallback a1, android.os.Handler a2) throws android.hardware.camera2.CameraAccessException { }
 }

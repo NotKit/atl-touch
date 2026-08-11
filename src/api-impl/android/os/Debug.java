@@ -4,7 +4,9 @@ import dalvik.system.VMDebug;
 
 public final class Debug {
 	public static class MemoryInfo {
-	}
+	
+	public java.lang.String getMemoryStat(java.lang.String a0) { return null; }
+}
 
 	public static void waitForDebugger() {
 	}
@@ -33,4 +35,6 @@ public final class Debug {
 	public static long threadCpuTimeNanos() {
 		return VMDebug.threadCpuTimeNanos();
 	}
+
+	public static void getMemoryInfo(android.os.Debug.MemoryInfo a0) { }
 }

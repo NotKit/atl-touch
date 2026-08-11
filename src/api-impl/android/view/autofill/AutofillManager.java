@@ -9,4 +9,12 @@ public class AutofillManager {
 	public void registerCallback(AutofillCallback callback) {}
 
 	public void unregisterCallback(AutofillCallback callback) {}
+
+	public void cancel() { }
+
+	public void commit() { }
+
+	public void notifyViewEntered(android.view.View a0, int a1, android.graphics.Rect a2) { }
+
+	public void notifyViewExited(android.view.View a0, int a1) { }
 }

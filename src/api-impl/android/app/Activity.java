@@ -849,4 +849,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public ActionBar getActionBar() {
 		return null;
 	}
+
+	public android.view.ActionMode startActionMode(android.view.ActionMode.Callback a0) { return null; }
+
+	public android.view.ActionMode startActionMode(android.view.ActionMode.Callback a0, int a1) { return null; }
 }

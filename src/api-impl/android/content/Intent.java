@@ -897,4 +897,8 @@ public class Intent implements Parcelable {
 	public int[] getIntArrayExtra(String name) {
 		return extras.getIntArray(name);
 	}
+
+	public static android.content.Intent parseUri(java.lang.String a0, int a1) throws java.net.URISyntaxException { return null; }
+
+	public static final int FLAG_GRANT_READ_URI_PERMISSION = 1;
 }

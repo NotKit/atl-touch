@@ -204,6 +204,10 @@ public class MediaCodec {
 	private native void native_releaseOutputBuffer(long codec, ByteBuffer buffer, boolean render);
 	private native void native_release(long codec);
 
+	public static final class CryptoException extends RuntimeException {
+		public int getErrorCode() { return 0; }
+	}
+
 	public static final class CryptoInfo {
 		public static final class Pattern {
 			private int blocksToEncrypt;
@@ -227,14 +231,34 @@ public class MediaCodec {
 				return blocksToSkip;
 			}
 		}
-	}
+	
+	public android.media.MediaCodec.CryptoInfo.Pattern getPattern() { return null; }
+
+	public byte[] iv;
+
+	public byte[] key;
+
+	public int mode;
+
+	public int numSubSamples;
+
+	public int[] numBytesOfClearData;
+
+	public int[] numBytesOfEncryptedData;
+
+	public void set(int a0, int[] a1, int[] a2, byte[] a3, byte[] a4, int a5) { }
+
+	public void setPattern(android.media.MediaCodec.CryptoInfo.Pattern a0) { }
+}
 
 	public static final class BufferInfo {
 		public int size;
 		public int flags;
 		public int offset;
 		public long presentationTimeUs;
-	}
+	
+	public void set(int a0, int a1, long a2, int a3) { }
+}
 
 	public static interface OnFrameRenderedListener {}
 
@@ -242,5 +266,35 @@ public class MediaCodec {
 	}
 
 	public static class CodecException extends IllegalStateException {
-	}
+	
+	public int getErrorCode() { return 0; }
+}
+
+	public android.media.MediaCodecInfo getCodecInfo() { return null; }
+
+	public android.media.MediaFormat getInputFormat() { return null; }
+
+	public android.view.Surface createInputSurface() { return null; }
+
+	public static final int BUFFER_FLAG_CODEC_CONFIG = 2;
+
+	public static final int BUFFER_FLAG_KEY_FRAME = 1;
+
+	public static final int BUFFER_FLAG_SYNC_FRAME = 1;
+
+	public static final int CONFIGURE_FLAG_ENCODE = 1;
+
+	public static final int INFO_OUTPUT_BUFFERS_CHANGED = -3;
+
+	public static final int INFO_OUTPUT_FORMAT_CHANGED = -2;
+
+	public static final java.lang.String PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
+
+	public static final java.lang.String PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
+
+	public void queueSecureInputBuffer(int a0, int a1, android.media.MediaCodec.CryptoInfo a2, long a3, int a4) throws android.media.MediaCodec.CryptoException { }
+
+	public void setCallback(android.media.MediaCodec.Callback a0) { }
+
+	public void setParameters(android.os.Bundle a0) { }
 }

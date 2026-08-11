@@ -517,4 +517,6 @@ public class RectF {
 			bottom = temp;
 		}
 	}
+
+	public static final android.os.Parcelable.Creator CREATOR = null;
 }

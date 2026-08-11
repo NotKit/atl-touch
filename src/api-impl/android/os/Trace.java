@@ -330,4 +330,6 @@ public final class Trace {
 	public static boolean isEnabled() {
 		return isTagEnabled(TRACE_TAG_APP);
 	}
+
+	public static void setCounter(java.lang.String a0, long a1) { }
 }

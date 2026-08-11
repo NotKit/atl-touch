@@ -362,4 +362,10 @@ public interface InputConnection {
 	 * <p>Note: This does nothing when called from input methods.</p>
 	 */
 	void closeConnection();
+
+	int CURSOR_UPDATE_IMMEDIATE = 1;
+
+	int CURSOR_UPDATE_MONITOR = 2;
+
+	int INPUT_CONTENT_GRANT_READ_URI_PERMISSION = 1;
 }

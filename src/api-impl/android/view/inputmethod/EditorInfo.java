@@ -19,4 +19,28 @@ public class EditorInfo {
 	public String packageName = "com.example.FIXME";
 	public String privateImeOptions = null;
 	public LocaleList hintLocales = null;
+
+	public java.lang.String[] contentMimeTypes;
+
+	public static final int IME_ACTION_DONE = 6;
+
+	public static final int IME_ACTION_GO = 2;
+
+	public static final int IME_ACTION_NEXT = 5;
+
+	public static final int IME_ACTION_NONE = 1;
+
+	public static final int IME_ACTION_PREVIOUS = 7;
+
+	public static final int IME_ACTION_SEARCH = 3;
+
+	public static final int IME_ACTION_SEND = 4;
+
+	public static final int IME_FLAG_NO_EXTRACT_UI = 268435456;
+
+	public static final int IME_FLAG_NO_FULLSCREEN = 33554432;
+
+	public static final int IME_FLAG_NO_PERSONALIZED_LEARNING = 16777216;
+
+	public void setInitialSurroundingText(java.lang.CharSequence a0) { }
 }

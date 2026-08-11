@@ -29,4 +29,6 @@ public interface ViewParent {
 	public void onStopNestedScroll(View target);
 
 	public void onDescendantInvalidated(View child, View target);
+
+	public default boolean requestSendAccessibilityEvent(android.view.View a0, android.view.accessibility.AccessibilityEvent a1) { return false; }
 }

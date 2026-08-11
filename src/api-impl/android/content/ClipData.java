@@ -7,7 +7,13 @@ public class ClipData {
 	public static class Item {
 
 		public Item(Uri uri) {}
-	}
+	
+	public android.net.Uri getUri() { return null; }
+
+	public java.lang.CharSequence coerceToText(android.content.Context a0) { return null; }
+
+	public java.lang.String getHtmlText() { return null; }
+}
 
 	String text;
 
@@ -35,4 +41,8 @@ public class ClipData {
 	public int getItemCount() {
 		return 0;
 	}
+
+	public android.content.ClipDescription getDescription() { return null; }
+
+	public static android.content.ClipData newHtmlText(java.lang.CharSequence a0, java.lang.CharSequence a1, java.lang.String a2) { return null; }
 }

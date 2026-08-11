@@ -36,4 +36,16 @@ public class AudioDeviceInfo {
 	public static final int TYPE_USB_HEADSET = 22;
 	public static final int TYPE_WIRED_HEADPHONES = 4;
 	public static final int TYPE_WIRED_HEADSET = 3;
+
+	public boolean isSource() { return false; }
+
+	public int getId() { return 0; }
+
+	public int getType() { return 0; }
+
+	public int[] getChannelCounts() { return null; }
+
+	public int[] getEncodings() { return null; }
+
+	public int[] getSampleRates() { return null; }
 }

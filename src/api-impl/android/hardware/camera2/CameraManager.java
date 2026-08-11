@@ -11,4 +11,10 @@ public class CameraManager {
 		throw new CameraAccessException(CameraAccessException.CAMERA_DISABLED,
 		    "camera2 is not implemented in ATL, use android.hardware.Camera");
 	}
+
+	public android.hardware.camera2.CameraCharacteristics getCameraCharacteristics(java.lang.String a0) throws android.hardware.camera2.CameraAccessException { return null; }
+
+	public void openCamera(java.lang.String a0, android.hardware.camera2.CameraDevice.StateCallback a1, android.os.Handler a2) throws android.hardware.camera2.CameraAccessException { }
+
+	public void openCamera(java.lang.String a0, java.util.concurrent.Executor a1, android.hardware.camera2.CameraDevice.StateCallback a2) throws android.hardware.camera2.CameraAccessException { }
 }

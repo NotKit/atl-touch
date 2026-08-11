@@ -17,4 +17,8 @@ public interface Parcelable {
 	public default void writeToParcel(Parcel dest, int flags) {
 		System.out.println("Parcelable.writeToParcel(" + this + ", " + dest + ", " + flags + ")");
 	}
+
+	int CONTENTS_FILE_DESCRIPTOR = 1;
+
+	int PARCELABLE_WRITE_RETURN_VALUE = 1;
 }

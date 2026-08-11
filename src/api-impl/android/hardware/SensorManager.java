@@ -50,4 +50,6 @@ public class SensorManager {
 	public List<Sensor> getSensorList(int type) {
 		return Arrays.asList(getDefaultSensor(type));
 	}
+
+	public static final int SENSOR_DELAY_NORMAL = 3;
 }

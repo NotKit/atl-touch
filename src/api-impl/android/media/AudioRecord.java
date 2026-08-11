@@ -83,4 +83,28 @@ public class AudioRecord {
 			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding, 32768);
 		}
 	}
+
+	public android.media.AudioDeviceInfo getRoutedDevice() { return null; }
+
+	public android.media.AudioFormat getFormat() { return null; }
+
+	public boolean setPreferredDevice(android.media.AudioDeviceInfo a0) { return false; }
+
+	public int getAudioFormat() { return 0; }
+
+	public int getAudioSessionId() { return 0; }
+
+	public int getAudioSource() { return 0; }
+
+	public int getBufferSizeInFrames() { return 0; }
+
+	public int getChannelCount() { return 0; }
+
+	public static final int ERROR = -1;
+
+	public static final int ERROR_INVALID_OPERATION = -3;
+
+	public static final int STATE_INITIALIZED = 1;
+
+	public static final int SUCCESS = 0;
 }

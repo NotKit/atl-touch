@@ -4050,4 +4050,22 @@ public class View implements Drawable.Callback {
 	protected void onResolveDrawables(int layoutDirection) {}
 
 	public void resetRtlProperties() {}
+
+	public static final int AUTOFILL_TYPE_TEXT = 1;
+
+	public static final int DRAG_FLAG_GLOBAL = 256;
+
+	public static final int IMPORTANT_FOR_ACCESSIBILITY_YES = 1;
+
+	public static final java.lang.String AUTOFILL_HINT_EMAIL_ADDRESS = "emailAddress";
+
+	public static final java.lang.String AUTOFILL_HINT_PASSWORD = "password";
+
+	public static final java.lang.String AUTOFILL_HINT_PHONE = "phone";
+
+	public static final java.lang.String AUTOFILL_HINT_USERNAME = "username";
+
+	public void onInitializeAccessibilityNodeInfo(android.view.accessibility.AccessibilityNodeInfo a0) { }
+
+	public void updateDragShadow(android.view.View.DragShadowBuilder a0) { }
 }

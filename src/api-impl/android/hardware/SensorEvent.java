@@ -10,4 +10,6 @@ public class SensorEvent {
 		this.values = values;
 		this.sensor = sensor;
 	}
+
+	public long timestamp;
 }

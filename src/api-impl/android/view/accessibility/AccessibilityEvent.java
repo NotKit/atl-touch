@@ -68,4 +68,46 @@ public class AccessibilityEvent {
 	public static final int WINDOWS_CHANGE_PIP = 1024;
 	public static final int WINDOWS_CHANGE_REMOVED = 2;
 	public static final int WINDOWS_CHANGE_TITLE = 4;
+
+	public int getFromIndex() { return 0; }
+
+	public int getToIndex() { return 0; }
+
+	public java.util.List getText() { return null; }
+
+	public static android.view.accessibility.AccessibilityEvent obtain(int a0) { return null; }
+
+	public void setAddedCount(int a0) { }
+
+	public void setBeforeText(java.lang.CharSequence a0) { }
+
+	public void setChecked(boolean a0) { }
+
+	public void setClassName(java.lang.CharSequence a0) { }
+
+	public void setContentDescription(java.lang.CharSequence a0) { }
+
+	public void setCurrentItemIndex(int a0) { }
+
+	public void setEnabled(boolean a0) { }
+
+	public void setFromIndex(int a0) { }
+
+	public void setItemCount(int a0) { }
+
+	public void setMaxScrollX(int a0) { }
+
+	public void setMaxScrollY(int a0) { }
+
+	public void setPackageName(java.lang.CharSequence a0) { }
+
+	public void setRemovedCount(int a0) { }
+
+	public void setScrollX(int a0) { }
+
+	public void setScrollY(int a0) { }
+
+	public void setSource(android.view.View a0, int a1) { }
+
+	public void setToIndex(int a0) { }
 }

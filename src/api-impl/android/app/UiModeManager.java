@@ -15,4 +15,8 @@ public class UiModeManager {
 	public int getNightMode() {
 		return Context.r.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
 	}
+
+	public float getContrast() { return 0.0f; }
+
+	public void removeContrastChangeListener(android.app.UiModeManager.ContrastChangeListener a0) { }
 }

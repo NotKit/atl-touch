@@ -11795,7 +11795,9 @@ public final class R {
 	</table>
 		 */
 		public static final int zAdjustment = 0x010101c1;
-	}
+	
+	public static final int colorAccent = 16843829;
+}
 	public static final class
 	bool {
 	}
@@ -12472,7 +12474,9 @@ public final class R {
 		 * Preference framework strings.
 		 */
 		public static final int yes = 0x01040013;
-	}
+	
+	public static final int paste_as_plain_text = 17039385;
+}
 	public static final class style {
 		/**
 		 * Base style for animations.  This style specifies no animations.

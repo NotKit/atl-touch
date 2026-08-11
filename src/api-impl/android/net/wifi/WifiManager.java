@@ -34,4 +34,6 @@ public class WifiManager {
 	public boolean isWifiEnabled() {
 		return false;
 	}
+
+	public android.net.DhcpInfo getDhcpInfo() { return null; }
 }

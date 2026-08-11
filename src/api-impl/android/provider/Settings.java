@@ -88,7 +88,11 @@ public class Settings {
 				return def;
 			}
 		}
-	}
+	
+	public static final java.lang.String ACCESSIBILITY_DISPLAY_INVERSION_ENABLED = "accessibility_display_inversion_enabled";
+
+	public static final java.lang.String DEFAULT_INPUT_METHOD = "default_input_method";
+}
 
 	public static final class System extends NameValueTable {
 		private final static String TAG = "Settings$System";
@@ -169,7 +173,11 @@ public class Settings {
 				return def;
 			}
 		}
-	}
+	
+	public static final java.lang.String FONT_SCALE = "font_scale";
+
+	public static final java.lang.String TEXT_SHOW_PASSWORD = "show_password";
+}
 
 	public static final class Global extends NameValueTable {
 		private final static String TAG = "Settings$Global";
@@ -240,7 +248,11 @@ public class Settings {
 				return def;
 			}
 		}
-	}
+	
+	public static final java.lang.String ANIMATOR_DURATION_SCALE = "animator_duration_scale";
+
+	public static final java.lang.String DEBUG_APP = "debug_app";
+}
 
 	public static class SettingNotFoundException extends AndroidException {}
 }

@@ -7,4 +7,6 @@ public abstract class CameraCaptureSession {
 
 	public static abstract class StateCallback {
 	}
+
+	public void close() { }
 }

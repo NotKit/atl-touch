@@ -28,4 +28,8 @@ public class ClipDescription /*implements Parcelable*/ {
 	public String getMimeType(int index) {
 		return "FIXME";
 	}
+
+	public boolean hasMimeType(java.lang.String a0) { return false; }
+
+	public long getTimestamp() { return 0L; }
 }

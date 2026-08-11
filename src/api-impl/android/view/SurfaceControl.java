@@ -9,4 +9,12 @@ public class SurfaceControl {
 	public static final int BUFFER_TRANSFORM_ROTATE_180 = 3;
 	public static final int BUFFER_TRANSFORM_ROTATE_270 = 7;
 	public static final int BUFFER_TRANSFORM_ROTATE_90 = 4;
+
+	public boolean isValid() { return false; }
+
+	public static class Builder { }
+
+	public static class Transaction { }
+
+	public void release() { }
 }

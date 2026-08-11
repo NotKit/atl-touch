@@ -33,4 +33,8 @@ public class MediaCodecList {
 			infos[i] = getCodecInfoAt(i);
 		return infos;
 	}
+
+	public static final int ALL_CODECS = 1;
+
+	public static final int REGULAR_CODECS = 0;
 }
