@@ -1,5 +1,5 @@
 /*
- * Launcher for running an app on a stock JVM (HotSpot) instead of ART.
+ * Launcher for running an app on a stock JVM instead of ART.
  *
  * Same boot sequence as src/main-executable/main.c — create the VM, register
  * libtranslation_layer_main under the app's class loader, then
@@ -11,6 +11,12 @@
  * Because a JVM has no libcore, the caller supplies the class path explicitly:
  * the pre-dex framework jar (--api-impl-jar), whatever compat jars the runtime
  * needs (--classpath) and the apk itself.
+ *
+ * This directory now holds two VM backends behind vm.h — the name is kept for
+ * the paths and docs that point at it. This file is the boot sequence and is
+ * shared by both; vm_hotspot.c creates the VM from libjvm.so, vm_image.c from a
+ * GraalVM native-image shared library that has no class path at all. Exactly
+ * one of them is linked into each executable.
  */
 
 // for RTLD_NEXT/dladdr in the compat shims, and for asprintf
@@ -35,6 +41,7 @@
 #include "../api-impl-jni/defines.h"
 #include "../api-impl-jni/util.h"
 #include "../main-executable/actions.h"
+#include "vm.h"
 
 #ifndef DEFFILEMODE
 	#define DEFFILEMODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) /* 0666 */
@@ -54,21 +61,6 @@ char *get_app_data_dir()
 {
 	return app_data_dir;
 }
-
-struct launcher_options {
-	char *main_activity_class;
-	char *api_impl_jar;
-	char *framework_res_apk;
-	char *natives_dir;
-	char **classpath;
-	char **library_path;
-	char **extra_jvm_options;
-	int window_width;
-	int window_height;
-	int sdk_int;
-	int smoke_test;
-	char *run_class;
-};
 
 static bool exception_check(JNIEnv *env, const char *what)
 {
@@ -91,176 +83,6 @@ static void fatal_exception_check(JNIEnv *env, const char *what)
 		exit(1);
 }
 
-static void add_option(GPtrArray *options, const char *format, ...) G_GNUC_PRINTF(2, 3);
-static void add_option(GPtrArray *options, const char *format, ...)
-{
-	va_list args;
-	va_start(args, format);
-	g_ptr_array_add(options, g_strdup_vprintf(format, args));
-	va_end(args);
-}
-
-static void append_path(GString *joined, const char *entry)
-{
-	if (!entry)
-		return;
-	if (joined->len)
-		g_string_append_c(joined, ':');
-	g_string_append(joined, entry);
-}
-
-static void append_path_list(GString *joined, char **list)
-{
-	for (char **entry = list; list && *entry; entry++)
-		append_path(joined, *entry);
-}
-
-/*
- * The `java` command expands a "dir/*" class path entry into the jars in that
- * directory before the VM ever sees it; JNI_CreateJavaVM does not, and would
- * silently put a directory named "*" on the class path instead. An app's
- * runtime dependencies are a directory full of jars, so do it here.
- */
-static void append_class_path(GString *joined, const char *entry)
-{
-	size_t len = strlen(entry);
-	if (len < 2 || strcmp(entry + len - 2, "/*")) {
-		append_path(joined, entry);
-		return;
-	}
-
-	char *dir_path = g_strndup(entry, len - 2);
-	GDir *dir = g_dir_open(dir_path, 0, NULL);
-	if (!dir) {
-		fprintf(stderr, "warning: class path entry %s: %s is not a directory\n", entry, dir_path);
-		g_free(dir_path);
-		return;
-	}
-
-	/* the order jars come back in is unspecified for `java` too */
-	const char *name;
-	while ((name = g_dir_read_name(dir))) {
-		if (!g_str_has_suffix(name, ".jar") && !g_str_has_suffix(name, ".JAR"))
-			continue;
-		char *jar = g_build_filename(dir_path, name, NULL);
-		append_path(joined, jar);
-		g_free(jar);
-	}
-
-	g_dir_close(dir);
-	g_free(dir_path);
-}
-
-/* class path entries are colon-separated like everywhere else in Java */
-static void append_class_path_list(GString *joined, char **list)
-{
-	for (char **entry = list; list && *entry; entry++) {
-		char **split = g_strsplit(*entry, ":", -1);
-		for (char **part = split; *part; part++)
-			if (**part)
-				append_class_path(joined, *part);
-		g_strfreev(split);
-	}
-}
-
-/*
- * The JVM's default locale comes from the environment, but Android's C locale
- * is always C/C.UTF-8 and native code may depend on that (decimal points in
- * strtod, and so on). Keep both: force the C locale, but hand the user's
- * language and region to the JVM as properties.
- */
-static void locale_options(GPtrArray *options)
-{
-	const char *locale = getenv("LC_ALL");
-	if (!locale || !*locale)
-		locale = getenv("LC_MESSAGES");
-	if (!locale || !*locale)
-		locale = getenv("LANG");
-
-	if (locale && *locale && strcmp(locale, "C") && strncmp(locale, "C.", 2) && strcmp(locale, "POSIX")) {
-		char language[3] = {0};
-		char country[3] = {0};
-		if (sscanf(locale, "%2[a-z]_%2[A-Z]", language, country) >= 1) {
-			add_option(options, "-Duser.language=%s", language);
-			if (*country)
-				add_option(options, "-Duser.country=%s", country);
-		}
-	}
-
-	setenv("LC_ALL", "C.UTF-8", 1);
-}
-
-static JNIEnv *create_vm(struct launcher_options *d, const char *apk, const char *app_lib_dir)
-{
-	JavaVM *vm;
-	JNIEnv *env;
-	GPtrArray *options = g_ptr_array_new_with_free_func(g_free);
-
-	GString *class_path = g_string_new(NULL);
-	append_path(class_path, d->api_impl_jar);
-	append_class_path_list(class_path, d->classpath);
-	append_path(class_path, apk);
-	append_path(class_path, d->framework_res_apk);
-
-	GString *library_path = g_string_new(NULL);
-	append_path_list(library_path, d->library_path);
-	append_path(library_path, d->natives_dir);
-	append_path(library_path, app_lib_dir);
-
-	add_option(options, "-Djava.class.path=%s", class_path->str);
-	add_option(options, "-Djava.library.path=%s", library_path->str);
-	add_option(options, "-DBuild.VERSION.SDK_INT=%d", d->sdk_int);
-	/* what the ART launcher keeps in C globals; a jar-based runtime wants them from Java too */
-	add_option(options, "-Datl.apk.path=%s", apk);
-	if (d->framework_res_apk)
-		add_option(options, "-Datl.framework.res.path=%s", d->framework_res_apk);
-	add_option(options, "-Datl.data.dir=%s", app_data_dir);
-	add_option(options, "-Datl.app.id=%s", g_application_get_application_id(g_application_get_default()));
-	/* the framework reads java.io.FileDescriptor's private fd where a JVM has no libcore equivalent */
-	g_ptr_array_add(options, g_strdup("--add-opens=java.base/java.io=ALL-UNNAMED"));
-
-	locale_options(options);
-
-	/* CheckJNI validates every JNI transition; with the AOSP graphics stack a
-	 * single frame makes tens of thousands of them, so keep it opt-in */
-	if (getenv("ATL_CHECK_JNI"))
-		g_ptr_array_add(options, g_strdup("-Xcheck:jni"));
-
-	const char *jdwp_port = getenv("JDWP_LISTEN");
-	if (jdwp_port)
-		add_option(options, "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=%s", jdwp_port);
-
-	for (char **extra = d->extra_jvm_options; extra && *extra; extra++)
-		g_ptr_array_add(options, g_strdup(*extra));
-
-	JavaVMOption *vm_options = g_new0(JavaVMOption, options->len);
-	for (guint i = 0; i < options->len; i++) {
-		vm_options[i].optionString = g_ptr_array_index(options, i);
-		fprintf(stderr, "jvm option: %s\n", vm_options[i].optionString);
-	}
-
-	JavaVMInitArgs args = {
-		.version = JNI_VERSION_1_8,
-		.nOptions = options->len,
-		.options = vm_options,
-		.ignoreUnrecognized = JNI_FALSE,
-	};
-
-	int ret = JNI_CreateJavaVM(&vm, (void **)&env, &args);
-	if (ret < 0) {
-		fprintf(stderr, "error: unable to launch the JVM (JNI_CreateJavaVM returned %d)\n", ret);
-		exit(1);
-	}
-	fprintf(stderr, "JVM launched successfully\n");
-
-	g_free(vm_options);
-	g_ptr_array_free(options, TRUE);
-	g_string_free(class_path, TRUE);
-	g_string_free(library_path, TRUE);
-
-	return env;
-}
-
 /*
  * System.load() registers a library with the class loader of its *calling*
  * class, and JNI method lookup only searches the loader of the class declaring
@@ -275,7 +97,10 @@ static void load_translation_layer(JNIEnv *env, const char *natives_dir)
 
 	jclass runtime_class = (*env)->FindClass(env, "android/atl/ATLRuntime");
 	if (exception_check(env, "looking up android.atl.ATLRuntime")) {
-		fprintf(stderr, "error: the framework jar (--api-impl-jar) does not look like a jar this launcher can use\n");
+		/* both backends land here, and each has its own way of not having the
+		 * framework, so name neither one's option as if it were the only cause */
+		fprintf(stderr, "error: the framework is not in this VM"
+		                " (--api-impl-jar for the libjvm launcher; built in, for the image one)\n");
 		exit(1);
 	}
 
@@ -321,6 +146,21 @@ static gboolean smoke_test_done(gpointer user_data)
 }
 
 /*
+ * main(String[]) needs an empty String[], so java.lang.String has to be looked
+ * up like any other class. Unchecked it is worse than useless on an image whose
+ * jni-config omits it: FindClass returns NULL with an exception pending, and
+ * NewObjectArray with a NULL element class then reports the miss as a failure of
+ * whatever ran next.
+ */
+static jobjectArray empty_string_array(JNIEnv *env)
+{
+	jclass string_class = (*env)->FindClass(env, "java/lang/String");
+	if (exception_check(env, "looking up java.lang.String") || !string_class)
+		exit(1);
+	return (*env)->NewObjectArray(env, 0, string_class, NULL);
+}
+
+/*
  * --run-class: run one class in the app's runtime instead of the application.
  * The framework, the class path and the native libraries are exactly what a
  * real run gets, which is what makes it useful for testing a single piece of an
@@ -341,12 +181,41 @@ static gboolean run_class_main(gpointer user_data)
 	if (exception_check(env, "looking up its main(String[])"))
 		exit(1);
 
-	jobjectArray no_args = (*env)->NewObjectArray(env, 0, (*env)->FindClass(env, "java/lang/String"), NULL);
+	jobjectArray no_args = empty_string_array(env);
 	(*env)->CallStaticVoidMethod(env, class, main_method, no_args);
 	if (exception_check(env, "running the --run-class class"))
 		exit(1);
 
 	fprintf(stderr, "run-class: %s.main() returned\n", class_name);
+	exit(0);
+}
+
+/*
+ * --vm-check: run one class's main(String[]) as soon as the VM exists and exit.
+ *
+ * Unlike --run-class this happens before any framework setup at all — no
+ * ATLRuntime, no handle cache, no window, no looper — so it works against a VM
+ * that contains nothing but the checked class. That is what makes it the test
+ * for a VM backend itself, rather than for the runtime the app needs.
+ */
+static void vm_check_main(JNIEnv *env, const char *class_name)
+{
+	char *binary_name = g_strdelimit(g_strdup(class_name), ".", '/');
+	jclass class = (*env)->FindClass(env, binary_name);
+	g_free(binary_name);
+	if (exception_check(env, "looking up the --vm-check class"))
+		exit(1);
+
+	jmethodID main_method = (*env)->GetStaticMethodID(env, class, "main", "([Ljava/lang/String;)V");
+	if (exception_check(env, "looking up its main(String[])"))
+		exit(1);
+
+	jobjectArray no_args = empty_string_array(env);
+	(*env)->CallStaticVoidMethod(env, class, main_method, no_args);
+	if (exception_check(env, "running the --vm-check class"))
+		exit(1);
+
+	fprintf(stderr, "vm check: %s.main() returned\n", class_name);
 	exit(0);
 }
 
@@ -396,8 +265,8 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 		exit(1);
 	}
 
-	d->api_impl_jar = required_path(d->api_impl_jar ?: getenv("ATL_API_IMPL_JAR"),
-	                                "--api-impl-jar", "the framework jar, javac output rather than dex");
+	/* what a class path means differs per backend, so each one checks its own */
+	vm_validate_options(d);
 	d->natives_dir = required_path(d->natives_dir ?: getenv("ATL_NATIVES_DIR"),
 	                               "--natives-dir", "the directory holding libtranslation_layer_main.so");
 	if (d->framework_res_apk || getenv("ATL_FRAMEWORK_RES_APK"))
@@ -412,7 +281,16 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	JNIEnv *env = create_vm(d, apk, app_lib_dir);
 	g_free(app_lib_dir);
 
+	if (d->vm_check) {
+		vm_check_main(env, d->vm_check);
+		return;
+	}
+
+	/* the first framework class either backend touches: unchecked, a VM without
+	 * it reports the *next* miss instead, which sends the reader after the wrong
+	 * one (it is how a stub image looks like a broken --api-impl-jar) */
 	jclass display_class = (*env)->FindClass(env, "android/view/Display");
+	fatal_exception_check(env, "looking up android.view.Display");
 	_SET_STATIC_INT_FIELD(display_class, "window_width", d->window_width);
 	_SET_STATIC_INT_FIELD(display_class, "window_height", d->window_height);
 
@@ -518,6 +396,8 @@ static void init_cmd_parameters(GApplication *app, struct launcher_options *d)
 		{ "sdk-int",          0,  0, G_OPTION_ARG_INT,          &d->sdk_int,             "the SDK level to report as Build.VERSION.SDK_INT",                                    "SDK_INT"       },
 		{ "smoke-test",       0,  0, G_OPTION_ARG_INT,          &d->smoke_test,          "boot the runtime and a window but no application, then exit 0 after N seconds",       "SECONDS"       },
 		{ "run-class",        0,  0, G_OPTION_ARG_STRING,      &d->run_class,           "run this class's main(String[]) in the app's runtime instead of the application",     "CLASS"         },
+		{ "vm-library",       0,  0, G_OPTION_ARG_FILENAME,   &d->vm_library,          "the native-image shared library to create the VM from; $ATL_IMAGE_LIB",               "SO"            },
+		{ "vm-check",         0,  0, G_OPTION_ARG_STRING,     &d->vm_check,            "run CLASS.main(String[]) as soon as the VM exists and exit, before any framework setup", "CLASS"       },
 		{NULL}
 		/* clang-format on */
 	};

@@ -296,6 +296,8 @@ jvm_dep = dependency('jni', modules: ['jvm'], required: get_option('hotspot-laun
 if jvm_dep.found()
 	executable('android-translation-layer-hotspot', [
 	                                                	'src/main-executable-hotspot/main.c',
+	                                                	'src/main-executable-hotspot/vm_common.c',
+	                                                	'src/main-executable-hotspot/vm_hotspot.c',
 	                                                	'src/main-executable-hotspot/glibc_compat.c',
 	                                                	'src/main-executable/actions.c',
 	                                                ],
@@ -311,6 +313,38 @@ if jvm_dep.found()
 	                                                ],
 	                                                install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
 	                                                               get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives')
+endif
+
+# The same launcher again, against a GraalVM native-image shared library. Only
+# the VM backend differs, and the image is dlopened rather than linked (see
+# vm_image.c), so this target needs no jvm_dep and gets no libjvm.so in its
+# DT_NEEDED -- dependency('jni') with no modules: is headers only.
+#
+# It still needs the JNI headers, and the feature option has to reach that
+# lookup: without `required:` a missing JDK would be a hard configure error even
+# on 'auto', which is not what a feature option means.
+jni_headers_dep = dependency('jni', required: get_option('image-launcher'))
+if jni_headers_dep.found()
+	executable('android-translation-layer-image', [
+	                                              	'src/main-executable-hotspot/main.c',
+	                                              	'src/main-executable-hotspot/vm_common.c',
+	                                              	'src/main-executable-hotspot/vm_image.c',
+	                                              	'src/main-executable-hotspot/glibc_compat.c',
+	                                              	'src/main-executable/actions.c',
+	                                              ],
+	                                              install: true,
+	                                              dependencies: [
+	                                              	dependency('gio-2.0'), jni_headers_dep, dependency('glfw3'), dependency('egl'), dependency('gl'),
+	                                              	declare_dependency(link_with: libtranslationlayer_so), dependency('dl'),
+	                                              ],
+	                                              link_args: [
+	                                              	# libtranslation_layer_main.so imports apk_path, atl_window,
+	                                              	# get_app_data_dir and the bionic_* calls from here
+	                                              	'-rdynamic',
+	                                              	'-Wl,-rpath,$ORIGIN',
+	                                              ],
+	                                              install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
+	                                                             get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives')
 endif
 
 # hax.jar
