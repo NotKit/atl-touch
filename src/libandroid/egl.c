@@ -137,7 +137,8 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 	/* A readback-mode window (no subsurface, so no wl_egl_window) has nothing a
 	 * GL driver can render into. Handing the NULL down is not survivable:
 	 * libhybris' wayland EGL platform aborts the process on it, where Mesa only
-	 * fails. Report EGL_BAD_NATIVE_WINDOW so the app can fall back. */
+	 * fails. Fail the call instead, so the app can fall back. (eglGetError is
+	 * the driver's, so it still says EGL_SUCCESS; the log line is the signal.) */
 	if (!native_window->egl_window) {
 		fprintf(stderr, "eglCreateWindowSurface: this ANativeWindow has no EGL window "
 		                "(readback mode); a GL producer needs the subsurface path\n");
