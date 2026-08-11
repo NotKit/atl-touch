@@ -101,6 +101,23 @@ public final class MessageQueue {
 		}
 	}
 
+	/**
+	 * Returns true if the looper has no pending messages which are due to be processed.
+	 *
+	 * <p>This method is safe to call from any thread.
+	 *
+	 * @return True if the looper is idle.
+	 */
+	public boolean isIdle() {
+		// AOSP's own implementation: idle means next() would have nothing to
+		// return right now. Unlike isIdling() this asks about the queue, not
+		// about whether the poll is currently blocked.
+		synchronized (this) {
+			final long now = SystemClock.uptimeMillis();
+			return mMessages == null || now < mMessages.when;
+		}
+	}
+
 	MessageQueue(boolean quitAllowed) {
 		mQuitAllowed = quitAllowed;
 		mPtr = nativeInit();
