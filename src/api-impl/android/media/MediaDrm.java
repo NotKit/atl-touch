@@ -32,6 +32,8 @@ public class MediaDrm {
 	public static final int SECURITY_LEVEL_SW_SECURE_DECODE = 2;
 	public static final int SECURITY_LEVEL_UNKNOWN = 0;
 
+	public MediaDrm(java.util.UUID uuid) throws android.media.UnsupportedSchemeException { }
+
 	public static final class KeyRequest {
 		public static final int REQUEST_TYPE_INITIAL = 0;
 		public static final int REQUEST_TYPE_NONE = 3;

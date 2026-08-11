@@ -11,4 +11,8 @@ public abstract class MetaKeyKeyListener {
 	public static long adjustMetaAfterKeypress(long a0) { return 0L; }
 
 	public static void adjustMetaAfterKeypress(android.text.Spannable a0) { }
+
+	public static int getMetaState(java.lang.CharSequence a0) { return 0; }
+
+	public static int getMetaState(long a0) { return 0; }
 }

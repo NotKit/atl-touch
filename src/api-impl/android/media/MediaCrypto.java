@@ -7,4 +7,6 @@ public class MediaCrypto {
 	public static boolean isCryptoSchemeSupported(java.util.UUID a0) { return false; }
 
 	public void release() { }
+
+	public MediaCrypto(java.util.UUID a0, byte[] a1) throws android.media.MediaCryptoException { }
 }

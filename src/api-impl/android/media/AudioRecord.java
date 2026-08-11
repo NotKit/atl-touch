@@ -109,4 +109,6 @@ public class AudioRecord {
 	public static final int SUCCESS = 0;
 
 	public int getTimestamp(android.media.AudioTimestamp a0, int a1) { return 0; }
+
+	public int read(java.nio.ByteBuffer a0, int a1) { return 0; }
 }

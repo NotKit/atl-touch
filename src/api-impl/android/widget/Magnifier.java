@@ -7,4 +7,6 @@ public class Magnifier {
 	public void dismiss() { }
 
 	public void show(float a0, float a1) { }
+
+	public Magnifier(android.view.View a0) { }
 }

@@ -121,6 +121,8 @@ public class MediaCodec {
 		freeOutputBuffers.add(index);
 	}
 
+	public MediaFormat getOutputFormat(int index) { return null; }
+
 	public MediaFormat getOutputFormat() {
 		return mediaFormat;
 	}

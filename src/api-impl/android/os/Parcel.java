@@ -410,12 +410,27 @@ public class Parcel {
 			p.writeToParcel(this, flags);
 	}
 
-	public Parcelable readParcelable(ClassLoader loader) throws ReflectiveOperationException {
+	@SuppressWarnings("unchecked")
+	public <T extends Parcelable> T readParcelable(ClassLoader loader) {
 		String className = readString();
 		if (className == null)
 			return null;
-		Parcelable.Creator<?> creator = (Parcelable.Creator<?>)loader.loadClass(className).getField("CREATOR").get(null);
-		return (Parcelable)creator.createFromParcel(this);
+		try {
+			Parcelable.Creator<?> creator = (Parcelable.Creator<?>)loader.loadClass(className).getField("CREATOR").get(null);
+			return (T)creator.createFromParcel(this);
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e.toString());
+		}
+	}
+
+	public <T extends Parcelable> void writeTypedObject(T value, int flags) {
+		writeBoolean(value != null);
+		if (value != null)
+			value.writeToParcel(this, flags);
+	}
+
+	public <T> T readTypedObject(Parcelable.Creator<T> creator) {
+		return readBoolean() ? creator.createFromParcel(this) : null;
 	}
 
 	public void writeStringArray(String[] strings) {

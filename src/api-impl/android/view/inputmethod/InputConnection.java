@@ -17,8 +17,6 @@ package android.view.inputmethod;
 import android.os.Bundle;
 import android.view.KeyEvent;
 
-class ExtractedText {}
-
 /**
  * The InputConnection interface is the communication channel from an
  * {@link InputMethod} back to the application that is receiving its input. It

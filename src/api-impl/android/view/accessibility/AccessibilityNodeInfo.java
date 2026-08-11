@@ -62,6 +62,8 @@ public class AccessibilityNodeInfo {
 	public static android.view.accessibility.AccessibilityNodeInfo.RangeInfo obtain(int a0, float a1, float a2, float a3) { return null; }
 }
 
+	public static AccessibilityNodeInfo obtain(android.view.View a0, int a1) { return null; }
+
 	public static AccessibilityNodeInfo obtain() { return null; }
 
 	public void setClassName(CharSequence className) {}

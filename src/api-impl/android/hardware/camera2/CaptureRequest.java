@@ -11,15 +11,15 @@ public class CaptureRequest {
 	public void set(android.hardware.camera2.CaptureRequest.Key a0, java.lang.Object a1) { }
 }
 
-	public static final android.hardware.camera2.CaptureRequest.Key CONTROL_AE_LOCK = null;
+	public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Boolean> CONTROL_AE_LOCK = null;
 
-	public static final android.hardware.camera2.CaptureRequest.Key CONTROL_AE_MODE = null;
+	public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> CONTROL_AE_MODE = null;
 
-	public static final android.hardware.camera2.CaptureRequest.Key CONTROL_AE_TARGET_FPS_RANGE = null;
+	public static final android.hardware.camera2.CaptureRequest.Key<android.util.Range<java.lang.Integer>> CONTROL_AE_TARGET_FPS_RANGE = null;
 
-	public static final android.hardware.camera2.CaptureRequest.Key CONTROL_AF_MODE = null;
+	public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> CONTROL_AF_MODE = null;
 
-	public static final android.hardware.camera2.CaptureRequest.Key CONTROL_VIDEO_STABILIZATION_MODE = null;
+	public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> CONTROL_VIDEO_STABILIZATION_MODE = null;
 
-	public static final android.hardware.camera2.CaptureRequest.Key LENS_OPTICAL_STABILIZATION_MODE = null;
+	public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> LENS_OPTICAL_STABILIZATION_MODE = null;
 }

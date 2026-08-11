@@ -6,5 +6,7 @@ public class PrintDocumentInfo {
 	public static final int CONTENT_TYPE_UNKNOWN = -1;
 	public static final int PAGE_COUNT_UNKNOWN = -1;
 
-	public static class Builder { }
+	public static class Builder { 
+	public Builder(java.lang.String a0) { }
+}
 }

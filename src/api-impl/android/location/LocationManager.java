@@ -73,4 +73,12 @@ public class LocationManager {
 	public static final java.lang.String NETWORK_PROVIDER = "network";
 
 	public boolean isProviderEnabled(java.lang.String a0) { return false; }
+
+	public void requestLocationUpdates(java.lang.String a0, long a1, float a2, android.location.LocationListener a3, android.os.Looper a4) { }
+
+	public void requestLocationUpdates(java.lang.String a0, long a1, float a2, java.util.concurrent.Executor a3, android.location.LocationListener a4) { }
+
+	public void requestLocationUpdates(long a0, float a1, android.location.Criteria a2, android.location.LocationListener a3, android.os.Looper a4) { }
+
+	public void requestLocationUpdates(long a0, float a1, android.location.Criteria a2, java.util.concurrent.Executor a3, android.location.LocationListener a4) { }
 }

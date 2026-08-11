@@ -920,4 +920,9 @@ public abstract class Context {
 	public void updateServiceGroup(android.content.ServiceConnection a0, int a1, int a2) { }
 
 	public int checkUriPermission(android.net.Uri a0, int a1, int a2, int a3) { return 0; }
+
+
+	public boolean bindService(android.content.Intent a0, int a1, java.util.concurrent.Executor a2, android.content.ServiceConnection a3) { return false; }
+
+	public void sendBroadcast(android.content.Intent a0, java.lang.String a1) { }
 }

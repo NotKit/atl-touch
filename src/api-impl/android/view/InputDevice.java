@@ -74,6 +74,8 @@ public class InputDevice {
 		return true;
 	}
 
+	public MotionRange getMotionRange(int axis) { return null; }
+
 	public MotionRange getMotionRange(int axis, int source) {
 		return new MotionRange(axis);
 	}

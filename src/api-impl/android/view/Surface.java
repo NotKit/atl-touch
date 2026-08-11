@@ -40,4 +40,10 @@ public class Surface {
 	public void release() { }
 
 	public void writeToParcel(android.os.Parcel a0, int a1) { }
+
+	public Surface() { }
+
+	public Surface(android.graphics.SurfaceTexture a0) { }
+
+	public Surface(android.view.SurfaceControl a0) { }
 }

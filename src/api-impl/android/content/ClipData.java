@@ -13,6 +13,8 @@ public class ClipData {
 	public java.lang.CharSequence coerceToText(android.content.Context a0) { return null; }
 
 	public java.lang.String getHtmlText() { return null; }
+
+	public Item(java.lang.CharSequence a0, java.lang.String a1) { }
 }
 
 	String text;
