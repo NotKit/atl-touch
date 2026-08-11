@@ -577,7 +577,7 @@ public class Parcel {
 		return array;
 	}
 
-	public void writeTypedArray(Parcelable[] array, int flags) {
+	public <T extends Parcelable> void writeTypedArray(T[] array, int flags) {
 		int len = array == null ? -1 : array.length;
 		writeInt(len);
 		for (int i = 0; i < len; i++) {
@@ -587,7 +587,7 @@ public class Parcel {
 		}
 	}
 
-	public void readTypedArray(Object[] array, Parcelable.Creator<Parcelable> creator) throws ReflectiveOperationException {
+	public <T> void readTypedArray(T[] array, Parcelable.Creator<T> creator) {
 		int size = readInt();
 		if (array.length != size)
 			throw new RuntimeException("array length mismatch");
@@ -599,11 +599,11 @@ public class Parcel {
 		}
 	}
 
-	public Object[] createTypedArray(Parcelable.Creator<Parcelable> creator) {
+	public <T> T[] createTypedArray(Parcelable.Creator<T> creator) {
 		int size = readInt();
 		if (size == -1)
 			return null;
-		Object[] array = creator.newArray(size);
+		T[] array = creator.newArray(size);
 		for (int i = 0; i < size; i++) {
 			if (readBoolean())
 				array[i] = creator.createFromParcel(this);
@@ -611,7 +611,7 @@ public class Parcel {
 		return array;
 	}
 
-	public void writeTypedList(List<Parcelable> list) {
+	public <T extends Parcelable> void writeTypedList(List<T> list) {
 		int len = list == null ? -1 : list.size();
 		writeInt(len);
 		for (int i = 0; i < len; i++) {
@@ -621,7 +621,7 @@ public class Parcel {
 		}
 	}
 
-	public void readTypedList(List<Parcelable> list, Parcelable.Creator<Parcelable> creator) throws ReflectiveOperationException {
+	public <T> void readTypedList(List<T> list, Parcelable.Creator<T> creator) {
 		int size = readInt();
 		list.clear();
 		for (int i = 0; i < size; i++) {
@@ -632,11 +632,11 @@ public class Parcel {
 		}
 	}
 
-	public ArrayList<Parcelable> createTypedArrayList(Parcelable.Creator<Parcelable> creator) throws ReflectiveOperationException {
+	public <T> ArrayList<T> createTypedArrayList(Parcelable.Creator<T> creator) {
 		int size = readInt();
 		if (size == -1)
 			return null;
-		ArrayList<Parcelable> list = new ArrayList<>(size);
+		ArrayList<T> list = new ArrayList<>(size);
 		for (int i = 0; i < size; i++) {
 			if (readBoolean())
 				list.add(creator.createFromParcel(this));
