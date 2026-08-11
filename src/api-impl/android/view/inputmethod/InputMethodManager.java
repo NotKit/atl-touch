@@ -73,4 +73,6 @@ public class InputMethodManager {
 	private static native void nativeHideSoftInput(long im_context);
 
 	public void updateCursorAnchorInfo(android.view.View a0, android.view.inputmethod.CursorAnchorInfo a1) { }
+
+	public void updateExtractedText(android.view.View a0, int a1, android.view.inputmethod.ExtractedText a2) { }
 }

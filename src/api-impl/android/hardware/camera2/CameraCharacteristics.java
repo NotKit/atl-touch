@@ -24,5 +24,5 @@ public class CameraCharacteristics {
 
 	public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> SENSOR_ORIENTATION = null;
 
-	public java.lang.Object get(android.hardware.camera2.CameraCharacteristics.Key a0) { return null; }
+	public <T> T get(android.hardware.camera2.CameraCharacteristics.Key<T> a0) { return null; }
 }

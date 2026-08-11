@@ -1,6 +1,6 @@
 package android.view;
 
-public class Surface {
+public class Surface implements android.os.Parcelable {
 	public long widget;
 	/* the SurfaceView this surface presents into (null for detached surfaces) */
 	SurfaceView view;
@@ -27,7 +27,7 @@ public class Surface {
 			view.postFrame(frame);
 	}
 
-	public static final android.os.Parcelable.Creator CREATOR = null;
+	public static final android.os.Parcelable.Creator<android.view.Surface> CREATOR = null;
 
 	public static final int ROTATION_0 = 0;
 

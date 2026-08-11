@@ -22,6 +22,8 @@ public class SurfaceControl {
 	public void apply() { }
 
 	public void close() { }
+
+	public android.view.SurfaceControl.Transaction setBufferSize(android.view.SurfaceControl a0, int a1, int a2) { return null; }
 }
 
 	public void release() { }

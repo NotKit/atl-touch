@@ -24,7 +24,7 @@ import java.io.PrintWriter;
  * the rectangle's width and height. Note: most methods do not check to see that
  * the coordinates are sorted correctly (i.e. left <= right and top <= bottom).
  */
-public class RectF {
+public class RectF implements android.os.Parcelable {
 	public float left;
 	public float top;
 	public float right;
@@ -518,5 +518,5 @@ public class RectF {
 		}
 	}
 
-	public static final android.os.Parcelable.Creator CREATOR = null;
+	public static final android.os.Parcelable.Creator<android.graphics.RectF> CREATOR = null;
 }

@@ -59,7 +59,7 @@ import libcore.io.Memory;
  * The FileDescriptor returned by {@link Parcel#readFileDescriptor}, allowing
  * you to close it when done with it.
  */
-public class ParcelFileDescriptor implements Closeable {
+public class ParcelFileDescriptor implements Closeable, android.os.Parcelable {
 	private static final String TAG = "ParcelFileDescriptor";
 
 	private final FileDescriptor mFd;
@@ -1020,5 +1020,5 @@ public class ParcelFileDescriptor implements Closeable {
 		}
 	}
 
-	public static final android.os.Parcelable.Creator CREATOR = null;
+	public static final android.os.Parcelable.Creator<android.os.ParcelFileDescriptor> CREATOR = null;
 }

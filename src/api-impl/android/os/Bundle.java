@@ -1186,5 +1186,5 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 		return "Bundle[" + mMap.toString() + "]";
 	}
 
-	public static final android.os.Parcelable.Creator CREATOR = null;
+	public static final android.os.Parcelable.Creator<android.os.Bundle> CREATOR = null;
 }
