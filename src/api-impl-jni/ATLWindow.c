@@ -59,6 +59,17 @@ struct ATLWindow {
 	unsigned int gl_texture;
 	unsigned int gl_program;
 	int gl_attr_pos, gl_attr_uv;
+	/* the chrome sub-surface ATL renders into once this window has a
+	 * SurfaceView (doc/SurfaceViewCompositing.md); the toplevel then only keeps
+	 * a full-size opaque buffer for input and window management */
+	void *chrome_egl_window;   /* struct wl_egl_window *: identity == generation */
+	EGLSurface chrome_surface;
+	/* GLFW's own EGL objects, read off the current context rather than through
+	 * glfwGetEGLContext(): those only answer for GLFW_EGL_CONTEXT_API, and ATL
+	 * lets GLFW pick the creation API (GLFW_NATIVE_CONTEXT_API on Wayland) */
+	EGLContext glfw_context;
+	EGLSurface glfw_surface;
+	int toplevel_width, toplevel_height; /* size of the last buffer it was given */
 	struct ATLWindow *next;
 };
 
@@ -600,6 +611,138 @@ static bool debug_damage(void)
 	return cached;
 }
 
+/* ATL_DEBUG_CHROME=1 traces the chrome sub-surface's presents */
+static bool debug_chrome(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = getenv("ATL_DEBUG_CHROME") != NULL;
+	return cached;
+}
+
+/* the EGLConfig GLFW's context was created with, so the chrome's window surface
+ * is context-compatible without guessing at attributes */
+static bool atl_window_egl_config(EGLDisplay display, EGLContext context, EGLConfig *out)
+{
+	EGLint config_id = 0, count = 0;
+	EGLint attrs[] = { EGL_CONFIG_ID, 0, EGL_NONE };
+
+	if (!eglQueryContext(display, context, EGL_CONFIG_ID, &config_id))
+		return false;
+	attrs[1] = config_id;
+	return eglChooseConfig(display, attrs, out, 1, &count) && count == 1;
+}
+
+/* the EGLSurface must go before the wl_egl_window under it does */
+static void atl_window_drop_chrome_surface(ATLWindow *window, EGLDisplay display)
+{
+	if (window->chrome_surface) {
+		if (eglGetCurrentSurface(EGL_DRAW) == window->chrome_surface)
+			eglMakeCurrent(display, window->glfw_surface, window->glfw_surface, window->glfw_context);
+		eglDestroySurface(display, window->chrome_surface);
+	}
+	window->chrome_surface = NULL;
+	window->chrome_egl_window = NULL;
+}
+
+/*
+ * Point the GL context at the chrome sub-surface, creating it (and its
+ * EGLSurface) the first time and after every recreation. Returns false when
+ * this window draws into its toplevel as before - which is every app without a
+ * SurfaceView, and every non-Wayland platform.
+ */
+static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
+{
+	EGLDisplay display;
+	EGLContext context;
+	struct wl_egl_window *egl_window;
+
+	if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
+		return false;
+	display = glfwGetEGLDisplay();
+	context = window->glfw_context;
+	if (display == EGL_NO_DISPLAY || context == EGL_NO_CONTEXT)
+		return false;
+	if (atl_surface_chrome_is_stale(window))
+		atl_window_drop_chrome_surface(window, display);
+	egl_window = atl_surface_chrome_ensure(window, width, height, atl_window_scale(window));
+	if (!egl_window) {
+		atl_window_drop_chrome_surface(window, display);
+		return false;
+	}
+
+	if (window->chrome_egl_window != (void *)egl_window) {
+		EGLConfig config;
+		EGLSurface surface;
+		EGLint alpha = 0;
+
+		atl_window_drop_chrome_surface(window, display);
+		if (!atl_window_egl_config(display, context, &config)) {
+			fprintf(stderr, "ATLWindow: no EGLConfig for the chrome surface (0x%x)\n", eglGetError());
+			atl_surface_chrome_fallback(window);
+			return false;
+		}
+		surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType)egl_window, NULL);
+		if (surface == EGL_NO_SURFACE) {
+			fprintf(stderr, "ATLWindow: eglCreateWindowSurface for the chrome failed (0x%x)\n", eglGetError());
+			atl_surface_chrome_fallback(window);
+			return false;
+		}
+		eglGetConfigAttrib(display, config, EGL_ALPHA_SIZE, &alpha);
+		if (alpha < 8)
+			fprintf(stderr, "ATLWindow: the chrome EGLConfig has %d alpha bits; "
+			                "a SurfaceView's hole will not be transparent\n", alpha);
+		window->chrome_surface = surface;
+		window->chrome_egl_window = egl_window;
+		/* a fresh buffer has no history, and the toplevel underneath keeps the
+		 * last scene it was given until it is cleared below */
+		window->full_redraw = true;
+	}
+
+	if (!eglMakeCurrent(display, window->chrome_surface, window->chrome_surface, context)) {
+		fprintf(stderr, "ATLWindow: eglMakeCurrent on the chrome surface failed (0x%x)\n", eglGetError());
+		atl_surface_chrome_fallback(window);
+		return false;
+	}
+	return true;
+}
+
+/*
+ * Present a frame that was drawn into the chrome sub-surface, and give the
+ * toplevel a buffer when it needs one: at the size it was just configured to,
+ * and whenever a sub-surface has parent-double-buffered state (a position, or a
+ * newly created sub-surface's place-on-top) waiting for a parent commit.
+ * Opaque black, because GLFW declares the whole toplevel opaque and a surface
+ * must not declare an opaque region it does not fill.
+ */
+static void atl_window_present_chrome(ATLWindow *window, int width, int height)
+{
+	EGLDisplay display = glfwGetEGLDisplay();
+	bool commit_parent;
+
+	if (!eglSwapBuffers(display, window->chrome_surface))
+		fprintf(stderr, "ATLWindow: eglSwapBuffers on the chrome surface failed (0x%x)\n", eglGetError());
+	/* GLFW believes its own surface is current on this thread and swaps it
+	 * without checking, so hand it back before anything calls into GLFW */
+	eglMakeCurrent(display, window->glfw_surface, window->glfw_surface, window->glfw_context);
+
+	commit_parent = atl_surface_layers_take_parent_commit(window);
+	if (window->toplevel_width != width || window->toplevel_height != height) {
+		window->toplevel_width = width;
+		window->toplevel_height = height;
+		commit_parent = true;
+	}
+	if (commit_parent) {
+		glViewport(0, 0, width, height);
+		glClearColor(0, 0, 0, 1);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glfwSwapBuffers(window->glfw_window);
+	}
+	if (debug_chrome())
+		fprintf(stderr, "ATLWindow: chrome present %dx%d, parent commit %s\n",
+		        width, height, commit_parent ? "yes" : "no");
+}
+
 static void atl_window_render(ATLWindow *window)
 {
 	if (!window->view_root || !glfwGetWindowAttrib(window->glfw_window, GLFW_VISIBLE))
@@ -633,6 +776,12 @@ static void atl_window_render(ATLWindow *window)
 	 * context current on this thread; harmless for the raster path, which
 	 * previously only made it current for the upload */
 	glfwMakeContextCurrent(window->glfw_window);
+	/* GLFW re-binds its own draw surface here every frame, so this is where the
+	 * two handles the chrome path has to restore are valid */
+	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+		window->glfw_context = eglGetCurrentContext();
+		window->glfw_surface = eglGetCurrentSurface(EGL_DRAW);
+	}
 
 	if (gpu_enabled() && !window->gpu_failed && !window->gpu_context) {
 		window->gpu_context = atl_gpu_context_create((void *(*)(const char *))glfwGetProcAddress);
@@ -665,6 +814,14 @@ static void atl_window_render(ATLWindow *window)
 		window->canvas_height = height;
 		full = true;
 	}
+
+	/* everything ATL draws goes to the chrome sub-surface once this window has a
+	 * SurfaceView, so that it composites above the app's own content; bound here
+	 * rather than at present time so a chrome that was just (re)created gets its
+	 * first buffer even on a frame with no damage */
+	bool chrome = atl_window_bind_chrome(window, width, height);
+	if (chrome)
+		full = full || window->full_redraw;
 
 	/* foreign GL use on this context (WebView texture binds) invalidates the
 	 * state Ganesh caches between frames */
@@ -708,11 +865,15 @@ static void atl_window_render(ATLWindow *window)
 
 	if (window->canvas_is_gpu) {
 		atl_canvas_gpu_present(window->gpu_context, canvas, width, height);
-		if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
-			atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
-			                               width, height, atl_window_scale(window));
+		if (chrome) {
+			atl_window_present_chrome(window, width, height);
+		} else {
+			if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+				atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+				                               width, height, atl_window_scale(window));
+			}
+			glfwSwapBuffers(window->glfw_window);
 		}
-		glfwSwapBuffers(window->glfw_window);
 		window->needs_redraw = false;
 		window->full_redraw = false;
 		if (debug_render() && (layout_ms > 50 || draw_ms > 50))
@@ -724,7 +885,9 @@ static void atl_window_render(ATLWindow *window)
 	int pixel_width, pixel_height, stride;
 	const void *pixels = atl_canvas_get_pixels(canvas, &pixel_width, &pixel_height, &stride);
 
-	glfwMakeContextCurrent(window->glfw_window);
+	/* no glfwMakeContextCurrent() here: it is already current from the top of
+	 * this function, and GLFW re-binds its own surface unconditionally, which
+	 * would send this blit to the toplevel instead of the chrome sub-surface */
 	if (!window->gl_program)
 		window->gl_program = atl_gl_make_blit_program(&window->gl_attr_pos, &window->gl_attr_uv);
 	if (!window->gl_texture) {
@@ -778,11 +941,15 @@ static void atl_window_render(ATLWindow *window)
 	glEnableVertexAttribArray(window->gl_attr_pos);
 	glEnableVertexAttribArray(window->gl_attr_uv);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
-		atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
-		                               width, height, atl_window_scale(window));
+	if (chrome) {
+		atl_window_present_chrome(window, width, height);
+	} else {
+		if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+			atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+			                               width, height, atl_window_scale(window));
+		}
+		glfwSwapBuffers(window->glfw_window);
 	}
-	glfwSwapBuffers(window->glfw_window);
 
 	window->needs_redraw = false;
 	window->full_redraw = false;

@@ -21,10 +21,99 @@ struct ATLSurfaceLayer {
 	bool fixed_size;
 	bool above;   /* setZOrderOnTop */
 	bool visible;
+	bool needs_parent_commit; /* set_position/creation is parent-double-buffered */
 	struct ATLSurfaceLayer *next;
 };
 
 static ATLSurfaceLayer *layers;
+
+/* the chrome sub-surface: one per window, created after every content layer */
+typedef struct ATLSurfaceChrome {
+	ATLWindow *parent;
+	struct wl_surface *surface;
+	struct wl_subsurface *subsurface;
+	struct wp_viewport *viewport;
+	struct wl_egl_window *egl_window;
+	int width, height;   /* framebuffer px */
+	int dest_width, dest_height; /* logical px, as last told to the compositor */
+	bool needs_parent_commit;
+	bool stale;          /* a layer appeared under it: rebuild to get back on top */
+	struct ATLSurfaceChrome *next;
+} ATLSurfaceChrome;
+
+static ATLSurfaceChrome *chromes;
+
+/* ATL_SURFACE_CHROME: "subsurface" (default) puts the scene in a chrome
+ * sub-surface above the content layers; "toplevel" is the pre-split punch-hole
+ * behaviour (content below the toplevel, which needs place_below and so only
+ * works on wlroots); "none" is neither, i.e. what ATL did on Mir - kept so the
+ * device's failure can be reproduced on a desktop compositor. */
+static bool chrome_disabled;   /* set by the env, or by a failed EGLSurface */
+
+bool atl_surface_chrome_enabled(void)
+{
+	static int cached = -1;
+
+	if (cached < 0) {
+		const char *mode = getenv("ATL_SURFACE_CHROME");
+		cached = !mode || !strcmp(mode, "subsurface") || !strcmp(mode, "1");
+		if (!cached)
+			fprintf(stderr, "ATLSurfaceLayer: chrome sub-surface disabled (ATL_SURFACE_CHROME=%s)\n", mode);
+	}
+	return cached == 1 && !chrome_disabled;
+}
+
+/* "toplevel" keeps asking for place_below; "none" reproduces Mir's ordering */
+static bool layers_place_below(void)
+{
+	const char *mode = getenv("ATL_SURFACE_CHROME");
+
+	if (atl_surface_chrome_enabled())
+		return false; /* the chrome is above us; below the parent would hide us */
+	return !mode || strcmp(mode, "none");
+}
+
+static ATLSurfaceChrome *chrome_for(ATLWindow *window)
+{
+	for (ATLSurfaceChrome *c = chromes; c; c = c->next)
+		if (c->parent == window)
+			return c;
+	return NULL;
+}
+
+static void chrome_free(ATLSurfaceChrome *chrome)
+{
+	ATLSurfaceChrome **link = &chromes;
+
+	while (*link && *link != chrome)
+		link = &(*link)->next;
+	if (*link)
+		*link = chrome->next;
+	if (chrome->egl_window)
+		wl_egl_window_destroy(chrome->egl_window);
+	if (chrome->viewport)
+		wp_viewport_destroy(chrome->viewport);
+	if (chrome->subsurface)
+		wl_subsurface_destroy(chrome->subsurface);
+	if (chrome->surface)
+		wl_surface_destroy(chrome->surface);
+	free(chrome);
+}
+
+/*
+ * Mark the chrome for rebuild, so the next atl_surface_chrome_ensure() creates a
+ * new one - which Wayland places on top of the parent's child stack again. It is
+ * not freed here: the EGLSurface the renderer holds must go first, because
+ * destroying a wl_egl_window an EGLSurface still references is a use-after-free
+ * inside the EGL driver.
+ */
+static void chrome_invalidate(ATLWindow *window)
+{
+	ATLSurfaceChrome *chrome = chrome_for(window);
+
+	if (chrome)
+		chrome->stale = true;
+}
 
 bool atl_surface_layers_available(void)
 {
@@ -64,7 +153,9 @@ ATLSurfaceLayer *atl_surface_layer_new(ATLWindow *parent)
 	layer->surface = wl_compositor_create_surface(compositor);
 	layer->subsurface = wl_subcompositor_get_subsurface(subcompositor, layer->surface, parent_surface);
 	wl_subsurface_set_desync(layer->subsurface); /* the app presents at its own cadence */
-	wl_subsurface_place_below(layer->subsurface, parent_surface);
+	if (layers_place_below())
+		wl_subsurface_place_below(layer->subsurface, parent_surface);
+	layer->needs_parent_commit = true;
 
 	/* input must keep going to the view hierarchy: ATL resolves a wl_surface to
 	 * a window by comparing against the GLFW toplevel, so anything the
@@ -86,6 +177,10 @@ ATLSurfaceLayer *atl_surface_layer_new(ATLWindow *parent)
 
 	layer->next = layers;
 	layers = layer;
+	/* a sub-surface created after this one would land on top of it, so the
+	 * chrome has to be built again - creation order is the only ordering
+	 * primitive that works on Mir */
+	chrome_invalidate(parent);
 	return layer;
 }
 
@@ -137,6 +232,7 @@ void atl_surface_layer_set_geometry(ATLSurfaceLayer *layer, int x, int y, int wi
 	layer->y = y;
 	layer->width = width;
 	layer->height = height;
+	layer->needs_parent_commit = true;
 
 	scale = atl_window_scale(layer->parent);
 	if (scale <= 0)
@@ -187,6 +283,18 @@ void atl_surface_layer_set_above(ATLSurfaceLayer *layer, bool above)
 	if (!layer || layer->above == above)
 		return;
 	layer->above = above;
+	if (atl_surface_chrome_enabled()) {
+		/* "above" would mean above the chrome, which needs this layer's
+		 * wl_surface recreated after it - and that destroys the EGLSurface the
+		 * app is already presenting to. See doc/SurfaceViewCompositing.md. */
+		static bool warned;
+		if (above && !warned) {
+			warned = true;
+			fprintf(stderr, "ATLSurfaceLayer: setZOrderOnTop is not honoured with the chrome sub-surface; "
+			                "the layer stays below ATL's own drawing\n");
+		}
+		return;
+	}
 	parent_surface = atl_window_wl_surface(layer->parent);
 	if (above)
 		wl_subsurface_place_above(layer->subsurface, parent_surface);
@@ -248,6 +356,10 @@ void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent
 	struct wl_region *opaque;
 	int w, h;
 
+	/* in chrome mode no part of the toplevel is transparent, so it must not
+	 * declare a punched region it does not fill */
+	if (atl_surface_chrome_enabled())
+		return;
 	if (!compositor || !parent || !atl_surface_layers_window_has_holes(window))
 		return;
 	if (scale <= 0)
@@ -268,4 +380,138 @@ void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent
 	}
 	wl_surface_set_opaque_region(parent, opaque);
 	wl_region_destroy(opaque);
+}
+
+/* --- the chrome sub-surface --- */
+
+/* every window that has a content layer needs one; a window with none keeps
+ * rendering straight into its toplevel, so ordinary apps never take this path */
+static bool window_has_layer(ATLWindow *window)
+{
+	for (ATLSurfaceLayer *l = layers; l; l = l->next)
+		if (l->parent == window)
+			return true;
+	return false;
+}
+
+struct wl_egl_window *atl_surface_chrome_ensure(ATLWindow *window, int fb_width, int fb_height, double scale)
+{
+	struct wl_compositor *compositor = atl_wayland_compositor();
+	struct wl_subcompositor *subcompositor = atl_wayland_subcompositor();
+	struct wl_surface *parent_surface = atl_window_wl_surface(window);
+	ATLSurfaceChrome *chrome;
+	struct wl_region *empty;
+
+	/* free a chrome the renderer has already let go of: stale (a layer appeared
+	 * under it), orphaned (its window's last SurfaceView went away) or disabled */
+	chrome = chrome_for(window);
+	if (chrome && (chrome->stale || !atl_surface_chrome_enabled() || !window_has_layer(window))) {
+		chrome_free(chrome);
+		chrome = NULL;
+	}
+
+	if (!atl_surface_chrome_enabled() || !compositor || !subcompositor || !parent_surface)
+		return NULL;
+	if (!window_has_layer(window))
+		return NULL;
+	if (fb_width < 1 || fb_height < 1)
+		return NULL;
+	if (scale <= 0)
+		scale = 1;
+
+	if (!chrome) {
+		chrome = calloc(1, sizeof(*chrome));
+		if (!chrome)
+			return NULL;
+		chrome->parent = window;
+		chrome->surface = wl_compositor_create_surface(compositor);
+		/* created last => on top of the parent's child stack, which is the one
+		 * ordering rule Mir honours */
+		chrome->subsurface = wl_subcompositor_get_subsurface(subcompositor, chrome->surface, parent_surface);
+		wl_subsurface_set_desync(chrome->subsurface);
+		/* input must reach the toplevel: atl_window_from_wl_surface() only
+		 * matches GLFW's surface, so anything this swallowed would be dropped */
+		empty = wl_compositor_create_region(compositor);
+		wl_surface_set_input_region(chrome->surface, empty);
+		wl_region_destroy(empty);
+		if (atl_wayland_viewporter())
+			chrome->viewport = wp_viewporter_get_viewport(atl_wayland_viewporter(), chrome->surface);
+		chrome->egl_window = wl_egl_window_create(chrome->surface, fb_width, fb_height);
+		if (!chrome->egl_window) {
+			fprintf(stderr, "ATLSurfaceChrome: wl_egl_window_create failed\n");
+			chrome_free(chrome);
+			return NULL;
+		}
+		chrome->width = fb_width;
+		chrome->height = fb_height;
+		chrome->needs_parent_commit = true;
+		chrome->next = chromes;
+		chromes = chrome;
+		int n = 0;
+		for (ATLSurfaceLayer *l = layers; l; l = l->next)
+			if (l->parent == window)
+				n++;
+		fprintf(stderr, "ATLSurfaceChrome: chrome sub-surface %dx%d above %d content layer(s)\n",
+		        fb_width, fb_height, n);
+	} else if (chrome->width != fb_width || chrome->height != fb_height) {
+		wl_egl_window_resize(chrome->egl_window, fb_width, fb_height, 0, 0);
+		chrome->width = fb_width;
+		chrome->height = fb_height;
+	}
+
+	/* only on a change: this runs every frame, and both are requests */
+	if (chrome->dest_width != (int)(fb_width / scale) || chrome->dest_height != (int)(fb_height / scale)) {
+		chrome->dest_width = (int)(fb_width / scale);
+		chrome->dest_height = (int)(fb_height / scale);
+		if (chrome->viewport)
+			wp_viewport_set_destination(chrome->viewport, chrome->dest_width, chrome->dest_height);
+		else
+			wl_surface_set_buffer_scale(chrome->surface, scale >= 2 ? (int)scale : 1);
+	}
+	return chrome->egl_window;
+}
+
+bool atl_surface_chrome_is_stale(ATLWindow *window)
+{
+	ATLSurfaceChrome *chrome = chrome_for(window);
+
+	return chrome && (chrome->stale || !atl_surface_chrome_enabled() || !window_has_layer(window));
+}
+
+void atl_surface_chrome_fallback(ATLWindow *window)
+{
+	struct wl_surface *parent_surface = atl_window_wl_surface(window);
+
+	if (chrome_disabled)
+		return;
+	fprintf(stderr, "ATLSurfaceChrome: falling back to the toplevel scene; ATL's drawing will be "
+	                "below a SurfaceView on a compositor without place_below\n");
+	chrome_disabled = true;
+	chrome_invalidate(window); /* freed by the next ensure(), after its EGLSurface */
+	/* the layers were created expecting something above them; put them back
+	 * under the toplevel, which is the pre-split behaviour */
+	for (ATLSurfaceLayer *l = layers; l; l = l->next) {
+		if (l->parent != window || l->above || !parent_surface)
+			continue;
+		wl_subsurface_place_below(l->subsurface, parent_surface);
+		l->needs_parent_commit = true;
+	}
+}
+
+bool atl_surface_layers_take_parent_commit(ATLWindow *window)
+{
+	ATLSurfaceChrome *chrome = chrome_for(window);
+	bool pending = false;
+
+	for (ATLSurfaceLayer *l = layers; l; l = l->next) {
+		if (l->parent != window || !l->needs_parent_commit)
+			continue;
+		l->needs_parent_commit = false;
+		pending = true;
+	}
+	if (chrome && chrome->needs_parent_commit) {
+		chrome->needs_parent_commit = false;
+		pending = true;
+	}
+	return pending;
 }

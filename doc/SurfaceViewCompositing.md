@@ -141,7 +141,8 @@ been measured on any compositor.
 | **two `SurfaceView`s** | two content layers; the chrome is recreated after the *second* one, so it is above both. Their order relative to each other is their creation order, which is what AOSP's default gives too. |
 | **a dialog over the `SurfaceView`** | drawn into the chrome, above the content. This is M2's exit criterion. |
 | **a dialog beside the `SurfaceView`** | same path, no special case. |
-| **a `SurfaceView` that is removed** | its layer is destroyed; the chrome stays (it covers the whole window and costs one present either way). Recreating the chrome is not needed because destroying a sub-surface cannot reorder the others. |
+| **one of two `SurfaceView`s removed** | its layer is destroyed and the chrome is left alone: destroying a sub-surface cannot reorder the others. |
+| **the last `SurfaceView` removed** | the chrome is dropped on the next frame (its `EGLSurface` first, then the `wl_egl_window`) and the scene goes back into the toplevel, i.e. back to the ordinary-app path. |
 | **`setZOrderOnTop(true)`** | **not honoured** in chrome mode: the layer stays below the chrome. Doing it properly means recreating that layer's `wl_surface` after the chrome, which would destroy the app's `EGLSurface` under it. It is logged once. On Mir it was never honoured anyway (`place_above` is the other unimplemented call). |
 | **teardown** | the chrome is destroyed with the window; the content layers keep the lifetime they already had (`Activity.detachWindowViews` → `surfaceDestroyed` → `native_destroyLayer`, atlas `062965c6`). |
 | **X11 / no `wl_subcompositor`** | `atl_surface_layers_available()` is false, no layer, no chrome, unchanged behaviour. |
@@ -180,3 +181,7 @@ is what it was before this change.
   the `wp_viewporter` handling.
 * Sub-surface synchronisation is left as it is: content layers are desync (the
   app presents at its own cadence) and so is the chrome.
+* It is verified on a headless wlroots compositor only. The `none` mode makes
+  that compositor stack surfaces the way Mir does, which is what makes a desktop
+  run evidence at all, but nothing here has run on Mir, at 1080x2412, or through
+  a window resize.

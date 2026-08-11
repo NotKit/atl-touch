@@ -95,3 +95,23 @@ The following environment variables are recognized by the main executable:
 ---
 
 `ATL_VALIDATE_CERTS` - if set, the signing certificate of the APK file will be validated on startup. This adds a few extra seconds to the startup time for large APKs.
+
+---
+
+`ATL_SURFACE_MODE=<subsurface|none>` - how a `SurfaceView`'s content reaches the screen.
+                                       `subsurface` (default) gives it a Wayland sub-surface of its own,
+                                       so a GL producer presents straight to the compositor;
+                                       anything else keeps the CPU read-back path
+                                       (`Surface.postFrame` into the scene), which cannot serve a GL producer.
+
+---
+
+`ATL_SURFACE_CHROME=<subsurface|toplevel|none>` - where ATL's own drawing goes when a `SurfaceView` exists;
+                                                  see `doc/SurfaceViewCompositing.md`.
+                                                  `subsurface` (default) puts the whole scene - views, dialogs,
+                                                  popups - in a second sub-surface created after the content one,
+                                                  which is the only ordering that works on Mir.
+                                                  `toplevel` is the old punch-hole behaviour (needs
+                                                  `wl_subsurface.place_below`, i.e. wlroots).
+                                                  `none` is neither, and only exists to reproduce Mir's
+                                                  stacking on a desktop compositor.
