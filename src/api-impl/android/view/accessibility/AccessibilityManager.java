@@ -5,9 +5,13 @@ import java.util.List;
 
 public class AccessibilityManager {
 
-	public interface AccessibilityStateChangeListener {}
+	public interface AccessibilityStateChangeListener {
+		public void onAccessibilityStateChanged(boolean enabled);
+	}
 
-	public interface TouchExplorationStateChangeListener {}
+	public interface TouchExplorationStateChangeListener {
+		public void onTouchExplorationStateChanged(boolean enabled);
+	}
 
 	public boolean isTouchExplorationEnabled() { return false; }
 
