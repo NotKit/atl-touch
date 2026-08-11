@@ -7,6 +7,16 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_net_ConnectivityManager_TYPE_BLUETOOTH
+#define android_net_ConnectivityManager_TYPE_BLUETOOTH 7L
+#undef android_net_ConnectivityManager_TYPE_ETHERNET
+#define android_net_ConnectivityManager_TYPE_ETHERNET 9L
+#undef android_net_ConnectivityManager_TYPE_MOBILE
+#define android_net_ConnectivityManager_TYPE_MOBILE 0L
+#undef android_net_ConnectivityManager_TYPE_WIFI
+#define android_net_ConnectivityManager_TYPE_WIFI 1L
+#undef android_net_ConnectivityManager_TYPE_WIMAX
+#define android_net_ConnectivityManager_TYPE_WIMAX 6L
 /*
  * Class:     android_net_ConnectivityManager
  * Method:    registerNetworkCallback

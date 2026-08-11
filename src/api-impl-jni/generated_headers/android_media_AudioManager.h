@@ -9,6 +9,24 @@ extern "C" {
 #endif
 #undef android_media_AudioManager_STREAM_MUSIC
 #define android_media_AudioManager_STREAM_MUSIC 3L
+#undef android_media_AudioManager_AUDIO_SESSION_ID_GENERATE
+#define android_media_AudioManager_AUDIO_SESSION_ID_GENERATE 0L
+#undef android_media_AudioManager_GET_DEVICES_ALL
+#define android_media_AudioManager_GET_DEVICES_ALL 3L
+#undef android_media_AudioManager_MODE_IN_COMMUNICATION
+#define android_media_AudioManager_MODE_IN_COMMUNICATION 3L
+#undef android_media_AudioManager_MODE_RINGTONE
+#define android_media_AudioManager_MODE_RINGTONE 1L
+#undef android_media_AudioManager_STREAM_ALARM
+#define android_media_AudioManager_STREAM_ALARM 4L
+#undef android_media_AudioManager_STREAM_NOTIFICATION
+#define android_media_AudioManager_STREAM_NOTIFICATION 5L
+#undef android_media_AudioManager_STREAM_RING
+#define android_media_AudioManager_STREAM_RING 2L
+#undef android_media_AudioManager_STREAM_SYSTEM
+#define android_media_AudioManager_STREAM_SYSTEM 1L
+#undef android_media_AudioManager_STREAM_VOICE_CALL
+#define android_media_AudioManager_STREAM_VOICE_CALL 0L
 /*
  * Class:     android_media_AudioManager
  * Method:    nativeSetStreamVolume

@@ -9,6 +9,12 @@ extern "C" {
 #endif
 #undef android_content_Context_MODE_PRIVATE
 #define android_content_Context_MODE_PRIVATE 0L
+#undef android_content_Context_BIND_AUTO_CREATE
+#define android_content_Context_BIND_AUTO_CREATE 1L
+#undef android_content_Context_BIND_IMPORTANT
+#define android_content_Context_BIND_IMPORTANT 64L
+#undef android_content_Context_BIND_WAIVE_PRIORITY
+#define android_content_Context_BIND_WAIVE_PRIORITY 32L
 /*
  * Class:     android_content_Context
  * Method:    native_get_apk_path

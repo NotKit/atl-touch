@@ -15,6 +15,14 @@ extern "C" {
 #define android_media_AudioTrack_PLAYSTATE_PAUSED 2L
 #undef android_media_AudioTrack_PLAYSTATE_PLAYING
 #define android_media_AudioTrack_PLAYSTATE_PLAYING 3L
+#undef android_media_AudioTrack_MODE_STREAM
+#define android_media_AudioTrack_MODE_STREAM 1L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY
+#define android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY 1L
+#undef android_media_AudioTrack_STATE_INITIALIZED
+#define android_media_AudioTrack_STATE_INITIALIZED 1L
+#undef android_media_AudioTrack_WRITE_BLOCKING
+#define android_media_AudioTrack_WRITE_BLOCKING 0L
 /*
  * Class:     android_media_AudioTrack
  * Method:    native_constructor

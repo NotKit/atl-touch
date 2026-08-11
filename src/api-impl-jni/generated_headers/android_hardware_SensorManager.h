@@ -7,6 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_hardware_SensorManager_SENSOR_DELAY_NORMAL
+#define android_hardware_SensorManager_SENSOR_DELAY_NORMAL 3L
 /*
  * Class:     android_hardware_SensorManager
  * Method:    register_accelerometer_listener_native

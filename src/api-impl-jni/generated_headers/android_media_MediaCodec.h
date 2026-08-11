@@ -9,6 +9,18 @@ extern "C" {
 #endif
 #undef android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM
 #define android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM 4L
+#undef android_media_MediaCodec_BUFFER_FLAG_CODEC_CONFIG
+#define android_media_MediaCodec_BUFFER_FLAG_CODEC_CONFIG 2L
+#undef android_media_MediaCodec_BUFFER_FLAG_KEY_FRAME
+#define android_media_MediaCodec_BUFFER_FLAG_KEY_FRAME 1L
+#undef android_media_MediaCodec_BUFFER_FLAG_SYNC_FRAME
+#define android_media_MediaCodec_BUFFER_FLAG_SYNC_FRAME 1L
+#undef android_media_MediaCodec_CONFIGURE_FLAG_ENCODE
+#define android_media_MediaCodec_CONFIGURE_FLAG_ENCODE 1L
+#undef android_media_MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED
+#define android_media_MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED -3L
+#undef android_media_MediaCodec_INFO_OUTPUT_FORMAT_CHANGED
+#define android_media_MediaCodec_INFO_OUTPUT_FORMAT_CHANGED -2L
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_constructor

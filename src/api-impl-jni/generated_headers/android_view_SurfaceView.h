@@ -227,6 +227,12 @@ extern "C" {
 #define android_view_SurfaceView_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS 4L
 #undef android_view_SurfaceView_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
 #define android_view_SurfaceView_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS 8L
+#undef android_view_SurfaceView_AUTOFILL_TYPE_TEXT
+#define android_view_SurfaceView_AUTOFILL_TYPE_TEXT 1L
+#undef android_view_SurfaceView_DRAG_FLAG_GLOBAL
+#define android_view_SurfaceView_DRAG_FLAG_GLOBAL 256L
+#undef android_view_SurfaceView_IMPORTANT_FOR_ACCESSIBILITY_YES
+#define android_view_SurfaceView_IMPORTANT_FOR_ACCESSIBILITY_YES 1L
 /*
  * Class:     android_view_SurfaceView
  * Method:    native_createSnapshot
