@@ -478,6 +478,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public boolean isInPictureInPictureMode() { return false; }
 
+	/* No picture-in-picture mode here, so the params are dropped. Present
+	 * because LaunchActivity's override calls super. */
+	public void setPictureInPictureParams(PictureInPictureParams params) {}
+
 	@Override
 	public void onContentChanged() {
 		Slog.i(TAG, "- onContentChanged - yay!");
