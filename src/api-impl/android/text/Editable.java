@@ -1,6 +1,6 @@
 package android.text;
 
-public interface Editable extends CharSequence {
+public interface Editable extends CharSequence, GetChars, Spannable, Appendable {
 
 	public class Factory {
 		public static Factory getInstance() {
@@ -22,9 +22,19 @@ public interface Editable extends CharSequence {
 
 	public Editable delete(int start, int end);
 
+	public Editable insert(int where, CharSequence text, int start, int end);
+
 	public Editable insert(int where, CharSequence text);
 
+	public Editable append(CharSequence text);
+
+	public Editable append(CharSequence text, int start, int end);
+
+	public Editable append(char text);
+
 	public void clear();
+
+	public void clearSpans();
 
 	public <T> T[] getSpans(int queryStart, int queryEnd, Class<T> kind);
 }
