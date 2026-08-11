@@ -762,6 +762,7 @@ srcs = [
 	'android/view/WindowMetrics.java',
 	'android/view/accessibility/AccessibilityManager.java',
 	'android/view/accessibility/AccessibilityNodeInfo.java',
+	'android/view/accessibility/AccessibilityRecord.java',
 	'android/view/accessibility/AccessibilityNodeProvider.java',
 	'android/view/accessibility/CaptioningManager.java',
 	'android/view/animation/AccelerateDecelerateInterpolator.java',

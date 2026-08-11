@@ -1,6 +1,6 @@
 package android.view.accessibility;
 
-public class AccessibilityEvent {
+public class AccessibilityEvent extends AccessibilityRecord implements android.os.Parcelable {
 	public static final int CONTENT_CHANGE_TYPE_CHECKED = 8192;
 	public static final int CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION = 4;
 	public static final int CONTENT_CHANGE_TYPE_CONTENT_INVALID = 1024;
