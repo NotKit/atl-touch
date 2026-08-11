@@ -22,6 +22,14 @@ public abstract class CameraDevice {
 	public static final int ERROR_CAMERA_SERVICE = 5;
 
 	public static final int ERROR_MAX_CAMERAS_IN_USE = 2;
+
+	public void onClosed(android.hardware.camera2.CameraDevice a0) { }
+
+	public void onDisconnected(android.hardware.camera2.CameraDevice a0) { }
+
+	public void onError(android.hardware.camera2.CameraDevice a0, int a1) { }
+
+	public void onOpened(android.hardware.camera2.CameraDevice a0) { }
 }
 
 	public android.hardware.camera2.CaptureRequest.Builder createCaptureRequest(int a0) throws android.hardware.camera2.CameraAccessException { return null; }

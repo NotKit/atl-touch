@@ -29,7 +29,9 @@ public class AudioAttributes {
 		public AudioAttributes build() {
 			return new AudioAttributes();
 		}
-	}
+	
+	public android.media.AudioAttributes.Builder setAllowedCapturePolicy(int a0) { return null; }
+}
 
 	public int getAllowedCapturePolicy() { return 0; }
 

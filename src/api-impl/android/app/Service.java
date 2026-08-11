@@ -64,4 +64,6 @@ public abstract class Service extends ContextWrapper {
 		super.attachBaseContext(newBase);
 		System.out.println("Service.attachBaseContext(" + newBase + ") called");
 	}
+
+	public boolean onUnbind(android.content.Intent a0) { return false; }
 }

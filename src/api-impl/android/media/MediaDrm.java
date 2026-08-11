@@ -47,10 +47,14 @@ public class MediaDrm {
 	}
 
 	public interface OnEventListener {
-	}
+	
+	public default void onEvent(android.media.MediaDrm a0, byte[] a1, int a2, int a3, byte[] a4) { }
+}
 
 	public interface OnKeyStatusChangeListener {
-	}
+	
+	public default void onKeyStatusChange(android.media.MediaDrm a0, byte[] a1, java.util.List a2, boolean a3) { }
+}
 
 	public android.media.MediaDrm.KeyRequest getKeyRequest(byte[] a0, byte[] a1, java.lang.String a2, int a3, java.util.HashMap a4) throws android.media.NotProvisionedException { return null; }
 
@@ -66,9 +70,17 @@ public class MediaDrm {
 
 	public static boolean isCryptoSchemeSupported(java.util.UUID a0, java.lang.String a1) { return false; }
 
-	public static class KeyStatus { }
+	public static class KeyStatus { 
+	public byte[] getKeyId() { return null; }
 
-	public static class ProvisionRequest { }
+	public int getStatusCode() { return 0; }
+}
+
+	public static class ProvisionRequest { 
+	public byte[] getData() { return null; }
+
+	public java.lang.String getDefaultUrl() { return null; }
+}
 
 	public void closeSession(byte[] a0) { }
 

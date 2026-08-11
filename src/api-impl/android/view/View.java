@@ -1882,7 +1882,9 @@ public class View implements Drawable.Callback {
 
 	public static class AccessibilityDelegate {
 		public void sendAccessibilityEvent(View view, int eventType) {}
-	}
+	
+	public android.view.accessibility.AccessibilityNodeProvider getAccessibilityNodeProvider(android.view.View a0) { return null; }
+}
 
 	public Drawable getBackground() {
 		return background;
@@ -4068,4 +4070,16 @@ public class View implements Drawable.Callback {
 	public void onInitializeAccessibilityNodeInfo(android.view.accessibility.AccessibilityNodeInfo a0) { }
 
 	public void updateDragShadow(android.view.View.DragShadowBuilder a0) { }
+
+	public boolean startDragAndDrop(android.content.ClipData a0, android.view.View.DragShadowBuilder a1, java.lang.Object a2, int a3) { return false; }
+
+	public boolean gatherTransparentRegion(android.graphics.Region a0) { return false; }
+
+	public boolean isVisibleToUserForAutofill(int a0) { return false; }
+
+	public boolean onDragEvent(android.view.DragEvent a0) { return false; }
+
+	public void autofill(android.util.SparseArray a0) { }
+
+	public void onProvideAutofillVirtualStructure(android.view.ViewStructure a0, int a1) { }
 }

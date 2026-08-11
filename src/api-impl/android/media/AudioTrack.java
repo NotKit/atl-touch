@@ -218,7 +218,9 @@ public class AudioTrack {
 		public Builder setPerformanceMode(int performanceMode) {
 			return this;
 		}
-	}
+	
+	public android.media.AudioTrack.Builder setSessionId(int a0) throws java.lang.IllegalArgumentException { return null; }
+}
 
 	public int getBufferCapacityInFrames() { return 0; }
 

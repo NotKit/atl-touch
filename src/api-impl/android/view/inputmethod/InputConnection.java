@@ -368,4 +368,10 @@ public interface InputConnection {
 	int CURSOR_UPDATE_MONITOR = 2;
 
 	int INPUT_CONTENT_GRANT_READ_URI_PERMISSION = 1;
+
+	public default android.os.Handler getHandler() { return null; }
+
+	public default boolean commitContent(android.view.inputmethod.InputContentInfo a0, int a1, android.os.Bundle a2) { return false; }
+
+	public default boolean requestCursorUpdates(int a0) { return false; }
 }

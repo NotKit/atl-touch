@@ -9,7 +9,9 @@ public class ConnectivityManager {
 	public class NetworkCallback {
 		public void onAvailable(Network network) {}
 		public void onLost(Network network) {}
-	}
+	
+	public void onLinkPropertiesChanged(android.net.Network a0, android.net.LinkProperties a1) { }
+}
 
 	public NetworkInfo getNetworkInfo(int networkType) {
 		return new NetworkInfo(nativeGetNetworkAvailable());

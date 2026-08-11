@@ -32,4 +32,6 @@ public class ClipDescription /*implements Parcelable*/ {
 	public boolean hasMimeType(java.lang.String a0) { return false; }
 
 	public long getTimestamp() { return 0L; }
+
+	public void setExtras(android.os.PersistableBundle a0) { }
 }

@@ -96,9 +96,13 @@ public class AccessibilityNodeInfo {
 
 	public boolean removeAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction a0) { return false; }
 
-	public static class CollectionInfo { }
+	public static class CollectionInfo { 
+	public static android.view.accessibility.AccessibilityNodeInfo.CollectionInfo obtain(int a0, int a1, boolean a2, int a3) { return null; }
+}
 
-	public static class CollectionItemInfo { }
+	public static class CollectionItemInfo { 
+	public static android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo obtain(int a0, int a1, int a2, int a3, boolean a4) { return null; }
+}
 
 	public static final int ACTION_ACCESSIBILITY_FOCUS = 64;
 
@@ -193,4 +197,10 @@ public class AccessibilityNodeInfo {
 	public void setText(java.lang.CharSequence a0) { }
 
 	public void setViewIdResourceName(java.lang.String a0) { }
+
+	public void setCollectionInfo(android.view.accessibility.AccessibilityNodeInfo.CollectionInfo a0) { }
+
+	public void setCollectionItemInfo(android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo a0) { }
+
+	public void setMovementGranularities(int a0) { }
 }

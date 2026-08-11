@@ -41,4 +41,10 @@ public abstract class ViewStructure {
 	public void setVisibility(int a0) { }
 
 	public void setWebDomain(java.lang.String a0) { }
+
+	public void setAutofillType(int a0) { }
+
+	public void setAutofillValue(android.view.autofill.AutofillValue a0) { }
+
+	public void setHtmlInfo(android.view.ViewStructure.HtmlInfo a0) { }
 }

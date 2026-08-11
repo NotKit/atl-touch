@@ -4,7 +4,13 @@ import android.os.Handler;
 import android.view.Display;
 
 public final class DisplayManager {
-	public static interface DisplayListener {}
+	public static interface DisplayListener {
+	public default void onDisplayAdded(int a0) { }
+
+	public default void onDisplayChanged(int a0) { }
+
+	public default void onDisplayRemoved(int a0) { }
+}
 
 	public Display getDisplay(int dummy) {
 		return new Display();

@@ -71,4 +71,6 @@ public class LocationManager {
 	public static final java.lang.String GPS_PROVIDER = "gps";
 
 	public static final java.lang.String NETWORK_PROVIDER = "network";
+
+	public boolean isProviderEnabled(java.lang.String a0) { return false; }
 }

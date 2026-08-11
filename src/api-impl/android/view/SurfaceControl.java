@@ -14,7 +14,15 @@ public class SurfaceControl {
 
 	public static class Builder { }
 
-	public static class Transaction { }
+	public static class Transaction { 
+	public android.view.SurfaceControl.Transaction reparent(android.view.SurfaceControl a0, android.view.SurfaceControl a1) { return null; }
+
+	public android.view.SurfaceControl.Transaction setVisibility(android.view.SurfaceControl a0, boolean a1) { return null; }
+
+	public void apply() { }
+
+	public void close() { }
+}
 
 	public void release() { }
 }

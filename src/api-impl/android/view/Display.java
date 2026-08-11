@@ -84,7 +84,9 @@ public final class Display {
 
 	public int getPixelFormat() { return 0; }
 
-	public static class HdrCapabilities { }
+	public static class HdrCapabilities { 
+	public float getDesiredMaxLuminance() { return 0.0f; }
+}
 
 	public static final int DEFAULT_DISPLAY = 0;
 }

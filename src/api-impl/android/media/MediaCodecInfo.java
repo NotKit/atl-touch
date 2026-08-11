@@ -112,5 +112,7 @@ public class MediaCodecInfo {
 
 	public static class EncoderCapabilities { }
 
-	public static class VideoCapabilities { }
+	public static class VideoCapabilities { 
+	public boolean isSizeSupported(int a0, int a1) { return false; }
+}
 }

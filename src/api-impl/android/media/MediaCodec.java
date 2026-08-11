@@ -263,7 +263,15 @@ public class MediaCodec {
 	public static interface OnFrameRenderedListener {}
 
 	public static abstract class Callback {
-	}
+	
+	public void onError(android.media.MediaCodec a0, android.media.MediaCodec.CodecException a1) { }
+
+	public void onInputBufferAvailable(android.media.MediaCodec a0, int a1) { }
+
+	public void onOutputBufferAvailable(android.media.MediaCodec a0, int a1, android.media.MediaCodec.BufferInfo a2) { }
+
+	public void onOutputFormatChanged(android.media.MediaCodec a0, android.media.MediaFormat a1) { }
+}
 
 	public static class CodecException extends IllegalStateException {
 	

@@ -56,4 +56,6 @@ public class TextToSpeech {
 	public static final int QUEUE_FLUSH = 0;
 
 	public static final int SUCCESS = 0;
+
+	public int speak(java.lang.String a0, int a1, java.util.HashMap a2) { return 0; }
 }

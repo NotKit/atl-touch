@@ -7,6 +7,8 @@ public class CaptureRequest {
 	public static class Builder {
 	
 	public void addTarget(android.view.Surface a0) { }
+
+	public void set(android.hardware.camera2.CaptureRequest.Key a0, java.lang.Object a1) { }
 }
 
 	public static final android.hardware.camera2.CaptureRequest.Key CONTROL_AE_LOCK = null;

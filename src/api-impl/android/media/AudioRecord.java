@@ -107,4 +107,6 @@ public class AudioRecord {
 	public static final int STATE_INITIALIZED = 1;
 
 	public static final int SUCCESS = 0;
+
+	public int getTimestamp(android.media.AudioTimestamp a0, int a1) { return 0; }
 }

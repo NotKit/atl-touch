@@ -17,4 +17,6 @@ public class AutofillManager {
 	public void notifyViewEntered(android.view.View a0, int a1, android.graphics.Rect a2) { }
 
 	public void notifyViewExited(android.view.View a0, int a1) { }
+
+	public void notifyValueChanged(android.view.View a0, int a1, android.view.autofill.AutofillValue a2) { }
 }

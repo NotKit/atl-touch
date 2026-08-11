@@ -121,4 +121,6 @@ public class AudioManager {
 	public void dispatchMediaKeyEvent(android.view.KeyEvent a0) { }
 
 	public void startBluetoothSco() { }
+
+	public android.media.AudioDeviceInfo[] getDevices(int a0) { return null; }
 }
