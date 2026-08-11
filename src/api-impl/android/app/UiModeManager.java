@@ -5,6 +5,9 @@ import android.content.res.Configuration;
 
 public class UiModeManager {
 
+	public interface ContrastChangeListener {
+	}
+
 	public int getCurrentModeType() {
 		return Context.r.getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK;
 	}

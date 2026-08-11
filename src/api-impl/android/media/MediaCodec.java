@@ -237,4 +237,10 @@ public class MediaCodec {
 	}
 
 	public static interface OnFrameRenderedListener {}
+
+	public static abstract class Callback {
+	}
+
+	public static class CodecException extends IllegalStateException {
+	}
 }
