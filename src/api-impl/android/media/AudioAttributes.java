@@ -8,7 +8,7 @@ public class AudioAttributes {
 
 	public int getUsage() { return 0; }
 
-	public class Builder {
+	public static class Builder {
 
 		public Builder setContentType(int content_type) {
 			return this;

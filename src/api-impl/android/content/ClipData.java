@@ -7,6 +7,10 @@ public class ClipData {
 	public static class Item {
 
 		public Item(Uri uri) {}
+
+		public Item(CharSequence text) {}
+
+		public Item(CharSequence text, String htmlText, android.content.Intent intent, Uri uri) {}
 	
 	public android.net.Uri getUri() { return null; }
 

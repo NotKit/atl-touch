@@ -46,12 +46,13 @@ public class ContextThemeWrapper extends ContextWrapper {
 	}
 
 	@Override
-	public Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException {
+	@SuppressWarnings("unchecked")
+	public <T> T getSystemService(Class<T> serviceClass) {
 		if (serviceClass == LayoutInflater.class) {
 			if (layout_inflater == null) {
 				layout_inflater = LayoutInflater.from(this.getBaseContext()).cloneInContext(this);
 			}
-			return layout_inflater;
+			return (T)layout_inflater;
 		}
 		return super.getSystemService(serviceClass);
 	}

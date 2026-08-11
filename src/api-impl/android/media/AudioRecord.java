@@ -82,7 +82,9 @@ public class AudioRecord {
 		public AudioRecord build() {
 			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding, 32768);
 		}
-	}
+	
+	public android.media.AudioRecord.Builder setBufferSizeInBytes(int a0) throws java.lang.IllegalArgumentException { return null; }
+}
 
 	public android.media.AudioDeviceInfo getRoutedDevice() { return null; }
 

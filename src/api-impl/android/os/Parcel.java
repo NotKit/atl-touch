@@ -378,7 +378,7 @@ public class Parcel {
 		writeMap(value == null ? null : value.mMap);
 	}
 
-	public Bundle readBundle(ClassLoader loader) throws ReflectiveOperationException {
+	public Bundle readBundle(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
@@ -391,7 +391,7 @@ public class Parcel {
 		return bundle;
 	}
 
-	public Bundle readBundle() throws ReflectiveOperationException {
+	public Bundle readBundle() {
 		return readBundle(getClass().getClassLoader());
 	}
 
@@ -489,7 +489,7 @@ public class Parcel {
 			writeValue(list.get(i));
 	}
 
-	public void readList(List<Object> list, ClassLoader loader) throws ReflectiveOperationException {
+	public void readList(List<Object> list, ClassLoader loader) {
 		int size = readInt();
 		list.clear();
 		for (int i = 0; i < size; i++)
@@ -508,7 +508,7 @@ public class Parcel {
 		}
 	}
 
-	public void readMap(Map<String, Object> map, ClassLoader loader) throws ReflectiveOperationException {
+	public void readMap(Map<String, Object> map, ClassLoader loader) {
 		int size = readInt();
 		map.clear();
 		for (int i = 0; i < size; i++) {
@@ -518,7 +518,7 @@ public class Parcel {
 		}
 	}
 
-	public HashMap<String, Object> readHashMap(ClassLoader loader) throws ReflectiveOperationException {
+	public HashMap<String, Object> readHashMap(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
@@ -540,7 +540,7 @@ public class Parcel {
 		}
 	}
 
-	public SparseArray<Object> readSparseArray(ClassLoader loader) throws ReflectiveOperationException {
+	public SparseArray<Object> readSparseArray(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
@@ -582,7 +582,7 @@ public class Parcel {
 			writeParcelable(array[i], flags);
 	}
 
-	public Parcelable[] readParcelableArray(ClassLoader loader) throws ReflectiveOperationException {
+	public Parcelable[] readParcelableArray(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
@@ -669,7 +669,7 @@ public class Parcel {
 		}
 	}
 
-	public Object[] readArray(ClassLoader loader) throws ReflectiveOperationException {
+	public Object[] readArray(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
@@ -679,7 +679,7 @@ public class Parcel {
 		return array;
 	}
 
-	public ArrayList<Object> readArrayList(ClassLoader loader) throws ReflectiveOperationException {
+	public ArrayList<Object> readArrayList(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
@@ -697,11 +697,11 @@ public class Parcel {
 		}
 	}
 
-	public Serializable readSerializable() throws ReflectiveOperationException {
+	public Serializable readSerializable() {
 		try {
 			return (Serializable) new ObjectInputStream(is).readObject();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
+		} catch (IOException | ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
 		}
 	}
 
@@ -715,10 +715,10 @@ public class Parcel {
 		writeSerializable(null);
 	}
 
-	public void readException() throws Exception {
+	public void readException() {
 		Exception e = (Exception)readSerializable();
 		if (e != null)
-			throw e;
+			throw new RuntimeException(e);
 	}
 
 	public void writeFileDescriptor(FileDescriptor fd) {
@@ -884,7 +884,7 @@ public class Parcel {
 		}
 	}
 
-	public Object readValue(ClassLoader loader) throws ReflectiveOperationException {
+	public Object readValue(ClassLoader loader) {
 		int type;
 		switch (type = readInt()) {
 			case 0:

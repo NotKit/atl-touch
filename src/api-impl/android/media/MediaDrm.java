@@ -34,6 +34,18 @@ public class MediaDrm {
 
 	public MediaDrm(java.util.UUID uuid) throws android.media.UnsupportedSchemeException { }
 
+	public static final class KeyStatus {
+		public static final int KEY_STATUS_EXPIRED = 1;
+		public static final int KEY_STATUS_INTERNAL_ERROR = 4;
+		public static final int KEY_STATUS_OUTPUT_NOT_ALLOWED = 2;
+		public static final int KEY_STATUS_PENDING = 3;
+		public static final int KEY_STATUS_USABLE = 0;
+
+		public byte[] getKeyId() { return null; }
+
+		public int getStatusCode() { return KEY_STATUS_INTERNAL_ERROR; }
+	}
+
 	public static final class KeyRequest {
 		public static final int REQUEST_TYPE_INITIAL = 0;
 		public static final int REQUEST_TYPE_NONE = 3;
@@ -55,7 +67,7 @@ public class MediaDrm {
 
 	public interface OnKeyStatusChangeListener {
 	
-	public default void onKeyStatusChange(android.media.MediaDrm a0, byte[] a1, java.util.List a2, boolean a3) { }
+	public default void onKeyStatusChange(android.media.MediaDrm a0, byte[] a1, java.util.List<android.media.MediaDrm.KeyStatus> a2, boolean a3) { }
 }
 
 	public android.media.MediaDrm.KeyRequest getKeyRequest(byte[] a0, byte[] a1, java.lang.String a2, int a3, java.util.HashMap a4) throws android.media.NotProvisionedException { return null; }
@@ -71,12 +83,6 @@ public class MediaDrm {
 	public static boolean isCryptoSchemeSupported(java.util.UUID a0) { return false; }
 
 	public static boolean isCryptoSchemeSupported(java.util.UUID a0, java.lang.String a1) { return false; }
-
-	public static class KeyStatus { 
-	public byte[] getKeyId() { return null; }
-
-	public int getStatusCode() { return 0; }
-}
 
 	public static class ProvisionRequest { 
 	public byte[] getData() { return null; }

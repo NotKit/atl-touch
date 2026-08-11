@@ -27,8 +27,6 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 
-class Editable {}
-
 class ComposingText {
 }
 
@@ -39,6 +37,8 @@ class ComposingText {
  * {@link #getEditable} to provide access to their own editable object.
  */
 public class BaseInputConnection implements InputConnection {
+
+	private android.text.Editable editable;
 
 	BaseInputConnection(InputMethodManager mgr, boolean fullEditor) {
 	}
@@ -71,8 +71,10 @@ public class BaseInputConnection implements InputConnection {
 	 * subclasses that are real text editors should override this and
 	 * supply their own.
 	 */
-	public Editable getEditable() {
-		return new Editable();
+	public android.text.Editable getEditable() {
+		if (editable == null)
+			editable = new android.text.SpannableStringBuilder();
+		return editable;
 	}
 
 	/**

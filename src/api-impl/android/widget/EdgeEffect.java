@@ -2,17 +2,12 @@ package android.widget;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.view.View;
 
-public class EdgeEffect extends View {
+public class EdgeEffect {
 
-	public EdgeEffect(Context context) {
-		super(context);
-	}
+	public EdgeEffect(Context context) {}
 
-	public EdgeEffect(Context context, AttributeSet attributeSet) {
-		super(context, attributeSet);
-	}
+	public EdgeEffect(Context context, AttributeSet attributeSet) {}
 
 	public void setSize(int width, int height) {}
 	public void onPull(float deltaDistance) {}
@@ -27,4 +22,6 @@ public class EdgeEffect extends View {
 	public void finish() {}
 
 	public void setBlendMode(android.graphics.BlendMode a0) { }
+
+	public boolean draw(android.graphics.Canvas a0) { return false; }
 }

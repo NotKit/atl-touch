@@ -4,7 +4,7 @@ import android.os.Handler;
 
 public class ConnectivityManager {
 
-	public class NetworkCallback {
+	public static class NetworkCallback {
 		public void onAvailable(Network network) {}
 		public void onLost(Network network) {}
 	

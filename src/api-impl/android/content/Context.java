@@ -211,7 +211,7 @@ public abstract class Context {
 
 	public abstract Object getSystemService(String name);
 
-	public abstract Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException;
+	public abstract <T> T getSystemService(Class<T> serviceClass);
 
 	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
 		if (receiver != null)

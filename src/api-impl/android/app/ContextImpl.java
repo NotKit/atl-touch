@@ -161,12 +161,17 @@ public final class ContextImpl extends Context {
 	}
 
 	@Override
-	public Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException {
+	@SuppressWarnings("unchecked")
+	public <T> T getSystemService(Class<T> serviceClass) {
 		if (serviceClass == LayoutInflater.class)
-			return layout_inflater;
+			return (T)layout_inflater;
 		if (serviceClass == JobScheduler.class)
-			return job_scheduler;
-		return serviceClass.getConstructors()[0].newInstance();
+			return (T)job_scheduler;
+		try {
+			return (T)serviceClass.getConstructors()[0].newInstance();
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
 	}
 
 	@Override

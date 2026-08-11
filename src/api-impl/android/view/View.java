@@ -4079,7 +4079,7 @@ public class View implements Drawable.Callback {
 
 	public boolean onDragEvent(android.view.DragEvent a0) { return false; }
 
-	public void autofill(android.util.SparseArray a0) { }
+	public void autofill(android.util.SparseArray<android.view.autofill.AutofillValue> a0) { }
 
 	public void onProvideAutofillVirtualStructure(android.view.ViewStructure a0, int a1) { }
 }

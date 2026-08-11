@@ -205,4 +205,6 @@ public class AccessibilityNodeInfo {
 	public void setCollectionItemInfo(android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo a0) { }
 
 	public void setMovementGranularities(int a0) { }
+
+	public void addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction a0) { }
 }

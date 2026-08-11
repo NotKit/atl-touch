@@ -2,9 +2,15 @@ package android.util;
 
 public class Range<T extends Comparable<? super T>> {
 
-	public java.lang.Comparable getLower() { return null; }
+	private final T lower;
+	private final T upper;
 
-	public java.lang.Comparable getUpper() { return null; }
+	public Range(T lower, T upper) {
+		this.lower = lower;
+		this.upper = upper;
+	}
 
-	public Range(java.lang.Comparable a0, java.lang.Comparable a1) { }
+	public T getLower() { return lower; }
+
+	public T getUpper() { return upper; }
 }
