@@ -251,6 +251,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_SurfaceView_native_1layersAvailable
 
 /*
  * Class:     android_view_SurfaceView
+ * Method:    native_chromeEnabled
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_view_SurfaceView_native_1chromeEnabled
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_view_SurfaceView
  * Method:    native_createLayer
  * Signature: (J)J
  */

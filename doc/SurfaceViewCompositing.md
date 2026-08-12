@@ -143,8 +143,8 @@ been measured on any compositor.
 | **a dialog beside the `SurfaceView`** | same path, no special case. |
 | **one of two `SurfaceView`s removed** | its layer is destroyed and the chrome is left alone: destroying a sub-surface cannot reorder the others. |
 | **the last `SurfaceView` removed** | the chrome is dropped on the next frame (its `EGLSurface` first, then the `wl_egl_window`) and the scene goes back into the toplevel, i.e. back to the ordinary-app path. |
-| **`setZOrderOnTop(true)`** | **not honoured** in chrome mode: the layer stays below the chrome. Doing it properly means recreating that layer's `wl_surface` after the chrome, which would destroy the app's `EGLSurface` under it. It is logged once. On Mir it was never honoured anyway (`place_above` is the other unimplemented call). |
-| **teardown** | the chrome is destroyed with the window; the content layers keep the lifetime they already had (`Activity.detachWindowViews` → `surfaceDestroyed` → `native_destroyLayer`, atlas `062965c6`). |
+| **`setZOrderOnTop(true)`** | **not honoured** in chrome mode: the layer stays below the chrome. Doing it properly means recreating that layer's `wl_surface` after the chrome, which would destroy the app's `EGLSurface` under it. It is logged once. The hole is still punched, though — `SurfaceView.draw` skips it only when the chrome is off — because without it the opaque chrome hides the app's content entirely rather than merely losing the ordering. On Mir the call was never honoured either, but there `place_above` being unimplemented left the layer above the toplevel, so the app got the visible result by accident. |
+| **teardown** | the chrome is freed when a window's last content layer goes away (the row above). There is no window-teardown path to hang it on otherwise: nothing in `src/` destroys an `ATLWindow`. |
 | **X11 / no `wl_subcompositor`** | `atl_surface_layers_available()` is false, no layer, no chrome, unchanged behaviour. |
 
 ## The knob and the fallback

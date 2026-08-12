@@ -117,9 +117,14 @@ public class SurfaceView extends View {
 			frameSrc.set(0, 0, frame.getWidth(), frame.getHeight());
 			frameDst.set(0, 0, getWidth(), getHeight());
 			canvas.drawBitmap(frame, frameSrc, frameDst, null);
-		} else if (mLayer != 0 && !mZOrderOnTop) {
+		} else if (mLayer != 0 && (!mZOrderOnTop || native_chromeEnabled())) {
 			/* the punch-hole: the scene reaches the toplevel's buffer unblended,
-			 * so this really does write alpha 0 and let the layer through */
+			 * so this really does write alpha 0 and let the layer through.
+			 *
+			 * With the chrome sub-surface the layer is always below the scene, so
+			 * setZOrderOnTop cannot be honoured - but skipping the hole then hides
+			 * the app's content behind an opaque chrome instead of merely losing
+			 * the ordering. Punch it anyway; the app sees its own frames. */
 			int save = canvas.save();
 			canvas.clipRect(0, 0, getWidth(), getHeight());
 			canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
@@ -228,6 +233,9 @@ public class SurfaceView extends View {
 
 	protected native long native_createSnapshot(int width, int height);
 	private static native boolean native_layersAvailable();
+	/* is ATL's scene going into the chrome sub-surface above every content layer?
+	 * Not cached: the chrome falls back to the toplevel if its EGLSurface fails. */
+	private static native boolean native_chromeEnabled();
 	private native long native_createLayer(long windowPtr);
 	private native void native_destroyLayer(long layer, Surface surface);
 	private native void native_bindSurface(Surface surface, long layer, int width, int height);

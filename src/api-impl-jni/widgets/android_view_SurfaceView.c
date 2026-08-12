@@ -37,6 +37,11 @@ JNIEXPORT jboolean JNICALL Java_android_view_SurfaceView_native_1layersAvailable
 	return atl_surface_layers_available() ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jboolean JNICALL Java_android_view_SurfaceView_native_1chromeEnabled(JNIEnv *env, jclass class)
+{
+	return atl_surface_chrome_enabled() ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createLayer(JNIEnv *env, jobject this, jlong window_ptr)
 {
 	if (!window_ptr)
