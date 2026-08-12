@@ -3,6 +3,7 @@ package android.app;
 import android.app.ActionBar;
 import android.atl.ATLFilePicker;
 import android.content.BroadcastReceiver;
+import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -17,6 +18,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Slog;
+import android.view.ContextMenu;
 import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.KeyEvent;
@@ -38,7 +40,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class Activity extends ContextThemeWrapper implements Window.Callback, LayoutInflater.Factory2 {
+public class Activity extends ContextThemeWrapper implements Window.Callback, LayoutInflater.Factory2,
+		ComponentCallbacks2, KeyEvent.Callback, View.OnCreateContextMenuListener {
 	private final static String TAG = "Activity";
 
 	public static final int RESULT_CANCELED = 0;
@@ -273,6 +276,30 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	public void onLowMemory() {
+	}
+
+	public void onTrimMemory(int level) {
+	}
+
+	/* KeyEvent.Callback: nothing in ATL dispatches key events here yet, but an
+	   app subclass that calls super.onKeyDown() must find one. */
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
+		return false;
+	}
+
+	public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
 	}
 
 	/* --- */

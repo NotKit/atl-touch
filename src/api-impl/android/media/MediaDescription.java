@@ -3,8 +3,9 @@ package android.media;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcelable;
 
-public class MediaDescription {
+public class MediaDescription implements Parcelable {
 
 	public Uri iconUri;
 	public CharSequence title;

@@ -1,6 +1,6 @@
 package android.os;
 
-public class ResultReceiver {
+public class ResultReceiver implements Parcelable {
 	public ResultReceiver(Handler handler) {
 	}
 }

@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.Slog;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -26,7 +27,7 @@ import android.view.WindowManagerGlobal;
  * the activity content with a dimmed scrim — like Android composites dialog
  * windows over the activity on one surface, and unlike a separate OS window.
  */
-public class Dialog implements Window.Callback, DialogInterface {
+public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callback {
 	private static final String TAG = "Dialog";
 
 	private Context context;
@@ -272,6 +273,24 @@ public class Dialog implements Window.Callback, DialogInterface {
 	public void onBackPressed() {
 		if (cancelable)
 			cancel();
+	}
+
+	/* KeyEvent.Callback: back is routed through panelCallbacks, so these are
+	   inert -- they exist because an app subclass calls super.onKeyDown(). */
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
+		return false;
 	}
 
 	public void hide() {

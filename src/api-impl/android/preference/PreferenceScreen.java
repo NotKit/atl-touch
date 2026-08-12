@@ -1,6 +1,12 @@
 package android.preference;
 
-public class PreferenceScreen extends Preference {
+import android.view.View;
+import android.widget.AdapterView;
+
+public class PreferenceScreen extends Preference implements AdapterView.OnItemClickListener {
+	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+	}
+
 	public int getPreferenceCount() {
 		return 0;
 	}

@@ -1,8 +1,9 @@
 package android.content;
 
 import android.net.Uri;
+import android.os.Handler;
 
-public class AsyncQueryHandler {
+public class AsyncQueryHandler extends Handler {
 
 	public AsyncQueryHandler(ContentResolver cr) {}
 

@@ -21,7 +21,7 @@ import java.io.PrintWriter;
 /**
  * Representation of a user on the device.
  */
-public final class UserHandle {
+public final class UserHandle implements Parcelable {
 	/**
 	 * @hide Range of uids allocated for a user.
 	 */

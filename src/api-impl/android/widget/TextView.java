@@ -32,7 +32,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 
-public class TextView extends View {
+public class TextView extends View implements android.view.ViewTreeObserver.OnPreDrawListener {
 	private ColorStateList colors = new ColorStateList(new int[][] {new int[0]}, new int[1]);
 	private CharSequence text = "";
 	private TextPaint paint = new TextPaint();
@@ -230,6 +230,12 @@ public class TextView extends View {
 	}
 
 	@Override
+	/* ViewTreeObserver.OnPreDrawListener: AOSP's TextView uses it to restart the
+	   marquee; ATL has no marquee, so it only ever returns "carry on drawing". */
+	public boolean onPreDraw() {
+		return true;
+	}
+
 	public void onDraw(Canvas canvas) {
 		drawCompoundDrawables(canvas);
 		if (text_layout == null)

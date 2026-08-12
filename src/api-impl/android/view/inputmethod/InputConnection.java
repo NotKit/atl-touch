@@ -372,4 +372,6 @@ public interface InputConnection {
 	public default boolean commitContent(android.view.inputmethod.InputContentInfo a0, int a1, android.os.Bundle a2) { return false; }
 
 	public default boolean requestCursorUpdates(int a0) { return false; }
+
+	public default boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) { return false; }
 }

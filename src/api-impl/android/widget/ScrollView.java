@@ -5,7 +5,7 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
 
-public class ScrollView extends ViewGroup {
+public class ScrollView extends FrameLayout {
 	private boolean fillViewport;
 
 	public ScrollView(Context context, AttributeSet attrs) {
@@ -22,7 +22,7 @@ public class ScrollView extends ViewGroup {
 		int height = 0;
 		if (getChildCount() > 0) {
 			View child = getChildAt(0);
-			LayoutParams lp = child.getLayoutParams();
+			ViewGroup.LayoutParams lp = child.getLayoutParams();
 			int childWidthMeasureSpec = getChildMeasureSpec(widthMeasureSpec, 0, lp.width);
 			int childHeightMeasureSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
 			child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
@@ -39,7 +39,7 @@ public class ScrollView extends ViewGroup {
 			View child = getChildAt(0);
 			int desiredHeight = getMeasuredHeight() - getPaddingTop() - getPaddingBottom();
 			if (child.getMeasuredHeight() < desiredHeight) {
-				LayoutParams lp = child.getLayoutParams();
+				ViewGroup.LayoutParams lp = child.getLayoutParams();
 				int childWidthMeasureSpec = getChildMeasureSpec(widthMeasureSpec, 0, lp.width);
 				int childHeightMeasureSpec = MeasureSpec.makeMeasureSpec(desiredHeight, MeasureSpec.EXACTLY);
 				child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
@@ -53,17 +53,6 @@ public class ScrollView extends ViewGroup {
 			View child = getChildAt(0);
 			child.layout(0, 0, child.getMeasuredWidth(), child.getMeasuredHeight());
 		}
-	}
-
-	/* AOSP ScrollView extends FrameLayout, so children get MarginLayoutParams */
-	@Override
-	public ViewGroup.LayoutParams generateLayoutParams(AttributeSet attrs) {
-		return new FrameLayout.LayoutParams(getContext(), attrs);
-	}
-
-	@Override
-	protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
-		return new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
 	}
 
 	public void setFillViewport(boolean fillViewport) {

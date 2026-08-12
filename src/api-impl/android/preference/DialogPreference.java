@@ -7,6 +7,8 @@ import android.view.View;
 
 /** Stub, see {@link PreferenceFragment}: apps only need it to link. */
 public class DialogPreference extends Preference implements DialogInterface.OnClickListener {
+	public DialogPreference(Context context) {}
+
 	public DialogPreference(Context context, AttributeSet attrs) {}
 
 	public DialogPreference(Context context, AttributeSet attrs, int defStyleAttr) {}
@@ -22,5 +24,17 @@ public class DialogPreference extends Preference implements DialogInterface.OnCl
 
 	protected void onDialogClosed(boolean positiveResult) {}
 
-	public void setDialogTitle(CharSequence dialogTitle) {}
+	private CharSequence dialogTitle;
+
+	public void setDialogTitle(CharSequence dialogTitle) {
+		this.dialogTitle = dialogTitle;
+	}
+
+	public CharSequence getDialogTitle() {
+		return dialogTitle;
+	}
+
+	public android.graphics.drawable.Drawable getDialogIcon() {
+		return null;
+	}
 }

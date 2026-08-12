@@ -876,6 +876,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	public void requestChildFocus(View child, View focused) {}
 
+	/* AOSP's ViewGroup does not scroll for the child either; ListView overrides it. */
+	public boolean requestChildRectangleOnScreen(View child, Rect rect, boolean immediate) {
+		return false;
+	}
+
 	public boolean getClipChildren() {
 		return false;
 	}
