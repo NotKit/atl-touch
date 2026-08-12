@@ -401,6 +401,12 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 		return NULL;
 	window = (struct ANativeWindow *)(intptr_t)(*env)->GetLongField(env, surface, field);
 	ANativeWindow_acquire(window);
+	/* the Surface a window was reached through is the Surface its frames belong
+	 * in, so complete the binding here rather than trusting whoever built the
+	 * window to have done it: unbound, unlockAndPost() can only fail (-ENODEV,
+	 * atl_native_window_present). A no-op for the SurfaceView path, which binds
+	 * at creation. */
+	atl_native_window_bind_surface(window, env, surface);
 	(*env)->MonitorExit(env, surface);
 
 	if (!window)
