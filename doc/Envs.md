@@ -115,3 +115,13 @@ The following environment variables are recognized by the main executable:
                                                   `wl_subsurface.place_below`, i.e. wlroots).
                                                   `none` is neither, and only exists to reproduce Mir's
                                                   stacking on a desktop compositor.
+
+---
+
+`ATL_SURFACE_CHROME_ALPHA=1` - ask GLFW for a framebuffer with an alpha channel. Needed wherever the EGL
+                               driver has no `EGL_EXT_present_opaque`: GLFW then skips every config that has
+                               one, so the chrome sub-surface cannot carry a `SurfaceView`'s hole - the hole
+                               comes out opaque black and the app's own frames are never seen. That is the
+                               case on Ubuntu Touch (hybris EGL), where it is what makes a dialog over a
+                               `SurfaceView` work. The cost is that GLFW then declares no opaque region for
+                               the toplevel, so it is off by default.

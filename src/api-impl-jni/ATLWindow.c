@@ -633,6 +633,58 @@ static bool atl_window_egl_config(EGLDisplay display, EGLContext context, EGLCon
 	return eglChooseConfig(display, attrs, out, 1, &count) && count == 1;
 }
 
+static EGLint atl_egl_attr(EGLDisplay display, EGLConfig config, EGLint attr)
+{
+	EGLint value = 0;
+
+	eglGetConfigAttrib(display, config, attr, &value);
+	return value;
+}
+
+/*
+ * The chrome's buffer carries the SurfaceView's hole, so it needs an alpha
+ * channel - and GLFW's own config has none on the phone: on hybris/Adreno the
+ * config GLFW settles on is 8/8/8/0, the hole lands as opaque black and the
+ * app's own frames underneath are never seen. Find the same config with 8 alpha
+ * bits instead of guessing at attributes, so everything else the context cares
+ * about (colour depth, depth/stencil, samples, renderable type) still matches.
+ */
+static bool atl_window_egl_config_alpha(EGLDisplay display, EGLConfig base, EGLConfig *out)
+{
+	static const EGLint match[] = {
+		EGL_RED_SIZE, EGL_GREEN_SIZE, EGL_BLUE_SIZE, EGL_DEPTH_SIZE,
+		EGL_STENCIL_SIZE, EGL_SAMPLES, EGL_RENDERABLE_TYPE, EGL_COLOR_BUFFER_TYPE,
+	};
+	EGLConfig *configs;
+	EGLint count = 0;
+	bool found = false;
+
+	if (atl_egl_attr(display, base, EGL_ALPHA_SIZE) >= 8)
+		return false;                                /* nothing to fix */
+	if (!eglGetConfigs(display, NULL, 0, &count) || count <= 0)
+		return false;
+	configs = calloc(count, sizeof(*configs));
+	if (!configs)
+		return false;
+	if (eglGetConfigs(display, configs, count, &count)) {
+		for (EGLint i = 0; i < count && !found; i++) {
+			if (atl_egl_attr(display, configs[i], EGL_ALPHA_SIZE) < 8)
+				continue;
+			if (!(atl_egl_attr(display, configs[i], EGL_SURFACE_TYPE) & EGL_WINDOW_BIT))
+				continue;
+			found = true;
+			for (size_t a = 0; a < sizeof(match) / sizeof(match[0]); a++)
+				if (atl_egl_attr(display, configs[i], match[a]) !=
+				    atl_egl_attr(display, base, match[a]))
+					found = false;
+			if (found)
+				*out = configs[i];
+		}
+	}
+	free(configs);
+	return found;
+}
+
 /* the EGLSurface must go before the wl_egl_window under it does */
 static void atl_window_drop_chrome_surface(ATLWindow *window, EGLDisplay display)
 {
@@ -672,7 +724,7 @@ static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
 	}
 
 	if (window->chrome_egl_window != (void *)egl_window) {
-		EGLConfig config;
+		EGLConfig config, with_alpha;
 		EGLSurface surface;
 		EGLint alpha = 0;
 
@@ -682,7 +734,26 @@ static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
 			atl_surface_chrome_fallback(window);
 			return false;
 		}
-		surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType)egl_window, NULL);
+		if (atl_window_egl_config_alpha(display, config, &with_alpha)) {
+			/* the driver may refuse a surface whose config is not the context's;
+			 * eglMakeCurrent is where it says so, so ask here and keep the
+			 * context's own config when it does */
+			surface = eglCreateWindowSurface(display, with_alpha, (EGLNativeWindowType)egl_window, NULL);
+			if (surface != EGL_NO_SURFACE &&
+			    eglMakeCurrent(display, surface, surface, context)) {
+				config = with_alpha;
+			} else {
+				fprintf(stderr, "ATLWindow: the chrome's 8-bit-alpha EGLConfig is not usable "
+				                "with this context (0x%x); the hole stays opaque\n", eglGetError());
+				if (surface != EGL_NO_SURFACE)
+					eglDestroySurface(display, surface);
+				surface = EGL_NO_SURFACE;
+			}
+		} else {
+			surface = EGL_NO_SURFACE;
+		}
+		if (surface == EGL_NO_SURFACE)
+			surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType)egl_window, NULL);
 		if (surface == EGL_NO_SURFACE) {
 			fprintf(stderr, "ATLWindow: eglCreateWindowSurface for the chrome failed (0x%x)\n", eglGetError());
 			atl_surface_chrome_fallback(window);
@@ -1029,6 +1100,18 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	 * users who want WebView on X11, at the cost of switching the GL backend. */
 	if (getenv("ATL_WEBVIEW_EGL"))
 		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+	/*
+	 * ATL_SURFACE_CHROME_ALPHA=1 asks GLFW for a framebuffer with an alpha
+	 * channel, which is the only way to get one where EGL_EXT_present_opaque is
+	 * missing: GLFW then "ignore[s] any config with an alpha channel to ensure
+	 * the buffer is opaque" (glfw src/egl_context.c). That is the phone -
+	 * hybris EGL has no such extension - so ATL's context comes up 8/8/8/0 and
+	 * the chrome sub-surface a SurfaceView's hole is punched into cannot be
+	 * transparent. The cost is that GLFW then declares no opaque region for the
+	 * toplevel, so it is a knob and not the default until that is measured.
+	 */
+	if (getenv("ATL_SURFACE_CHROME_ALPHA"))
+		glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
 #ifdef GLFW_WAYLAND_APP_ID
 	/* Lomiri/Mir associates windows with their launcher entry through the
 	 * wayland app_id */

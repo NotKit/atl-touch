@@ -91,6 +91,17 @@ main argument for moving the whole scene rather than splitting it:
   the scene's alpha reaches the chrome's buffer unmodified. That is what makes
   the hole a hole. **This is the same mechanism the punch-hole already relied
   on; the only thing that changes is which buffer it lands in.**
+* **The chrome's buffer must have an alpha channel, and on Ubuntu Touch it does
+  not unless it is asked for.** GLFW ignores every `EGLConfig` with alpha unless
+  the window asked to be transparent and the driver lacks `EGL_EXT_present_opaque`
+  (`glfw/src/egl_context.c`, "HACK: ... ignore any config with an alpha channel to
+  ensure the buffer is opaque"). hybris EGL has no such extension, so on the
+  phone ATL's context comes up 8/8/8/0, alpha 0 lands as opaque black, and the
+  content sub-surface underneath is hidden completely. `ATL_SURFACE_CHROME_ALPHA=1`
+  asks for the transparent framebuffer that makes the hole a hole there. Giving
+  the chrome surface its own alpha-bearing config instead does not work: the
+  driver answers `EGL_BAD_MATCH` (0x3009) when that surface is made current with
+  the context, which ATL detects and falls back from.
 * `SurfaceView.draw()` still issues `drawColor(0, PorterDuff.Mode.CLEAR)` over
   its own bounds. It is not removed and does not need to be: it now writes alpha
   0 into the chrome sub-surface instead of into the toplevel, which is exactly
