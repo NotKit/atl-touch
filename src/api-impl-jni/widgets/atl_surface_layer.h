@@ -60,6 +60,8 @@ void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent
  * without one wherever the EGL driver has no EGL_EXT_present_opaque.
  */
 bool atl_surface_chrome_alpha_enabled(void);
+/* is ATL declaring the toplevel's opaque region? No if ATL_SURFACE_OPAQUE_REGION=0 */
+bool atl_surface_opaque_region_enabled(void);
 /* does this window have any layer below it (i.e. is a hole expected)? */
 bool atl_surface_layers_window_has_holes(ATLWindow *window);
 

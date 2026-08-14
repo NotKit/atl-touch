@@ -88,7 +88,7 @@ bool atl_surface_chrome_alpha_enabled(void)
  * is the only one there is. The knob exists to measure what it is worth and to
  * escape a compositor that gets it wrong.
  */
-static bool declare_opaque_region(void)
+bool atl_surface_opaque_region_enabled(void)
 {
 	static int cached = -1;
 
@@ -458,7 +458,7 @@ void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent
 	/* in chrome mode no part of the toplevel is transparent, so it must not
 	 * declare a punched region it does not fill - it declares all of itself */
 	if (atl_surface_chrome_enabled() || !atl_surface_layers_window_has_holes(window)) {
-		if (atl_surface_chrome_alpha_enabled() && declare_opaque_region())
+		if (atl_surface_chrome_alpha_enabled() && atl_surface_opaque_region_enabled())
 			declare_whole_toplevel_opaque(window, compositor, parent, w, h);
 		return;
 	}

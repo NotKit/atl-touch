@@ -760,9 +760,14 @@ static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
 			return false;
 		}
 		eglGetConfigAttrib(display, config, EGL_ALPHA_SIZE, &alpha);
-		if (alpha < 8)
-			fprintf(stderr, "ATLWindow: the chrome EGLConfig has %d alpha bits; "
-			                "a SurfaceView's hole will not be transparent\n", alpha);
+		/* unconditional: this one line is what lets a log say for itself which
+		 * of the two states produced it, which no run before 2026-08-14 could */
+		fprintf(stderr, "ATLWindow: chrome EGLConfig has %d alpha bits "
+		                "(transparent-framebuffer hint %s, opaque region %s)%s\n",
+		        alpha, atl_surface_chrome_alpha_enabled() ? "on" : "off",
+		        atl_surface_chrome_alpha_enabled() && atl_surface_opaque_region_enabled()
+		                ? "declared by ATL" : "left to GLFW",
+		        alpha < 8 ? "; a SurfaceView's hole will not be transparent" : "");
 		window->chrome_surface = surface;
 		window->chrome_egl_window = egl_window;
 		/* a fresh buffer has no history, and the toplevel underneath keeps the
@@ -1120,6 +1125,18 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	 */
 	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND && atl_surface_chrome_alpha_enabled())
 		glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
+	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+		/* once per process: a log that does not say which of the two states it
+		 * was taken in cannot be used to attribute anything to either */
+		static bool said;
+		if (!said) {
+			said = true;
+			fprintf(stderr, "ATLWindow: transparent-framebuffer hint %s, opaque region %s\n",
+			        atl_surface_chrome_alpha_enabled() ? "on" : "off",
+			        atl_surface_chrome_alpha_enabled() && atl_surface_opaque_region_enabled()
+			                ? "declared by ATL" : "left to GLFW");
+		}
+	}
 #ifdef GLFW_WAYLAND_APP_ID
 	/* Lomiri/Mir associates windows with their launcher entry through the
 	 * wayland app_id */
