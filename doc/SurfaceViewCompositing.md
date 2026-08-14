@@ -33,11 +33,13 @@ needs no capability detection:
   Wayland's own rules, and Mir honours that (`firefox-atl/testapps/wlsubz`, §16.1).
 * **Mir honours a sub-surface's alpha per pixel**, so a sub-surface with holes in
   it over another sub-surface is a real compositing primitive there, not a hint.
-  What is measured is *binary* alpha — 0 lets the layer below through, 255 covers
-  it, inside one frame of one EGL-backed chrome buffer on an Adreno 740
-  (`firefox-atl` §18.3, and `testapps/evidence/device-7f6af1cc-mir-default.png`).
-  **Partial alpha on an EGL sub-surface has never been exercised on Mir**; this
-  design does not use any.
+  Measured twice on an Adreno 740: with *binary* alpha, where 0 lets the layer
+  below through and 255 covers it (`firefox-atl` §18.3 and
+  `testapps/evidence/device-7f6af1cc-mir-default.png`), and with *partial* alpha,
+  where a 50%-transparent bar drawn into the chrome over the hole comes out as
+  the premultiplied source-over blend of the bar and the app's own frames, to the
+  byte (`testapps/evidence/device-7f6af1cc-mir-baralpha128.png`). This design
+  uses only the binary case.
 
 ## The stack
 
