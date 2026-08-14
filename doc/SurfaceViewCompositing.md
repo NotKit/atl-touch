@@ -31,8 +31,13 @@ needs no capability detection:
 * **Creation order is the one ordering primitive that works everywhere.** A
   newly created sub-surface is placed at the top of its parent's child stack by
   Wayland's own rules, and Mir honours that (`firefox-atl/testapps/wlsubz`, §16.1).
-* **Mir blends a sub-surface per pixel**, so a mostly transparent sub-surface
-  over another sub-surface is a real compositing primitive there, not a hint.
+* **Mir honours a sub-surface's alpha per pixel**, so a sub-surface with holes in
+  it over another sub-surface is a real compositing primitive there, not a hint.
+  What is measured is *binary* alpha — 0 lets the layer below through, 255 covers
+  it, inside one frame of one EGL-backed chrome buffer on an Adreno 740
+  (`firefox-atl` §18.3, and `testapps/evidence/device-7f6af1cc-mir-default.png`).
+  **Partial alpha on an EGL sub-surface has never been exercised on Mir**; this
+  design does not use any.
 
 ## The stack
 
@@ -100,10 +105,13 @@ main argument for moving the whole scene rather than splitting it:
   content sub-surface underneath is hidden completely. **ATL therefore asks for
   the transparent framebuffer by default** (`ATLWindow.c`, `atl_window_new`);
   `ATL_SURFACE_CHROME_ALPHA=0` is the way back. Giving the chrome surface its own
-  alpha-bearing config instead is tried first and is expected to fail
-  `eglMakeCurrent` on a driver that will not mix configs; ATL detects that and
-  falls back to the context's own config, and the fallback message names the
-  error the driver gave.
+  alpha-bearing config instead is tried first, and on hybris/Adreno the driver
+  refuses it: `eglMakeCurrent` answers `EGL_BAD_MATCH` (`0x3009`) and ATL falls
+  back to the context's own config. That is measured, on an Adreno 740 through
+  hybris EGL, in `firefox-atl`'s
+  `testapps/evidence/device-7f6af1cc-mir-alpha0.log`; between `eb906148` and
+  2026-08-14 the same claim was in this file and in `eb906148`'s commit message
+  with no run behind it.
 * `SurfaceView.draw()` still issues `drawColor(0, PorterDuff.Mode.CLEAR)` over
   its own bounds. It is not removed and does not need to be: it now writes alpha
   0 into the chrome sub-surface instead of into the toplevel, which is exactly
@@ -218,7 +226,17 @@ the cost of the change, never the failure it fixes.** That one is the phone's.
 Mir ignores `set_opaque_region` altogether (`firefox-atl` §17.4), so on the
 target device the declaration is expected to be worth nothing either way; what
 it buys is that no wlroots/Mesa desktop is asked to blend a window ATL knows to
-be opaque.
+be opaque. A `WAYLAND_DEBUG` trace from the phone shows ATL sending exactly one
+`set_opaque_region(0,0,1080,2349)` on the toplevel, immediately before its one
+and only `attach`, and Mir raising no complaint; what Mir then does with it is
+not visible from the client side.
+
+And on the phone the default is the difference between an app being visible and
+not. One build of `7f6af1cc`, one `ATL_TEST_DIALOG` run each, 600x500
+`SurfaceView` rect (300,000 px): the default gives 196,762 px of the app's own GL
+frames, a 23,904 px overlay bar and a 75,200 px dialog over them;
+`ATL_SURFACE_CHROME_ALPHA=0` on the same build gives **0** app pixels and 272,191
+px of black. `firefox-atl` `testapps/evidence/device-7f6af1cc-mir-{default,alpha0}.*`.
 
 ## What this design does not do
 
