@@ -190,23 +190,30 @@ every pixel a `SurfaceView` app draws is lost on Ubuntu Touch (0 GL px and
 turning it on is that GLFW stops declaring the toplevel's opaque region, and
 that is now ATL's own call, so there is nothing left to trade.
 
-Measured on a headless sway (Mesa/llvmpipe, 720x1440), three states of the same
-build — the new default, `ATL_SURFACE_CHROME_ALPHA=0` (the old default) and
-`ATL_SURFACE_OPAQUE_REGION=0` (alpha on, nobody declaring):
+Measured on a headless sway (Mesa 26.1.4 on llvmpipe, 720x1440), three states of
+the same build — the new default, `ATL_SURFACE_CHROME_ALPHA=0` (the old default)
+and `ATL_SURFACE_OPAQUE_REGION=0` (alpha on, nobody declaring). The frames, the
+logs and the wire traces are `firefox-atl`'s
+`testapps/evidence/desktop-7f6af1cc-sway-*`:
 
 * `surfacetest` with a dialog over the `SurfaceView`: **one frame, byte-identical
   in all three** (sha256 `dc3dd205…`, which is also the frame §17.6 and §18.3
   recorded), 72,023 dialog px and 24,000 yellow-bar px inside the layer rect.
-* A static ordinary app (no `SurfaceView`): **byte-identical in all three**.
-* An animating ordinary app: the three states differ by 4.1k-4.3k px of 1,036,800
-  — but two runs of the *same* state differ by 4.1k-4.2k in the same bounding
-  box, so the difference is the app's own animation and nothing here resolves
-  above it.
+* An animating ordinary app (`LibreSudoku`), two runs of each state: two runs of
+  the *same* state differ by 3,901–4,292 px of 1,036,800 and two runs of
+  *different* states by 0–4,292, so the cross-state range lies inside the
+  same-state one and two cross-state pairs are byte-identical. The invariant, not
+  a difference, is the result: **no pair of states differs by more than two runs
+  of one state do**, and every difference is inside that app's animated centre.
 * On the wire (`WAYLAND_DEBUG=1`): the old default sends
   `wl_surface.set_opaque_region` twice, both from GLFW's own `wl_compositor`;
   the new default sends it once, `wl_region.add(0,0,720,1440)` from ATL's
   `wl_compositor` immediately before the toplevel's `attach`/`commit`;
   `ATL_SURFACE_OPAQUE_REGION=0` sends it zero times.
+
+Mesa has `EGL_EXT_present_opaque` and its config carries alpha anyway, so all
+three states get a chrome config with 8 alpha bits there: **the desktop measures
+the cost of the change, never the failure it fixes.** That one is the phone's.
 
 Mir ignores `set_opaque_region` altogether (`firefox-atl` §17.4), so on the
 target device the declaration is expected to be worth nothing either way; what
