@@ -97,11 +97,13 @@ main argument for moving the whole scene rather than splitting it:
   (`glfw/src/egl_context.c`, "HACK: ... ignore any config with an alpha channel to
   ensure the buffer is opaque"). hybris EGL has no such extension, so on the
   phone ATL's context comes up 8/8/8/0, alpha 0 lands as opaque black, and the
-  content sub-surface underneath is hidden completely. `ATL_SURFACE_CHROME_ALPHA=1`
-  asks for the transparent framebuffer that makes the hole a hole there. Giving
-  the chrome surface its own alpha-bearing config instead does not work: the
-  driver answers `EGL_BAD_MATCH` (0x3009) when that surface is made current with
-  the context, which ATL detects and falls back from.
+  content sub-surface underneath is hidden completely. **ATL therefore asks for
+  the transparent framebuffer by default** (`ATLWindow.c`, `atl_window_new`);
+  `ATL_SURFACE_CHROME_ALPHA=0` is the way back. Giving the chrome surface its own
+  alpha-bearing config instead is tried first and is expected to fail
+  `eglMakeCurrent` on a driver that will not mix configs; ATL detects that and
+  falls back to the context's own config, and the fallback message names the
+  error the driver gave.
 * `SurfaceView.draw()` still issues `drawColor(0, PorterDuff.Mode.CLEAR)` over
   its own bounds. It is not removed and does not need to be: it now writes alpha
   0 into the chrome sub-surface instead of into the toplevel, which is exactly
@@ -109,15 +111,19 @@ main argument for moving the whole scene rather than splitting it:
   `SurfaceView.java` is unchanged by the split.
 * The **toplevel** is cleared to opaque black once, on the frame the chrome
   becomes active and on every framebuffer resize, and is not drawn into again.
-  Opaque black is deliberate: GLFW declares a full-window opaque region for a
-  window that did not ask for `GLFW_TRANSPARENT_FRAMEBUFFER`, and a surface must
-  not declare an opaque region it does not fill (§16.1 lane 4, design
-  constraint 2). Black is also what shows for the one frame between the toplevel
-  resize and the chrome resize.
-* ATL's punched opaque region (`atl_surface_layers_before_swap`) is **not
-  issued** in chrome mode. It exists to tell the compositor which part of the
-  toplevel is transparent; in chrome mode no part of the toplevel is
-  transparent. It stays for the legacy mode.
+  Opaque black is deliberate: the whole toplevel is declared opaque, and a
+  surface must not declare an opaque region it does not fill (§16.1 lane 4,
+  design constraint 2). Black is also what shows for the one frame between the
+  toplevel resize and the chrome resize.
+* **ATL declares the toplevel's opaque region itself**, because GLFW only does
+  it for a window that did not ask for `GLFW_TRANSPARENT_FRAMEBUFFER` and ATL now
+  always asks. `atl_surface_layers_before_swap()` sends the whole window in
+  chrome mode and in the ordinary no-`SurfaceView` case, and the window minus
+  every hole in the legacy `toplevel` mode; it is re-sent only when the size
+  changes, which is when GLFW re-sent its own. In chrome mode the toplevel
+  commits rarely, so the call is made from `atl_window_present_chrome()` on the
+  commit that does happen. `ATL_SURFACE_OPAQUE_REGION=0` turns the declaration
+  off, which is the state atlas shipped between `eb906148` and this change.
 
 ## What the toplevel is still for
 
@@ -175,6 +181,37 @@ If the chrome's `EGLSurface` cannot be created, ATL logs it, drops back to
 `toplevel` mode for the rest of the process and issues `place_below` on the
 layers that already exist. On Mir that fallback is the inverted behaviour, which
 is what it was before this change.
+
+## Why the alpha framebuffer is the default (2026-08-14)
+
+It was a knob for two days, and a knob is the wrong shape for it: without it
+every pixel a `SurfaceView` app draws is lost on Ubuntu Touch (0 GL px and
+272,191 px of black in a 300,000-px rect, `firefox-atl` §18.3). The one cost of
+turning it on is that GLFW stops declaring the toplevel's opaque region, and
+that is now ATL's own call, so there is nothing left to trade.
+
+Measured on a headless sway (Mesa/llvmpipe, 720x1440), three states of the same
+build — the new default, `ATL_SURFACE_CHROME_ALPHA=0` (the old default) and
+`ATL_SURFACE_OPAQUE_REGION=0` (alpha on, nobody declaring):
+
+* `surfacetest` with a dialog over the `SurfaceView`: **one frame, byte-identical
+  in all three** (sha256 `dc3dd205…`, which is also the frame §17.6 and §18.3
+  recorded), 72,023 dialog px and 24,000 yellow-bar px inside the layer rect.
+* A static ordinary app (no `SurfaceView`): **byte-identical in all three**.
+* An animating ordinary app: the three states differ by 4.1k-4.3k px of 1,036,800
+  — but two runs of the *same* state differ by 4.1k-4.2k in the same bounding
+  box, so the difference is the app's own animation and nothing here resolves
+  above it.
+* On the wire (`WAYLAND_DEBUG=1`): the old default sends
+  `wl_surface.set_opaque_region` twice, both from GLFW's own `wl_compositor`;
+  the new default sends it once, `wl_region.add(0,0,720,1440)` from ATL's
+  `wl_compositor` immediately before the toplevel's `attach`/`commit`;
+  `ATL_SURFACE_OPAQUE_REGION=0` sends it zero times.
+
+Mir ignores `set_opaque_region` altogether (`firefox-atl` §17.4), so on the
+target device the declaration is expected to be worth nothing either way; what
+it buys is that no wlroots/Mesa desktop is asked to blend a window ATL knows to
+be opaque.
 
 ## What this design does not do
 

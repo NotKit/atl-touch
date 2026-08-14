@@ -118,10 +118,21 @@ The following environment variables are recognized by the main executable:
 
 ---
 
-`ATL_SURFACE_CHROME_ALPHA=1` - ask GLFW for a framebuffer with an alpha channel. Needed wherever the EGL
-                               driver has no `EGL_EXT_present_opaque`: GLFW then skips every config that has
-                               one, so the chrome sub-surface cannot carry a `SurfaceView`'s hole - the hole
-                               comes out opaque black and the app's own frames are never seen. That is the
-                               case on Ubuntu Touch (hybris EGL), where it is what makes a dialog over a
-                               `SurfaceView` work. The cost is that GLFW then declares no opaque region for
-                               the toplevel, so it is off by default.
+`ATL_SURFACE_CHROME_ALPHA=0` - do *not* ask GLFW for a framebuffer with an alpha channel. ATL asks by
+                               default (Wayland only), because wherever the EGL driver has no
+                               `EGL_EXT_present_opaque` GLFW skips every config that has an alpha channel,
+                               and then the chrome sub-surface cannot carry a `SurfaceView`'s hole - the
+                               hole comes out opaque black and the app's own frames are never seen. That is
+                               the case on Ubuntu Touch (hybris EGL), where the hint is what makes a dialog
+                               over a `SurfaceView` work at all. GLFW stops declaring the toplevel's opaque
+                               region once the hint is set, so ATL declares it itself; see
+                               `ATL_SURFACE_OPAQUE_REGION`. This is the way back to the pre-2026-08-14
+                               behaviour if some driver dislikes the alpha config.
+
+---
+
+`ATL_SURFACE_OPAQUE_REGION=0` - do not declare the toplevel's opaque region. ATL declares it (the whole
+                                window, or the window minus the `SurfaceView` holes in
+                                `ATL_SURFACE_CHROME=toplevel` mode) because GLFW stops doing it for a window
+                                that asked for a transparent framebuffer. Only useful for measuring what
+                                that declaration is worth, or to escape a compositor that mishandles it.

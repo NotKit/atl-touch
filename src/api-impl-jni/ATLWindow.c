@@ -783,8 +783,9 @@ static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
  * toplevel a buffer when it needs one: at the size it was just configured to,
  * and whenever a sub-surface has parent-double-buffered state (a position, or a
  * newly created sub-surface's place-on-top) waiting for a parent commit.
- * Opaque black, because GLFW declares the whole toplevel opaque and a surface
- * must not declare an opaque region it does not fill.
+ * Opaque black, because the whole toplevel is declared opaque - by GLFW when
+ * the framebuffer has no alpha, by ATL when it has - and a surface must not
+ * declare an opaque region it does not fill.
  */
 static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 {
@@ -807,6 +808,10 @@ static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 		glViewport(0, 0, width, height);
 		glClearColor(0, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT);
+		/* the toplevel commits rarely in this mode, so its opaque region has to
+		 * go out with the commit that does happen */
+		atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+		                               width, height, atl_window_scale(window));
 		glfwSwapBuffers(window->glfw_window);
 	}
 	if (debug_chrome())
@@ -1101,16 +1106,19 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	if (getenv("ATL_WEBVIEW_EGL"))
 		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 	/*
-	 * ATL_SURFACE_CHROME_ALPHA=1 asks GLFW for a framebuffer with an alpha
-	 * channel, which is the only way to get one where EGL_EXT_present_opaque is
-	 * missing: GLFW then "ignore[s] any config with an alpha channel to ensure
-	 * the buffer is opaque" (glfw src/egl_context.c). That is the phone -
-	 * hybris EGL has no such extension - so ATL's context comes up 8/8/8/0 and
-	 * the chrome sub-surface a SurfaceView's hole is punched into cannot be
-	 * transparent. The cost is that GLFW then declares no opaque region for the
-	 * toplevel, so it is a knob and not the default until that is measured.
+	 * Ask GLFW for a framebuffer with an alpha channel, which is the only way to
+	 * get one where EGL_EXT_present_opaque is missing: GLFW then "ignore[s] any
+	 * config with an alpha channel to ensure the buffer is opaque" (glfw
+	 * src/egl_context.c). That is the phone - hybris EGL has no such extension -
+	 * so without this ATL's context comes up 8/8/8/0, the hole punched into the
+	 * chrome sub-surface for a SurfaceView lands as opaque black, and every
+	 * pixel the app draws is lost. GLFW stops declaring the toplevel's opaque
+	 * region once the hint is set, so ATL declares it itself
+	 * (atl_surface_layers_before_swap). ATL_SURFACE_CHROME_ALPHA=0 is the way
+	 * back. Wayland only: on X11 the hint picks an ARGB visual, which needs a
+	 * compositing WM, and there are no sub-surfaces there anyway.
 	 */
-	if (getenv("ATL_SURFACE_CHROME_ALPHA"))
+	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND && atl_surface_chrome_alpha_enabled())
 		glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
 #ifdef GLFW_WAYLAND_APP_ID
 	/* Lomiri/Mir associates windows with their launcher entry through the
