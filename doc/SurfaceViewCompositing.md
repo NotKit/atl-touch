@@ -145,12 +145,24 @@ main argument for moving the whole scene rather than splitting it:
   the GLFW `wl_egl_window` last dequeued. Those are independent, and a device
   `WAYLAND_DEBUG` trace shows them disagreeing: `wl_region@38.add(0,0,1080,2349)`
   and `set_opaque_region` on the toplevel, then an `attach` of a buffer that was
-  allocated **960x540** and is damaged `0,0,960,540`. The 960x540 pool is
-  allocated at `eglCreateWindowSurface` time, and the back buffer is dequeued
-  again (`usage 0x10000300`) *before* `xdg_toplevel.configure(1080, 2349)`
-  arrives; in chrome mode the toplevel then swaps only when its size changes or
-  a sub-surface needs a parent commit, so that one pre-`configure` buffer is
-  still the one that goes out ~550 ms later. It is stale, not merely early.
+  allocated **960x540** and is damaged `0,0,960,540`.
+
+  960x540 is not a mystery and not a rotation: it is the size ATL asks for. The
+  ternary at `main-executable/main.c:463` reads
+  `d->window_width ? d->window_width : 540`, but `main()` has already set
+  `callback_data->window_width = 960` / `window_height = 540`
+  (`main.c:754-755`), so the `540, 960` fallback is unreachable and every window
+  with no `-w`/`-h` is created 960x540. Three buffers of that size are allocated
+  before anything else happens, one of them is dequeued for drawing *before*
+  `xdg_toplevel.configure(1080, 2349)` arrives, and in chrome mode the toplevel
+  then swaps only when its size changes or a sub-surface needs a parent commit —
+  once, in a 42 s run, about 550 ms after that configure. So the buffer that
+  goes out is the pre-`configure` one: **stale, not merely early.**
+
+  The desktop cannot see this, and now it is clear why: `firefox-atl`'s
+  `desktop-run/run-apk.sh` passes `-w 720 -h 1440`, exactly the headless sway
+  output's size, so there the requested size and the configured size agree and
+  the toplevel's one attach really is 720x1440.
 * **Why the mismatch is nevertheless harmless in both directions.** Too large:
   "the compositor ignores the parts of the opaque region that fall outside of
   the surface" (`wayland.xml`, `wl_surface.set_opaque_region`), so the surplus
