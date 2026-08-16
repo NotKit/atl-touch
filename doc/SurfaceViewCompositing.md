@@ -121,10 +121,14 @@ main argument for moving the whole scene rather than splitting it:
   `SurfaceView.java` is unchanged by the split.
 * The **toplevel** is cleared to opaque black once, on the frame the chrome
   becomes active and on every framebuffer resize, and is not drawn into again.
-  Opaque black is deliberate: the whole toplevel is declared opaque, and a
-  surface must not declare an opaque region it does not fill (§16.1 lane 4,
-  design constraint 2). Black is also what shows for the one frame between the
-  toplevel resize and the chrome resize.
+  Opaque black is deliberate: the whole toplevel is declared opaque, and what
+  §16.1 lane 4's design constraint 2 forbids is declaring *transparent content*
+  opaque — the case it was measured on blacked out 201,056 px of chrome on a
+  wlroots desktop. A clear of the whole buffer to `(0,0,0,1)` is what keeps the
+  declaration honest about content. It does **not** by itself make the declared
+  rectangle the same rectangle as the surface; see the next bullet. Black is
+  also what shows for the one frame between the toplevel resize and the chrome
+  resize.
 * **ATL declares the toplevel's opaque region itself**, because GLFW only does
   it for a window that did not ask for `GLFW_TRANSPARENT_FRAMEBUFFER` and ATL now
   always asks. `atl_surface_layers_before_swap()` sends the whole window in
@@ -134,6 +138,32 @@ main argument for moving the whole scene rather than splitting it:
   commits rarely, so the call is made from `atl_window_present_chrome()` on the
   commit that does happen. `ATL_SURFACE_OPAQUE_REGION=0` turns the declaration
   off, which is the state atlas shipped between `eb906148` and this change.
+* **The rectangle ATL declares is the framebuffer size, not the size of the
+  buffer being attached, and on the phone the two differ.** The size comes from
+  `glfwGetFramebufferSize()` at the top of `atl_window_render()` and is passed
+  down to `atl_surface_layers_before_swap()`; the buffer comes from whatever
+  the GLFW `wl_egl_window` last dequeued. Those are independent, and a device
+  `WAYLAND_DEBUG` trace shows them disagreeing: `wl_region@38.add(0,0,1080,2349)`
+  and `set_opaque_region` on the toplevel, then an `attach` of a buffer that was
+  allocated **960x540** and is damaged `0,0,960,540`. The 960x540 pool is
+  allocated at `eglCreateWindowSurface` time, and the back buffer is dequeued
+  again (`usage 0x10000300`) *before* `xdg_toplevel.configure(1080, 2349)`
+  arrives; in chrome mode the toplevel then swaps only when its size changes or
+  a sub-surface needs a parent commit, so that one pre-`configure` buffer is
+  still the one that goes out ~550 ms later. It is stale, not merely early.
+* **Why the mismatch is nevertheless harmless in both directions.** Too large:
+  "the compositor ignores the parts of the opaque region that fall outside of
+  the surface" (`wayland.xml`, `wl_surface.set_opaque_region`), so the surplus
+  is dropped by the protocol. Too small (the shrink case): declaring less than
+  is opaque only forfeits an optimisation, and the request's own description
+  calls an opaque region "not required for correct behaviour". The failure mode
+  the description does name — "marking transparent content as opaque will
+  result in repaint artifacts" — is content, not size, and the full-buffer
+  opaque clear above is what rules it out. So the size mismatch is a defect of
+  tidiness in what ATL tells the compositor, not of correctness, and this
+  document does not claim design constraint 2 holds rectangle-for-rectangle at
+  the toplevel's first commit. **What Mir does with any of this is not visible
+  from a client-side trace** and has not been measured.
 
 ## What the toplevel is still for
 
@@ -230,8 +260,8 @@ target device the declaration is expected to be worth nothing either way; what
 it buys is that no wlroots/Mesa desktop is asked to blend a window ATL knows to
 be opaque. A `WAYLAND_DEBUG` trace from the phone shows ATL sending exactly one
 `set_opaque_region(0,0,1080,2349)` on the toplevel, immediately before its one
-and only `attach`, and Mir raising no complaint; what Mir then does with it is
-not visible from the client side.
+and only `attach` — of a 960x540 buffer, see above — and Mir raising no
+complaint; what Mir then does with it is not visible from the client side.
 
 And on the phone the default is the difference between an app being visible and
 not. One build of `7f6af1cc`, one `ATL_TEST_DIALOG` run each, 600x500
