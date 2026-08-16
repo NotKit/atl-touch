@@ -45,15 +45,23 @@ int atl_surface_layer_buffer_height(ATLSurfaceLayer *layer);
 bool atl_surface_layer_is_above(ATLSurfaceLayer *layer);
 
 /*
- * Called from atl_window_render() just before glfwSwapBuffers: re-sends the
- * toplevel's opaque region as "everything except the holes", in the same commit
- * Mesa is about to make. Without it a compositor is entitled to ignore the
- * alpha the scene wrote.
- *
- * Does nothing in chrome mode, where the toplevel has no holes to declare.
+ * Called just before every commit of the toplevel: sends its opaque region, as
+ * "everything except the holes" in the punch-hole mode and as the whole window
+ * in every other case. Without the first a compositor is entitled to ignore the
+ * alpha the scene wrote; without the second nobody declares the region at all,
+ * because GLFW stops declaring it as soon as the window asks for a transparent
+ * framebuffer - which ATL does whenever the chrome needs an alpha channel.
  */
 void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent,
                                     int fb_width, int fb_height, double scale);
+/*
+ * Should the window ask GLFW for an alpha-bearing framebuffer? Yes unless
+ * ATL_SURFACE_CHROME_ALPHA=0: the chrome sub-surface's hole is opaque black
+ * without one wherever the EGL driver has no EGL_EXT_present_opaque.
+ */
+bool atl_surface_chrome_alpha_enabled(void);
+/* is ATL declaring the toplevel's opaque region? No if ATL_SURFACE_OPAQUE_REGION=0 */
+bool atl_surface_opaque_region_enabled(void);
 /* does this window have any layer below it (i.e. is a hole expected)? */
 bool atl_surface_layers_window_has_holes(ATLWindow *window);
 

@@ -63,6 +63,42 @@ bool atl_surface_chrome_enabled(void)
 	return cached == 1 && !chrome_disabled;
 }
 
+/*
+ * ATL_SURFACE_CHROME_ALPHA: ask GLFW for a framebuffer with an alpha channel,
+ * which is the only way to get one where EGL_EXT_present_opaque is missing -
+ * the phone. Without it the chrome's buffer is 8/8/8/0, a SurfaceView's hole
+ * lands as opaque black and the app's own frames are never seen. On by default
+ * since 2026-08-14; ATL_SURFACE_CHROME_ALPHA=0 is the way back.
+ */
+bool atl_surface_chrome_alpha_enabled(void)
+{
+	static int cached = -1;
+
+	if (cached < 0) {
+		const char *v = getenv("ATL_SURFACE_CHROME_ALPHA");
+		cached = !(v && (!strcmp(v, "0") || !strcmp(v, "off") || !strcmp(v, "no")));
+	}
+	return cached == 1;
+}
+
+/*
+ * ATL_SURFACE_OPAQUE_REGION=0 stops ATL declaring the toplevel's opaque region.
+ * GLFW declares it itself for a window that did not ask to be transparent and
+ * stops as soon as it does, so with the alpha framebuffer on this declaration
+ * is the only one there is. The knob exists to measure what it is worth and to
+ * escape a compositor that gets it wrong.
+ */
+bool atl_surface_opaque_region_enabled(void)
+{
+	static int cached = -1;
+
+	if (cached < 0) {
+		const char *v = getenv("ATL_SURFACE_OPAQUE_REGION");
+		cached = !(v && (!strcmp(v, "0") || !strcmp(v, "off") || !strcmp(v, "no")));
+	}
+	return cached == 1;
+}
+
 /* "toplevel" keeps asking for place_below; "none" reproduces Mir's ordering */
 static bool layers_place_below(void)
 {
@@ -349,6 +385,62 @@ bool atl_surface_layers_window_has_holes(ATLWindow *window)
 	return false;
 }
 
+/*
+ * The whole toplevel, declared opaque. This is what GLFW itself sends for a
+ * window that did not ask for GLFW_TRANSPARENT_FRAMEBUFFER, and ATL now does
+ * ask (the chrome's hole needs the alpha channel), so it falls to ATL. The
+ * toplevel really is opaque: in chrome mode it is one opaque black clear under
+ * a chrome that covers it, and otherwise it carries the scene exactly as it did
+ * when its config had no alpha bits at all.
+ *
+ * Re-sent only when the size changes, which is when GLFW re-sent its own (it
+ * does it per xdg_toplevel.configure). One region per window, remembered here
+ * because the ATLWindow struct is private to ATLWindow.c.
+ */
+struct toplevel_opaque {
+	ATLWindow *window;
+	int w, h;
+	struct toplevel_opaque *next;
+};
+static struct toplevel_opaque *toplevel_opaques;
+
+static void declare_whole_toplevel_opaque(ATLWindow *window, struct wl_compositor *compositor,
+                                          struct wl_surface *parent, int w, int h)
+{
+	struct toplevel_opaque *o;
+	struct wl_region *opaque;
+
+	for (o = toplevel_opaques; o; o = o->next)
+		if (o->window == window)
+			break;
+	if (o && o->w == w && o->h == h)
+		return;
+	if (!o) {
+		o = calloc(1, sizeof(*o));
+		if (!o)
+			return;
+		o->window = window;
+		o->next = toplevel_opaques;
+		toplevel_opaques = o;
+	}
+	o->w = w;
+	o->h = h;
+
+	opaque = wl_compositor_create_region(compositor);
+	wl_region_add(opaque, 0, 0, w, h);
+	wl_surface_set_opaque_region(parent, opaque);
+	wl_region_destroy(opaque);
+}
+
+/* the punched region below replaces it, so the next full-window one must go out
+ * again even at an unchanged size */
+static void forget_whole_toplevel_opaque(ATLWindow *window)
+{
+	for (struct toplevel_opaque *o = toplevel_opaques; o; o = o->next)
+		if (o->window == window)
+			o->w = o->h = 0;
+}
+
 void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent,
                                     int fb_width, int fb_height, double scale)
 {
@@ -356,20 +448,25 @@ void atl_surface_layers_before_swap(ATLWindow *window, struct wl_surface *parent
 	struct wl_region *opaque;
 	int w, h;
 
-	/* in chrome mode no part of the toplevel is transparent, so it must not
-	 * declare a punched region it does not fill */
-	if (atl_surface_chrome_enabled())
-		return;
-	if (!compositor || !parent || !atl_surface_layers_window_has_holes(window))
+	if (!compositor || !parent)
 		return;
 	if (scale <= 0)
 		scale = 1;
 	w = (int)(fb_width / scale);
 	h = (int)(fb_height / scale);
 
+	/* in chrome mode no part of the toplevel is transparent, so it must not
+	 * declare a punched region it does not fill - it declares all of itself */
+	if (atl_surface_chrome_enabled() || !atl_surface_layers_window_has_holes(window)) {
+		if (atl_surface_chrome_alpha_enabled() && atl_surface_opaque_region_enabled())
+			declare_whole_toplevel_opaque(window, compositor, parent, w, h);
+		return;
+	}
+
 	/* whole toplevel minus every hole; GLFW re-sets its own full-window opaque
 	 * region when it handles a configure, but that happens in glfwPollEvents()
 	 * earlier in the same tick */
+	forget_whole_toplevel_opaque(window); /* so it is re-sent if the holes go */
 	opaque = wl_compositor_create_region(compositor);
 	wl_region_add(opaque, 0, 0, w, h);
 	for (ATLSurfaceLayer *l = layers; l; l = l->next) {
