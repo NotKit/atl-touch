@@ -136,3 +136,9 @@ The following environment variables are recognized by the main executable:
                                 `ATL_SURFACE_CHROME=toplevel` mode) because GLFW stops doing it for a window
                                 that asked for a transparent framebuffer. Only useful for measuring what
                                 that declaration is worth, or to escape a compositor that mishandles it.
+                                Note that the rectangle is the *framebuffer* size, which is not always the
+                                size of the buffer the toplevel attaches: a window created at 960x540 (the
+                                default - see `-w`/`-h`) and then configured to the display size declares
+                                the configured rectangle over a buffer still at the created size. The
+                                protocol clips the surplus away, so this is untidy rather than wrong;
+                                `doc/SurfaceViewCompositing.md` has the measurement.

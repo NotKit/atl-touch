@@ -163,6 +163,13 @@ main argument for moving the whole scene rather than splitting it:
   `desktop-run/run-apk.sh` passes `-w 720 -h 1440`, exactly the headless sway
   output's size, so there the requested size and the configured size agree and
   the toplevel's one attach really is 720x1440.
+
+  Measured on the oneplus11, not argued: launching the same build with
+  `-w 1080 -h 2349` allocates no 960x540 buffer at all, and the toplevel's one
+  attach is a 1080x2349 buffer damaged over its whole area under a region of
+  exactly that rectangle. The captured frame is byte-identical to the default
+  run's, so none of this reaches the picture — the chrome covers the toplevel
+  either way. `firefox-atl` `testapps/evidence/device-1a123d11-mir-wfull.*`.
 * **Why the mismatch is nevertheless harmless in both directions.** Too large:
   "the compositor ignores the parts of the opaque region that fall outside of
   the surface" (`wayland.xml`, `wl_surface.set_opaque_region`), so the surplus
