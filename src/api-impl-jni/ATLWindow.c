@@ -858,11 +858,17 @@ static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 
 	commit_parent = atl_surface_layers_take_parent_commit(window);
 	if (window->toplevel_width != width || window->toplevel_height != height) {
+		/* Only the toplevel's *first* buffer can be stale. It is dequeued
+		 * during GL setup, before any configure has arrived, so this swap
+		 * attaches it at the created size. Every later size change is dequeued
+		 * after the configure - the driver reallocates at whatever size the
+		 * wl_egl_window has then - and that attach already agrees, so a resync
+		 * there costs a clear and a swap for a buffer identical to the one just
+		 * sent (measured: firefox-atl testapps/evidence/device-resize-attaches.txt). */
+		if (!window->toplevel_width && !window->toplevel_height)
+			window->toplevel_resync = true;
 		window->toplevel_width = width;
 		window->toplevel_height = height;
-		/* the buffer this swap is about to attach was dequeued before the
-		 * configure that changed the size, so it still has the old one */
-		window->toplevel_resync = true;
 		commit_parent = true;
 	}
 	if (commit_parent) {
@@ -881,17 +887,19 @@ static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 }
 
 /*
- * Give the toplevel one more buffer after a size change.
+ * Give the toplevel one more buffer after its first size change.
  *
- * A swap attaches the buffer that was dequeued for it, and both EGL stacks
- * measured here dequeue at draw time - which for the toplevel is the frame
- * *before* the one that notices the new size. So the commit that reacts to a
- * configure carries the previous size's buffer, and in chrome mode nothing else
- * ever commits the toplevel: the stale buffer would stay up for the life of the
- * window. Measured on the phone before this existed, a 960x540 buffer sat under
- * a 1080x2349 opaque region for the whole run (doc/SurfaceViewCompositing.md).
- * Costs one opaque-black clear and one swap per resize, on a surface the chrome
- * covers completely.
+ * A swap attaches the buffer that was dequeued for it, and the toplevel's first
+ * one is dequeued while the context is being set up, before any configure. So
+ * the commit that reacts to the *first* configure carries the created size's
+ * buffer, and in chrome mode nothing else ever commits the toplevel: that stale
+ * buffer would stay up for the life of the window. Measured on the phone before
+ * this existed, a 960x540 buffer sat under a 1080x2349 opaque region for the
+ * whole run (doc/SurfaceViewCompositing.md).
+ *
+ * Costs one opaque-black clear and one swap, once per window, on a surface the
+ * chrome covers completely. A later resize does not need it: its buffer is
+ * dequeued after the configure and comes back at the new size by itself.
  */
 static void atl_window_resync_toplevel(ATLWindow *window)
 {
