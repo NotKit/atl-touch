@@ -171,30 +171,42 @@ main argument for moving the whole scene rather than splitting it:
   exactly that rectangle. The captured frame is byte-identical to the default
   run's, so none of this reaches the picture — the chrome covers the toplevel
   either way. `firefox-atl` `testapps/evidence/device-1a123d11-mir-wfull.*`.
-* **Under a resize the toplevel is one commit behind, so it is given a second
-  one.** A swap attaches the buffer that was dequeued for it, and the dequeue
-  happens at draw time — which for the toplevel is the frame *before* the one
-  that notices the new size. `atl_window_present_chrome()` commits the parent
-  when the size changes, and that commit therefore carries the previous size's
-  buffer; nothing else commits the toplevel, so it used to stop there. Measured
-  on the phone with `ATL_DEBUG_RESIZE`, on a build that had no second commit: one
-  attach in a 30 s run, 960x540 under a 1080x2349 region, and it stood until the
-  run ended. `atl_window_resync_toplevel()` gives the toplevel one more
-  opaque-black commit on the next tick, outside the render path so that an idle
-  window and a frame with no damage still get it. The same run then attaches
-  960x540 and, 8.2 ms later, 1080x2349 — after which buffer, damage, region and
-  configure all name the same rectangle. `firefox-atl`
-  `testapps/evidence/device-resize-attaches.txt` has both arms.
+* **At its *first* configure the toplevel is one commit behind, so it is given a
+  second one — and only there.** A swap attaches the buffer that was dequeued for
+  it, and the toplevel's first buffer is dequeued while the GL context is being
+  set up, before any configure has arrived. `atl_window_present_chrome()` commits
+  the parent when the size changes, and that first commit therefore carries the
+  created size's buffer; nothing else commits the toplevel, so it used to stop
+  there. Measured on the phone with `ATL_DEBUG_RESIZE`, on a build that had no
+  second commit: one attach in a 30 s run, 960x540 under a 1080x2349 region, and
+  it stood until the run ended. `atl_window_resync_toplevel()` gives the toplevel
+  one more opaque-black commit — on the **same** tick, in the same
+  `atl_windows_tick()` loop body as `atl_window_render()`
+  (`ATLWindow.c:1171-1178`), but outside the render path so that an idle window
+  and a frame with no damage still get it. The same run then attaches 960x540
+  and, 8.2 ms later, 1080x2349 — after which buffer, damage, region and configure
+  all name the same rectangle. `firefox-atl`
+  `testapps/evidence/device-resize-attaches.txt` has all the arms.
 
-  And the case that was never exercised until 2026-08-17 — a *second*
-  `xdg_toplevel.configure`, at a new size, after the window is mapped — turns
-  out to be the easy one: the resize's own commit already allocates at the new
-  size (the previous toplevel swap was long past, so the dequeue happens after
-  the resize), and the toplevel attaches 600x800 16.4 ms after
-  `configure(600, 800)`. The prediction in `firefox-atl` PLAN.md §20.2 — that a
-  post-`configure` resize would hold a stale buffer *indefinitely* — is wrong for
-  a resize and right for the very first configure, which is the one that had been
-  measured.
+  A *later* `xdg_toplevel.configure`, at a new size, after the window is mapped —
+  never exercised until 2026-08-17 — turns out to be the easy one: the resize's
+  own commit already allocates at the new size (the previous toplevel swap was
+  long past, so the dequeue happens after the configure), and the toplevel
+  attaches 600x800 16.4 ms after `configure(600, 800)`. The prediction in
+  `firefox-atl` PLAN.md §20.2 — that a post-`configure` resize would hold a stale
+  buffer *indefinitely* — is wrong for a resize and right for the very first
+  configure, which is the one that had been measured.
+
+  So a resync on a later size change is redundant, and it was measured to be: on
+  the build that resynced unconditionally the 600x800 resize cost **two**
+  identical attaches 5.786 ms apart. Since 2026-08-17 the resync is armed only
+  when `toplevel_width`/`toplevel_height` are still 0 (`ATLWindow.c:868-869`), and
+  the same experiment on the phone gives **one** `toplevel resync commit` line in
+  a 30 s run and one attach per genuine resize, each agreeing with its configure.
+  That run happens to carry two genuine resizes — the requested 600x800 and an
+  unrequested `configure(1080, 2349)` 948 ms later, the shell rotating the phone
+  back to portrait mid-run — and both cost one agreeing attach. `firefox-atl`
+  `testapps/evidence/device-a2e83ce0-mir-resize*`.
 * **Why the mismatch is nevertheless harmless in both directions.** Too large:
   "the compositor ignores the parts of the opaque region that fall outside of
   the surface" (`wayland.xml`, `wl_surface.set_opaque_region`), so the surplus

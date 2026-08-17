@@ -141,7 +141,7 @@ The following environment variables are recognized by the main executable:
                                 default - see `-w`/`-h`) and then configured to the display size declares
                                 the configured rectangle over a buffer still at the created size. Since
                                 2026-08-17 that lasts one commit rather than the life of the window - the
-                                toplevel is re-attached at the new size on the next tick - and the surplus
+                                toplevel is re-attached at the new size on the same tick - and the surplus
                                 is what the protocol says the compositor drops. Measured on Mir 1.8.3, an
                                 oversized region changes nothing in the output either;
                                 `doc/SurfaceViewCompositing.md` has both measurements and their limits.
@@ -160,3 +160,7 @@ The following environment variables are recognized by the main executable:
                                 alone is enough; a compositor that ignores size hints will not resize.
                                 Pair it with `ATL_DEBUG_CHROME=1`, which then logs each new framebuffer size
                                 and every toplevel commit.
+                                The limit is set once and never unset, but it does not pin the window: in a
+                                run on 2026-08-17 the shell rotated the phone and configured the toplevel
+                                back to 1080x2349 948 ms after the 600x800 it had just granted. That is a
+                                second genuine resize for free, and worth reading the trace for.
