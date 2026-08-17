@@ -475,9 +475,16 @@ static void on_char(GLFWwindow *glfw_window, unsigned int codepoint)
 		(*env)->ExceptionDescribe(env);
 }
 
+static bool debug_chrome(void);
+
 static void on_framebuffer_size(GLFWwindow *glfw_window, int width, int height)
 {
 	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	/* the only place a compositor-driven resize is visible in ATL's own log:
+	 * everything downstream just reads glfwGetFramebufferSize() */
+	if (debug_chrome())
+		fprintf(stderr, "ATLWindow: framebuffer size now %dx%d (was %dx%d)\n",
+		        width, height, window->layout_width, window->layout_height);
 	window->needs_redraw = true;
 	window->full_redraw = true;
 }
@@ -618,6 +625,51 @@ static bool debug_chrome(void)
 	if (cached < 0)
 		cached = getenv("ATL_DEBUG_CHROME") != NULL;
 	return cached;
+}
+
+/*
+ * ATL_DEBUG_RESIZE=<seconds>[:<w>x<h>] - once, <seconds> after the first tick,
+ * ask the compositor to resize this window (default 600x800).
+ *
+ * A phone shell configures a window once, when it maps, and never again, so the
+ * resize path of the chrome/toplevel split had no way of being exercised on the
+ * compositor it was written for. xdg_toplevel has no "please resize me", but a
+ * size *limit* is a request the compositor answers with a fresh configure -
+ * measured on Mir 1.8.3, where set_max_size alone is enough - and GLFW sends
+ * both limits from glfwSetWindowSizeLimits(). Diagnostic only: nothing in ATL
+ * sets this by itself.
+ */
+static bool debug_resize(int *w, int *h, double *after)
+{
+	static int cached = -1;
+	static int rw = 600, rh = 800;
+	static double rt;
+
+	if (cached < 0) {
+		const char *s = getenv("ATL_DEBUG_RESIZE");
+		char *end = NULL;
+		cached = 0;
+		if (s && *s) {
+			double t = strtod(s, &end);
+			if (end != s && t >= 0) {
+				cached = 1;
+				rt = t;
+				if (end && *end == ':') {
+					int pw = 0, ph = 0;
+					if (sscanf(end + 1, "%dx%d", &pw, &ph) == 2 && pw > 0 && ph > 0) {
+						rw = pw;
+						rh = ph;
+					}
+				}
+			}
+		}
+	}
+	if (!cached)
+		return false;
+	*w = rw;
+	*h = rh;
+	*after = rt;
+	return true;
 }
 
 /* the EGLConfig GLFW's context was created with, so the chrome's window surface
@@ -1047,7 +1099,22 @@ static void atl_window_render(ATLWindow *window)
 
 static gboolean atl_windows_tick(gpointer user_data)
 {
+	int rw, rh;
+	double after;
+
 	glfwPollEvents();
+	if (windows && debug_resize(&rw, &rh, &after)) {
+		static jlong t0;
+		static bool fired;
+		jlong now = atl_uptime_millis();
+		if (!t0)
+			t0 = now;
+		if (!fired && (double)(now - t0) >= after * 1000.0) {
+			fired = true;
+			fprintf(stderr, "ATLWindow: ATL_DEBUG_RESIZE: asking the compositor for %dx%d\n", rw, rh);
+			glfwSetWindowSizeLimits(windows->glfw_window, rw, rh, rw, rh);
+		}
+	}
 	for (ATLWindow *window = windows; window; window = window->next) {
 		if (window->needs_redraw)
 			atl_window_render(window);

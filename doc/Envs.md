@@ -142,3 +142,18 @@ The following environment variables are recognized by the main executable:
                                 the configured rectangle over a buffer still at the created size. The
                                 protocol clips the surplus away, so this is untidy rather than wrong;
                                 `doc/SurfaceViewCompositing.md` has the measurement.
+
+---
+
+`ATL_DEBUG_RESIZE=<seconds>[:<w>x<h>]` - once, `<seconds>` after the first frame tick, ask the compositor
+                                to resize this window to `<w>x<h>` (default 600x800). A diagnostic, not a
+                                feature: a phone shell configures a window when it maps and never again, so
+                                without this there is no way to exercise what ATL does when a
+                                `xdg_toplevel.configure` arrives at a *new* size - which is the case the
+                                chrome/toplevel split has to get right and the one no run had ever taken.
+                                `xdg_toplevel` has no "resize me" request; what this sends is a size *limit*
+                                (`glfwSetWindowSizeLimits`, min = max = the asked size), which a compositor
+                                answers with a fresh configure. Measured on Mir 1.8.3, where `set_max_size`
+                                alone is enough; a compositor that ignores size hints will not resize.
+                                Pair it with `ATL_DEBUG_CHROME=1`, which then logs each new framebuffer size
+                                and every toplevel commit.
