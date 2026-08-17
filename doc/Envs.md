@@ -139,9 +139,12 @@ The following environment variables are recognized by the main executable:
                                 Note that the rectangle is the *framebuffer* size, which is not always the
                                 size of the buffer the toplevel attaches: a window created at 960x540 (the
                                 default - see `-w`/`-h`) and then configured to the display size declares
-                                the configured rectangle over a buffer still at the created size. The
-                                protocol clips the surplus away, so this is untidy rather than wrong;
-                                `doc/SurfaceViewCompositing.md` has the measurement.
+                                the configured rectangle over a buffer still at the created size. Since
+                                2026-08-17 that lasts one commit rather than the life of the window - the
+                                toplevel is re-attached at the new size on the next tick - and the surplus
+                                is what the protocol says the compositor drops. Measured on Mir 1.8.3, an
+                                oversized region changes nothing in the output either;
+                                `doc/SurfaceViewCompositing.md` has both measurements and their limits.
 
 ---
 

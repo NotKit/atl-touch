@@ -120,7 +120,8 @@ main argument for moving the whole scene rather than splitting it:
   the "stops drawing the punch-hole into the toplevel" this design asks for.
   `SurfaceView.java` is unchanged by the split.
 * The **toplevel** is cleared to opaque black once, on the frame the chrome
-  becomes active and on every framebuffer resize, and is not drawn into again.
+  becomes active, and twice on every framebuffer resize (see the resync bullet
+  below); it is not drawn into again.
   Opaque black is deliberate: the whole toplevel is declared opaque, and what
   §16.1 lane 4's design constraint 2 forbids is declaring *transparent content*
   opaque — the case it was measured on blacked out 201,056 px of chrome on a
@@ -170,6 +171,30 @@ main argument for moving the whole scene rather than splitting it:
   exactly that rectangle. The captured frame is byte-identical to the default
   run's, so none of this reaches the picture — the chrome covers the toplevel
   either way. `firefox-atl` `testapps/evidence/device-1a123d11-mir-wfull.*`.
+* **Under a resize the toplevel is one commit behind, so it is given a second
+  one.** A swap attaches the buffer that was dequeued for it, and the dequeue
+  happens at draw time — which for the toplevel is the frame *before* the one
+  that notices the new size. `atl_window_present_chrome()` commits the parent
+  when the size changes, and that commit therefore carries the previous size's
+  buffer; nothing else commits the toplevel, so it used to stop there. Measured
+  on the phone with `ATL_DEBUG_RESIZE`, on a build that had no second commit: one
+  attach in a 30 s run, 960x540 under a 1080x2349 region, and it stood until the
+  run ended. `atl_window_resync_toplevel()` gives the toplevel one more
+  opaque-black commit on the next tick, outside the render path so that an idle
+  window and a frame with no damage still get it. The same run then attaches
+  960x540 and, 8.2 ms later, 1080x2349 — after which buffer, damage, region and
+  configure all name the same rectangle. `firefox-atl`
+  `testapps/evidence/device-resize-attaches.txt` has both arms.
+
+  And the case that was never exercised until 2026-08-17 — a *second*
+  `xdg_toplevel.configure`, at a new size, after the window is mapped — turns
+  out to be the easy one: the resize's own commit already allocates at the new
+  size (the previous toplevel swap was long past, so the dequeue happens after
+  the resize), and the toplevel attaches 600x800 16.4 ms after
+  `configure(600, 800)`. The prediction in `firefox-atl` PLAN.md §20.2 — that a
+  post-`configure` resize would hold a stale buffer *indefinitely* — is wrong for
+  a resize and right for the very first configure, which is the one that had been
+  measured.
 * **Why the mismatch is nevertheless harmless in both directions.** Too large:
   "the compositor ignores the parts of the opaque region that fall outside of
   the surface" (`wayland.xml`, `wl_surface.set_opaque_region`), so the surplus
@@ -181,8 +206,23 @@ main argument for moving the whole scene rather than splitting it:
   opaque clear above is what rules it out. So the size mismatch is a defect of
   tidiness in what ATL tells the compositor, not of correctness, and this
   document does not claim design constraint 2 holds rectangle-for-rectangle at
-  the toplevel's first commit. **What Mir does with any of this is not visible
-  from a client-side trace** and has not been measured.
+  the toplevel's first commit — though since 2026-08-17 it holds from the second
+  commit on, ~8-17 ms in, rather than never.
+
+  **What Mir does with an oversized region is still not visible from a
+  client-side trace**, and on 2026-08-17 it was looked for on the phone rather
+  than assumed: Mir 1.8.3 has no log of it (the session journal carries qtmir's
+  per-surface lines and not one line matching `opaque` or `region`), and its own
+  compositing decisions have no debug output reachable without restarting the
+  compositor. What can be observed is its *output*, and a probe that declares a
+  600x600 opaque region over a **1x1** transparent buffer changes nothing
+  measurable in it — 0 unpainted pixels inside the window in all four cells of
+  two back-to-back replicates (`firefox-atl`
+  `testapps/wlresize/device-oversized-region.sh`,
+  `testapps/evidence/device-a1473285-mir-oversized-region-r*.txt`). That is
+  consistent with the protocol's clipping rule and does not prove it: the thing
+  the rule governs is what the compositor draws *behind* the surplus, and here
+  the surplus is over the same screen either way.
 
 ## What the toplevel is still for
 
@@ -293,9 +333,9 @@ px of black. `firefox-atl` `testapps/evidence/device-7f6af1cc-mir-{default,alpha
 
 * It does not make ATL's chrome cheaper. The chrome sub-surface is a full-window
   buffer presented every frame, exactly like the toplevel was. The toplevel is
-  presented only when it must be (chrome activation, resize, and any frame where
-  a sub-surface has parent-side state to apply), so the steady state is still one
-  full-window present per frame.
+  presented only when it must be (chrome activation, resize — twice, the second
+  one being the resync — and any frame where a sub-surface has parent-side state
+  to apply), so the steady state is still one full-window present per frame.
 * It does not give the chrome an opaque region, so a compositor blends the whole
   window every frame even where the chrome is opaque. Declaring the real opaque
   region (the window minus the holes) on the *chrome* surface is a legitimate
