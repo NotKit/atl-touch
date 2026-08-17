@@ -1113,6 +1113,11 @@ static gboolean atl_windows_tick(gpointer user_data)
 			fired = true;
 			fprintf(stderr, "ATLWindow: ATL_DEBUG_RESIZE: asking the compositor for %dx%d\n", rw, rh);
 			glfwSetWindowSizeLimits(windows->glfw_window, rw, rh, rw, rh);
+			/* xdg_surface state is double-buffered and in chrome mode the
+			 * toplevel can go a whole run without a commit, so the limits
+			 * would otherwise sit pending forever and no configure would come */
+			if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+				wl_surface_commit(glfwGetWaylandWindow(windows->glfw_window));
 		}
 	}
 	for (ATLWindow *window = windows; window; window = window->next) {
