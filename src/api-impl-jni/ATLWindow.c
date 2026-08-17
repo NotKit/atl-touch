@@ -70,6 +70,7 @@ struct ATLWindow {
 	EGLContext glfw_context;
 	EGLSurface glfw_surface;
 	int toplevel_width, toplevel_height; /* size of the last buffer it was given */
+	bool toplevel_resync;      /* its last commit went out at the previous size */
 	struct ATLWindow *next;
 };
 
@@ -859,6 +860,9 @@ static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 	if (window->toplevel_width != width || window->toplevel_height != height) {
 		window->toplevel_width = width;
 		window->toplevel_height = height;
+		/* the buffer this swap is about to attach was dequeued before the
+		 * configure that changed the size, so it still has the old one */
+		window->toplevel_resync = true;
 		commit_parent = true;
 	}
 	if (commit_parent) {
@@ -874,6 +878,42 @@ static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 	if (debug_chrome())
 		fprintf(stderr, "ATLWindow: chrome present %dx%d, parent commit %s\n",
 		        width, height, commit_parent ? "yes" : "no");
+}
+
+/*
+ * Give the toplevel one more buffer after a size change.
+ *
+ * A swap attaches the buffer that was dequeued for it, and both EGL stacks
+ * measured here dequeue at draw time - which for the toplevel is the frame
+ * *before* the one that notices the new size. So the commit that reacts to a
+ * configure carries the previous size's buffer, and in chrome mode nothing else
+ * ever commits the toplevel: the stale buffer would stay up for the life of the
+ * window. Measured on the phone before this existed, a 960x540 buffer sat under
+ * a 1080x2349 opaque region for the whole run (doc/SurfaceViewCompositing.md).
+ * Costs one opaque-black clear and one swap per resize, on a surface the chrome
+ * covers completely.
+ */
+static void atl_window_resync_toplevel(ATLWindow *window)
+{
+	int width, height;
+
+	window->toplevel_resync = false;
+	if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
+		return;
+	glfwGetFramebufferSize(window->glfw_window, &width, &height);
+	/* another configure landed in between: the next present handles it */
+	if (width < 1 || height < 1 ||
+	    width != window->toplevel_width || height != window->toplevel_height)
+		return;
+	glfwMakeContextCurrent(window->glfw_window);
+	glViewport(0, 0, width, height);
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
+	                               width, height, atl_window_scale(window));
+	glfwSwapBuffers(window->glfw_window);
+	if (debug_chrome())
+		fprintf(stderr, "ATLWindow: toplevel resync commit %dx%d\n", width, height);
 }
 
 static void atl_window_render(ATLWindow *window)
@@ -1123,6 +1163,10 @@ static gboolean atl_windows_tick(gpointer user_data)
 	for (ATLWindow *window = windows; window; window = window->next) {
 		if (window->needs_redraw)
 			atl_window_render(window);
+		/* not inside the render path: an idle window still owes the toplevel
+		 * this commit, and a frame with no damage never reaches a present */
+		if (window->toplevel_resync)
+			atl_window_resync_toplevel(window);
 	}
 	return G_SOURCE_CONTINUE;
 }
