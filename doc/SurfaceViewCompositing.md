@@ -236,6 +236,22 @@ main argument for moving the whole scene rather than splitting it:
   the rule governs is what the compositor draws *behind* the surplus, and here
   the surplus is over the same screen either way.
 
+  **And one committed frame contradicts the ones that agree.** The oversized
+  region cell has been run three times, not eight: the "eight cells" above are a
+  four-cell set run twice, and only one of the four declares an oversized region.
+  Of its three runs two report 0 unpainted pixels inside the window and the third,
+  an earlier unguarded one, reports **201,056** — the toplevel's whole rectangle
+  minus the two sub-surfaces the probe paints itself, to the pixel. It is
+  committed as `testapps/evidence/device-mir-oversized-region-unguarded-outlier.txt`
+  and classified alongside the others in
+  `testapps/evidence/region-verdict-committed-cells.txt`. A blanked screen
+  mid-capture is the likeliest explanation and there is no evidence for it; the
+  capture guard that run lacked would **not** have excluded it either, since the
+  two counts the guard tests are the sub-surfaces and both are present in that
+  frame. So this paragraph's claim is two agreeing replicates against one
+  disagreeing frame, and it was not re-run on 2026-08-17 — the phone's display
+  cannot be woken over ssh.
+
 ## What the toplevel is still for
 
 Three things, and they are all real:
