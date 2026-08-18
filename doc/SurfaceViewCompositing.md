@@ -120,8 +120,9 @@ main argument for moving the whole scene rather than splitting it:
   the "stops drawing the punch-hole into the toplevel" this design asks for.
   `SurfaceView.java` is unchanged by the split.
 * The **toplevel** is cleared to opaque black once, on the frame the chrome
-  becomes active, and twice on every framebuffer resize (see the resync bullet
-  below); it is not drawn into again.
+  becomes active and on every framebuffer resize, and twice on that first frame
+  only — the resync bullet below is the second clear, and since `a2e83ce0` it is
+  armed nowhere else; it is not drawn into again.
   Opaque black is deliberate: the whole toplevel is declared opaque, and what
   §16.1 lane 4's design constraint 2 forbids is declaring *transparent content*
   opaque — the case it was measured on blacked out 201,056 px of chrome on a
@@ -240,10 +241,16 @@ main argument for moving the whole scene rather than splitting it:
   region cell has been run three times, not eight: the "eight cells" above are a
   four-cell set run twice, and only one of the four declares an oversized region.
   Of its three runs two report 0 unpainted pixels inside the window and the third,
-  an earlier unguarded one, reports **201,056** — the toplevel's whole rectangle
-  minus the two sub-surfaces the probe paints itself, to the pixel. It is
-  committed as `testapps/evidence/device-mir-oversized-region-unguarded-outlier.txt`
-  and classified alongside the others in
+  an earlier unguarded one, reports **201,056**, which is the *counted* region
+  minus the two sub-surfaces the probe paints itself, to the pixel - not the
+  whole toplevel. `count.py` crops to the 600x600 toplevel inset by 8 px a side
+  (`firefox-atl testapps/wlsubz/count.py:96`), so it counts 584x584 = 341,056 px,
+  and 341,056 - 140,000 = 201,056; the 140,000 is the union of the two 300x300
+  sub-surfaces at (50,50) and (150,150), which overlap by 200x200. The *whole*
+  rectangle minus the same two would be 360,000 - 140,000 = **220,000**. The run
+  is committed as
+  `testapps/evidence/device-mir-oversized-region-unguarded-outlier.txt` and
+  classified alongside the others in
   `testapps/evidence/region-verdict-committed-cells.txt`. A blanked screen
   mid-capture is the likeliest explanation and there is no evidence for it; the
   capture guard that run lacked would **not** have excluded it either, since the
