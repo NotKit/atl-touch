@@ -85,4 +85,60 @@ public interface MenuItem {
 	public MenuItem setIntent(Intent intent);
 
 	public default android.content.Intent getIntent() { return null; }
+
+	/**
+	 * AOSP keeps the tint on the item and applies it when the icon is read;
+	 * without state an interface can only forward to the icon itself. Fenix's
+	 * showToolbarWithIconButton calls this from onCreateMenu, and the missing
+	 * method aborted the whole toolbar menu.
+	 */
+	public default MenuItem setIconTintList(android.content.res.ColorStateList tint) {
+		Drawable icon = getIcon();
+		if (icon != null)
+			icon.setTintList(tint);
+		return this;
+	}
+
+	public default android.content.res.ColorStateList getIconTintList() { return null; }
+
+	public default MenuItem setIconTintMode(android.graphics.PorterDuff.Mode mode) { return this; }
+
+	public default android.graphics.PorterDuff.Mode getIconTintMode() { return null; }
+
+	/**
+	 * API 26's accessibility/shortcut tail. Fenix's showToolbarWithIconButton
+	 * builds a title-less icon item and calls setContentDescription between
+	 * setIconTintList and setShowAsAction, so the missing method left the item
+	 * with neither its "show as action" flag nor its click listener.
+	 * Defaults, not state: appcompat's MenuItemImpl overrides all of them.
+	 */
+	public default MenuItem setContentDescription(CharSequence contentDescription) { return this; }
+
+	public default CharSequence getContentDescription() { return null; }
+
+	public default MenuItem setTooltipText(CharSequence tooltipText) { return this; }
+
+	public default CharSequence getTooltipText() { return null; }
+
+	public default MenuItem setAlphabeticShortcut(char alphaChar, int alphaModifiers) {
+		return setAlphabeticShortcut(alphaChar);
+	}
+
+	public default char getAlphabeticShortcut() { return 0; }
+
+	public default int getAlphabeticModifiers() { return KeyEvent.META_CTRL_ON; }
+
+	public default MenuItem setNumericShortcut(char numericChar, int numericModifiers) {
+		return setNumericShortcut(numericChar);
+	}
+
+	public default char getNumericShortcut() { return 0; }
+
+	public default int getNumericModifiers() { return KeyEvent.META_CTRL_ON; }
+
+	public default MenuItem setShortcut(char numericChar, char alphaChar, int numericModifiers, int alphaModifiers) {
+		return setShortcut(numericChar, alphaChar);
+	}
+
+	public default ContextMenu.ContextMenuInfo getMenuInfo() { return null; }
 }

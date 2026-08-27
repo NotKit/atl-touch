@@ -210,6 +210,8 @@ public class PopupMenu {
 		@Override
 		public MenuItem add(int groupId, int itemId, int order, CharSequence title) {
 			MenuItemImpl item = new MenuItemImpl(itemId, this, String.valueOf(title), null);
+			item.groupId = groupId;
+			item.order = order;
 			items.add(item);
 			item.setVisible(true);
 			return item;
@@ -279,6 +281,8 @@ public class PopupMenu {
 		@Override
 		public SubMenu addSubMenu(int groupId, int itemId, int order, CharSequence title) {
 			SubMenuImpl submenu = new SubMenuImpl(itemId, this, String.valueOf(title));
+			submenu.item.groupId = groupId;
+			submenu.item.order = order;
 			items.add(submenu.item);
 			submenu.item.setVisible(true);
 			return submenu;
@@ -346,8 +350,11 @@ public class PopupMenu {
 
 	private class MenuItemImpl implements MenuItem {
 		private int id;
+		private int groupId;
+		private int order;
 		private MenuImpl parent;
 		private String title;
+		private String titleCondensed;
 		SubMenuImpl subMenu;
 		int position; // position in list of visible items, or -1 if not visible
 
@@ -422,6 +429,7 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setTitleCondensed(CharSequence titleCondensed) {
+			this.titleCondensed = titleCondensed == null ? null : String.valueOf(titleCondensed);
 			return this;
 		}
 
@@ -450,8 +458,7 @@ public class PopupMenu {
 
 		@Override
 		public int getGroupId() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getGroupId'");
+			return groupId;
 		}
 
 		@Override
@@ -495,8 +502,7 @@ public class PopupMenu {
 
 		@Override
 		public boolean hasSubMenu() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'hasSubMenu'");
+			return subMenu != null;
 		}
 
 		@Override
@@ -507,8 +513,7 @@ public class PopupMenu {
 
 		@Override
 		public boolean isChecked() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'isChecked'");
+			return false;
 		}
 
 		@Override
@@ -528,26 +533,22 @@ public class PopupMenu {
 
 		@Override
 		public int getOrder() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getOrder'");
+			return order;
 		}
 
 		@Override
 		public boolean isEnabled() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'isEnabled'");
+			return true;
 		}
 
 		@Override
 		public CharSequence getTitleCondensed() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getTitleCondensed'");
+			return titleCondensed != null ? titleCondensed : title;
 		}
 
 		@Override
 		public CharSequence getTitle() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getTitle'");
+			return title;
 		}
 
 		@Override
