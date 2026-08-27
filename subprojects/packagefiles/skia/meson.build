@@ -39,7 +39,12 @@ gn_args = [
     # Prefer system libraries where possible
     'skia_use_system_freetype2=true',
     'skia_use_system_harfbuzz=true',
-    'skia_use_system_libjpeg_turbo=true',
+    # ... except libjpeg-turbo: SkJpegCodec::onGetScaledDimensions() calls
+    # jpeg_calc_output_dimensions() on a zeroed jpeg_decompress_struct, which
+    # libjpeg-turbo 3.x dereferences cinfo->master in. Any sampled JPEG decode
+    # (BitmapFactory with inSampleSize > 1) then segfaults. Skia's own copy is
+    # the 2.x fork it was written against.
+    'skia_use_system_libjpeg_turbo=false',
     'skia_use_system_libpng=true',
     'skia_use_system_libwebp=true',
     'skia_use_system_zlib=true',
