@@ -117,6 +117,7 @@ public abstract class Context {
 		dm = new DisplayMetrics();
 		Configuration config = new Configuration();
 		native_updateConfig(config);
+		applyWindowSizeDp(config, dm);
 		r = new Resources(assets, dm, config);
 		application_info = new ApplicationInfo();
 		try (XmlResourceParser parser = assets.openXmlResourceParser("AndroidManifest.xml")) {
@@ -155,6 +156,35 @@ public abstract class Context {
 				}
 			}
 		}
+	}
+
+	/* screenWidthDp and friends describe the app's window in dp. The window size
+	 * is already in DisplayMetrics, in pixels, so convert here rather than asking
+	 * the native side, which used to leave all three at 0 -- Compose measures
+	 * popups against AT_MOST(screenWidthDp * density) and got 0x0. One method,
+	 * because the boot snapshot and every later window resize have to agree. */
+	private static void applyWindowSizeDp(Configuration config, DisplayMetrics metrics) {
+		config.screenWidthDp = (int)(metrics.widthPixels / metrics.density);
+		config.screenHeightDp = (int)(metrics.heightPixels / metrics.density);
+		config.smallestScreenWidthDp = Math.min(config.screenWidthDp, config.screenHeightDp);
+	}
+
+	/**
+	 * The window's size changed after the static initialiser above snapshotted
+	 * it. AOSP does this from ActivityThread.handleConfigurationChanged;
+	 * Display.setWindowSize() calls it here. The toolkit dispatches
+	 * onConfigurationChanged into each view tree separately, from
+	 * ViewRootImpl.dispatchConfigurationChanged().
+	 */
+	public static void onWindowSizeChanged() {
+		if (r == null)
+			return; /* the static initialiser is still running: it reads the new size itself */
+		dm.setToDefaults();
+		Configuration config = new Configuration(r.getConfiguration());
+		applyWindowSizeDp(config, dm);
+		r.updateConfiguration(config, dm);
+		if (this_application != null)
+			this_application.onConfigurationChanged(config);
 	}
 
 	private static native String native_get_apk_path();
@@ -887,7 +917,17 @@ public abstract class Context {
 
 	public boolean bindIsolatedService(android.content.Intent a0, int a1, java.lang.String a2, java.util.concurrent.Executor a3, android.content.ServiceConnection a4) { return false; }
 
-	public java.util.concurrent.Executor getMainExecutor() { return null; }
+	/* Not null: callers hand this straight to APIs that dereference it -
+	 * androidx.biometric NPEs on it before a Fragment can even start. */
+	public java.util.concurrent.Executor getMainExecutor() {
+		final android.os.Handler handler = new android.os.Handler(getMainLooper());
+		return new java.util.concurrent.Executor() {
+			@Override
+			public void execute(Runnable command) {
+				handler.post(command);
+			}
+		};
+	}
 
 	public static final int BIND_AUTO_CREATE = 1;
 

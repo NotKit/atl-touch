@@ -167,11 +167,55 @@ public final class ContextImpl extends Context {
 			return (T)layout_inflater;
 		if (serviceClass == JobScheduler.class)
 			return (T)job_scheduler;
+		// The name-keyed switch above is the real table; go through it rather
+		// than reflecting, or an interface (WindowManager) has no constructor
+		// at all and getConstructors()[0] throws AIOOBE past the catch.
+		String name = SYSTEM_SERVICE_NAMES.get(serviceClass.getName());
+		if (name != null)
+			return (T)getSystemService(name);
 		try {
 			return (T)serviceClass.getConstructors()[0].newInstance();
-		} catch (ReflectiveOperationException e) {
+		} catch (ReflectiveOperationException | ArrayIndexOutOfBoundsException e) {
 			return null;
 		}
+	}
+
+	private static final java.util.Map<String, String> SYSTEM_SERVICE_NAMES = new java.util.HashMap<>();
+	static {
+		String[] pairs = {
+			"android.view.WindowManager", "window",
+			"android.content.ClipboardManager", "clipboard",
+			"android.hardware.SensorManager", "sensor",
+			"android.net.ConnectivityManager", "connectivity",
+			"android.app.KeyguardManager", "keyguard",
+			"android.telephony.TelephonyManager", "phone",
+			"android.media.AudioManager", "audio",
+			"android.app.ActivityManager", "activity",
+			"android.hardware.usb.UsbManager", "usb",
+			"android.os.Vibrator", "vibrator",
+			"android.os.PowerManager", "power",
+			"android.hardware.display.DisplayManager", "display",
+			"android.media.MediaRouter", "media_router",
+			"android.app.NotificationManager", "notification",
+			"android.app.AlarmManager", "alarm",
+			"android.hardware.input.InputManager", "input",
+			"android.location.LocationManager", "location",
+			"android.app.UiModeManager", "uimode",
+			"android.view.inputmethod.InputMethodManager", "input_method",
+			"android.view.accessibility.AccessibilityManager", "accessibility",
+			"android.net.wifi.WifiManager", "wifi",
+			"android.bluetooth.BluetoothManager", "bluetooth",
+			"android.app.AppOpsManager", "appops",
+			"android.os.UserManager", "user",
+			"android.view.accessibility.CaptioningManager", "captioning",
+			"android.app.StatusBarManager", "statusbar",
+			"android.hardware.camera2.CameraManager", "camera",
+			"android.hardware.display.ColorDisplayManager", "color_display",
+			"android.app.SearchManager", "search",
+			"android.os.storage.StorageManager", "storage",
+		};
+		for (int i = 0; i < pairs.length; i += 2)
+			SYSTEM_SERVICE_NAMES.put(pairs[i], pairs[i + 1]);
 	}
 
 	@Override

@@ -33,7 +33,7 @@ public class ActivityManager {
 	}
 
 	public List<RunningAppProcessInfo> getRunningAppProcesses() {
-		return Arrays.asList(new RunningAppProcessInfo(Process.myPid(), Context.this_application.getPackageName()));
+		return Arrays.asList(new RunningAppProcessInfo(Process.myPid(), Context.pkg.applicationInfo.packageName));
 	}
 
 	public boolean isLowRamDevice() { return false; }
