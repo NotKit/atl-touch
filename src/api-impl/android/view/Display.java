@@ -1,13 +1,34 @@
 package android.view;
 
+import android.content.Context;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.DisplayMetrics;
 
 public final class Display {
 
+	/* the window's size in pixels: what the launcher asked for until there is a
+	 * window, then what the compositor actually granted */
 	public static int window_width = 960;
 	public static int window_height = 540;
+
+	/**
+	 * Publish the window's size. Every writer goes through here, because a size
+	 * that arrives after Context's static initialiser has already built
+	 * Configuration still has to reach Configuration: Resources hands it to
+	 * AssetManager.setConfiguration, so resource qualifiers are chosen from it,
+	 * and a screenWidthDp left at the size the launcher asked for means the app
+	 * resolves resources for a screen it does not have.
+	 */
+	public static synchronized void setWindowSize(int width, int height) {
+		if (width < 1 || height < 1)
+			return;
+		if (width == window_width && height == window_height)
+			return;
+		window_width = width;
+		window_height = height;
+		Context.onWindowSizeChanged();
+	}
 
 	// FIXME: what do we return here?
 	// we don't want to hardcode this stuff, but at the same time the apps can cache it
@@ -82,7 +103,9 @@ public final class Display {
 
 	public float getHdrSdrRatio() { return 0.0f; }
 
-	public int getPixelFormat() { return 0; }
+	// PixelFormat.UNKNOWN made PixelFormat.getPixelFormatInfo() throw for
+	// GeckoView's GeckoAppShell.getScreenDepth(). The toplevel is ARGB8888.
+	public int getPixelFormat() { return android.graphics.PixelFormat.RGBA_8888; }
 
 	public static class HdrCapabilities { 
 	public float getDesiredMaxLuminance() { return 0.0f; }

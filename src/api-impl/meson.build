@@ -758,6 +758,7 @@ srcs = [
 	'android/view/WindowInsets.java',
 	'android/view/WindowInsetsAnimation.java',
 	'android/view/WindowInsetsController.java',
+	'android/view/WindowInspector.java',
 	'android/view/WindowManager.java',
 	'android/view/WindowManagerGlobal.java',
 	'android/view/WindowManagerImpl.java',
