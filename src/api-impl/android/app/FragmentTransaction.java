@@ -8,8 +8,9 @@ public class FragmentTransaction {
 		this.activity = activity;
 	}
 
-	public FragmentTransaction add(Fragment fragment, String string) {
+	public FragmentTransaction add(Fragment fragment, String tag) {
 		fragment.activity = activity;
+		fragment.tag = tag;
 		activity.fragments.add(fragment);
 		return this;
 	}

@@ -186,6 +186,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		Slog.i(TAG, "- onCreate - yay!");
 
 		for (Fragment fragment : fragments) {
+			fragment.created = true;
 			fragment.onCreate(savedInstanceState);
 		}
 
@@ -502,8 +503,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return null;
 	}
 
+	private FragmentManager fragmentManager;
+
 	public FragmentManager getFragmentManager() {
-		return new FragmentManager(this);
+		if (fragmentManager == null)
+			fragmentManager = new FragmentManager(this);
+		return fragmentManager;
 	}
 
 	public LayoutInflater getLayoutInflater() {
@@ -513,6 +518,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public boolean isChangingConfigurations() { return false; }
 
 	public boolean isInPictureInPictureMode() { return false; }
+
+	/* No picture-in-picture mode here, so the params are dropped. Present
+	 * because LaunchActivity's override calls super. */
+	public void setPictureInPictureParams(PictureInPictureParams params) {}
 
 	@Override
 	public void onContentChanged() {
@@ -660,6 +669,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		finish();
 	}
 
+	/* No task stack here, so there is no task to remove: finishing is all of it. */
+	public void finishAndRemoveTask() {
+		finish();
+	}
+
 	public void overridePendingTransition(int enterAnim, int exitAnim) {}
 
 	public native boolean isTaskRoot();
@@ -759,6 +773,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	void performCreate(Bundle savedInstanceState) {
 		dispatchLifecycle(LIFECYCLE_CREATE, LIFECYCLE_PRE, savedInstanceState);
 		onCreate(savedInstanceState);
+		/* A fragment added from the app's own onCreate() - androidx's
+		 * ReportFragment is - was not in the list when onCreate() looped over
+		 * it. Catch it up, then hand every fragment onActivityCreated(), which
+		 * is ReportFragment's only source of ON_CREATE below SDK 29. */
+		for (Fragment fragment : new ArrayList<>(fragments)) {
+			if (!fragment.created) {
+				fragment.created = true;
+				fragment.onCreate(savedInstanceState);
+			}
+			fragment.onActivityCreated(savedInstanceState);
+		}
 		dispatchLifecycle(LIFECYCLE_CREATE, LIFECYCLE_ON, savedInstanceState);
 		dispatchLifecycle(LIFECYCLE_CREATE, LIFECYCLE_POST, savedInstanceState);
 	}

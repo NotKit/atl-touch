@@ -12,6 +12,7 @@ import android.util.Slog;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
+import android.view.ContextThemeWrapper;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -59,8 +60,13 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	};
 
 	public Dialog(Context context, int themeResId) {
-		this.context = context;
-		window = new Window(context, this);
+		// AOSP resolves windowBackground, windowIsFloating and the rest against
+		// the *dialog's* theme, not the activity's. Dropping themeResId gave a
+		// BottomSheetDialog (whose theme paints a transparent window) the
+		// activity's opaque windowBackground, and the panel then covered the
+		// whole window with it.
+		this.context = themeResId != 0 ? new ContextThemeWrapper(context, themeResId) : context;
+		window = new Window(this.context, this);
 	}
 
 	public Dialog(Context context) {
