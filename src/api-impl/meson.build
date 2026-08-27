@@ -104,6 +104,7 @@ srcs = [
 	'android/atl/ATLKeyboardDialog.java',
 	'android/atl/ATLKeyboardViewer.java',
 	'android/atl/ATLMediaContentProvider.java',
+	'android/atl/ATLRuntime.java',
 	'android/atl/ATLTimeZone.java',
 	'android/atl/ATLZoneInfoDb.java',
 	'android/atl/FileDescriptorUtils.java',

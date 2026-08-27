@@ -1,0 +1,14 @@
+option('hotspot-launcher',
+       type: 'feature',
+       value: 'auto',
+       description: 'build android-translation-layer-hotspot, the launcher that runs apps on a stock JVM instead of ART (needs a JDK with libjvm)')
+
+option('image-launcher',
+       type: 'feature',
+       value: 'auto',
+       description: 'build android-translation-layer-image, the same launcher creating the VM from a GraalVM native-image shared library instead of libjvm')
+
+option('skia-prebuilt',
+       type: 'string',
+       value: '',
+       description: 'directory holding a prebuilt libskia.so and the skia include/ tree, used instead of building the skia subproject (required for a cross build)')
