@@ -336,35 +336,92 @@ public class ViewRootImpl implements ViewParent {
 		for (Panel panel : panels)
 			layoutNeeded |= panel.view.isLayoutRequested();
 		layoutNeeded |= panelLayoutPending;
-		if (layoutNeeded)
-			performLayout(width, height);
+		if (layoutNeeded) {
+			try {
+				performLayout(width, height);
+			} catch (Throwable t) {
+				// draw with the previous layout rather than abort the frame
+				reportDrawThrow("layout", t, width, height);
+			}
+		}
 		if (window != null && window.view_tree_observer != null)
 			window.view_tree_observer.dispatchOnDraw();
 		Canvas canvas = new DisplayListCanvas(canvas_ptr);
-		if (view != null)
-			view.draw(canvas);
+		int baseSaveCount = canvas.getSaveCount();
+		if (view != null) {
+			try {
+				view.draw(canvas);
+			} catch (Throwable t) {
+				reportDrawThrow("the decor view", t, width, height);
+				canvas.restoreToCount(baseSaveCount); // a partial draw left its saves behind
+			}
+		}
 		for (Panel panel : panels) {
 			if (panel.view.getVisibility() != View.VISIBLE)
 				continue;
-			if ((panel.params.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0)
-				canvas.drawColor(((int)(panel.params.dimAmount * 255) << 24));
-			drawPanelShadow(canvas, panel.view);
-			canvas.save();
-			canvas.translate(panel.view.getLeft(), panel.view.getTop());
-			// a panel is a window of its own size: clip like AOSP's surface would,
-			// so panel damage (the panel's bounds) covers everything it can draw
-			canvas.clipRect(0, 0, panel.view.getWidth(), panel.view.getHeight());
-			// ...and give it that surface. On AOSP a panel draws into its own
-			// transparent buffer which the compositor blends over the window, so a
-			// non-SrcOver paint in the panel never touches the layer below. Drawing
-			// straight onto the shared canvas would let it: Telegram's bottom sheets
-			// paint their dim with PorterDuff.SRC, which replaced the whole activity
-			// with black instead of shading it.
-			int layer = canvas.saveLayer(0, 0, panel.view.getWidth(), panel.view.getHeight(), null);
-			panel.view.draw(canvas);
-			canvas.restoreToCount(layer);
-			canvas.restore();
+			try {
+				if ((panel.params.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0)
+					canvas.drawColor(((int)(panel.params.dimAmount * 255) << 24));
+				drawPanelShadow(canvas, panel.view);
+				canvas.save();
+				canvas.translate(panel.view.getLeft(), panel.view.getTop());
+				// a panel is a window of its own size: clip like AOSP's surface would,
+				// so panel damage (the panel's bounds) covers everything it can draw
+				canvas.clipRect(0, 0, panel.view.getWidth(), panel.view.getHeight());
+				// ...and give it that surface. On AOSP a panel draws into its own
+				// transparent buffer which the compositor blends over the window, so a
+				// non-SrcOver paint in the panel never touches the layer below. Drawing
+				// straight onto the shared canvas would let it: Telegram's bottom sheets
+				// paint their dim with PorterDuff.SRC, which replaced the whole activity
+				// with black instead of shading it.
+				int layer = canvas.saveLayer(0, 0, panel.view.getWidth(), panel.view.getHeight(), null);
+				panel.view.draw(canvas);
+				canvas.restoreToCount(layer);
+				canvas.restore();
+			} catch (Throwable t) {
+				reportDrawThrow(panel.view.getClass().getName(), t, width, height);
+			} finally {
+				canvas.restoreToCount(baseSaveCount);
+			}
 		}
+	}
+
+	private String lastDrawThrow;   // class and message of the last one reported
+	private int drawThrowCount;     // how many times it has repeated since
+
+	/*
+	 * A Throwable escaping the draw used to be swallowed at the native boundary,
+	 * and by then mDirty was already empty: the damage was gone, no later frame
+	 * repainted the region, and the canvas kept the transparent clear
+	 * atl_canvas_begin_frame left there -- which composites as black wherever
+	 * the window is over ATL's opaque toplevel.  Report it once per distinct
+	 * throwable and put the damage back, so the region is repainted rather than
+	 * left as a permanent hole.
+	 *
+	 * Putting the damage back is not enough on its own: nothing else invalidates
+	 * a screen that is not moving, so the repaint never comes and the hole stays
+	 * (measured -- a throw on two frames of a static onboarding screen left it
+	 * #000000 for the rest of the run).  So ask for the frame too, but only for
+	 * the first few repeats of the same throwable: a deterministic one would
+	 * otherwise spin the render loop for as long as its view is on screen.
+	 */
+	private static final int DRAW_THROW_RETRIES = 3;
+
+	private void reportDrawThrow(String what, Throwable t, int width, int height) {
+		String key = t.getClass().getName() + ": " + t.getMessage();
+		if (key.equals(lastDrawThrow)) {
+			if (++drawThrowCount % 100 == 0)
+				System.err.println("ATL_DRAW_THROW: " + key + " (x" + drawThrowCount + ")");
+		} else {
+			lastDrawThrow = key;
+			drawThrowCount = 1;
+			System.err.println("ATL_DRAW_THROW while drawing " + what
+			    + " -- this frame is incomplete; the damage is being kept");
+			t.printStackTrace();
+		}
+		mDirty.union(0, 0, width, height);
+		if (drawThrowCount <= DRAW_THROW_RETRIES && scene != 0)
+			nativeInvalidate(scene);
 	}
 
 	/* Android default light and shadow parameters (ThreadedRenderer / config.xml) */
