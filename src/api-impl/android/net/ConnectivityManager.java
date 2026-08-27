@@ -4,6 +4,7 @@ import android.os.Handler;
 
 public class ConnectivityManager {
 
+	/* static: apps subclass it without a ConnectivityManager in hand */
 	public static class NetworkCallback {
 		public void onAvailable(Network network) {}
 		public void onLost(Network network) {}
@@ -62,4 +63,18 @@ public class ConnectivityManager {
 	public static final int TYPE_WIMAX = 6;
 
 	public static final java.lang.String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
+
+	public static final int RESTRICT_BACKGROUND_STATUS_DISABLED = 1;
+
+	public static final int RESTRICT_BACKGROUND_STATUS_WHITELISTED = 2;
+
+	public static final int RESTRICT_BACKGROUND_STATUS_ENABLED = 3;
+
+	/**
+	 * There is no Data Saver here, so background use is never restricted.
+	 * Fenix's DownloadLanguagesFeature.start calls this, and the missing
+	 * method escaped FragmentManager.executeOpsTogether -- the transaction
+	 * that was moving the fragment to STARTED stopped there.
+	 */
+	public int getRestrictBackgroundStatus() { return RESTRICT_BACKGROUND_STATUS_DISABLED; }
 }
