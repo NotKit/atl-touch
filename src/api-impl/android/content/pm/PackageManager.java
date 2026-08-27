@@ -1464,7 +1464,13 @@ public class PackageManager {
 	 */
 	public PackageInfo getPackageInfo(String packageName, int flags) throws NameNotFoundException {
 		if (packageName.equals(Context.pkg.packageName)) {
-			return PackageParser.generatePackageInfo(Context.pkg, new int[0], flags, 0, 0, new HashSet<>(), new PackageUserState());
+			PackageInfo info = PackageParser.generatePackageInfo(Context.pkg, new int[0], flags, 0, 0, new HashSet<>(), new PackageUserState());
+			// An app that declares no <service> gets an empty array, not null.
+			// GeckoView walks this list without a null check and takes the
+			// whole process down with it.
+			if ((flags & GET_SERVICES) != 0 && info.services == null)
+				info.services = new ServiceInfo[0];
+			return info;
 		} else if (packageName.equals("atl") || packageName.equals("android")) {
 			PackageInfo info = new PackageInfo();
 			info.packageName = packageName;
@@ -2591,7 +2597,10 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentContentProvidersAsUser(
 	    Intent intent, int flags, int userId) {
-		return null;
+		// Empty, not null: the platform never returns null here, and Kotlin
+		// callers declare the result non-null (Fenix's
+		// DefaultDistributionProviderChecker NPEs and kills the process).
+		return new java.util.ArrayList<ResolveInfo>();
 	}
 
 	/**
@@ -2607,7 +2616,7 @@ public class PackageManager {
 	 * @see #GET_RESOLVED_FILTER
 	 */
 	public List<ResolveInfo> queryIntentContentProviders(Intent intent, int flags) {
-		return null;
+		return new java.util.ArrayList<ResolveInfo>();
 	}
 
 	/**

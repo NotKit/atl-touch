@@ -10,6 +10,9 @@ public class AppWidgetManager {
 		return new AppWidgetManager();
 	}
 
+	/* there is no launcher to pin a widget to */
+	public boolean isRequestPinAppWidgetSupported() { return false; }
+
 	public int[] getAppWidgetIds(ComponentName provider) {
 		return new int[0];
 	}

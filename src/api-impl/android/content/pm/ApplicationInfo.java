@@ -394,6 +394,9 @@ public class ApplicationInfo extends PackageItemInfo {
 	 */
 	public String sourceDir = "/tmp/FIXME/FIXME.apk"; // FIXME
 
+	/* the volume this app is on; StorageStatsManager callers read it */
+	public java.util.UUID storageUuid = new java.util.UUID(0, 0);
+
 	/**
 	 * Full path to the location of the publicly available parts of this
 	 * package (i.e. the primary resource package and manifest).  For

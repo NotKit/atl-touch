@@ -14,10 +14,22 @@ public class SystemProperties {
 		properties.put("ro.build.tags", "release-keys");
 		properties.put("ro.build.type", "user");
 		// TODO how to actually get the system's supported abis?
-		if (System.getProperty("os.arch").equals("x86_64")) {
+		switch (System.getProperty("os.arch")) {
+		case "x86_64":
 			properties.put("ro.product.cpu.abi", "x86_64");
 			properties.put("ro.product.cpu.abi2", "x86");
 			properties.put("ro.product.cpu.abilist", "x86_64,x86");
+			break;
+		case "aarch64":
+			properties.put("ro.product.cpu.abi", "arm64-v8a");
+			properties.put("ro.product.cpu.abi2", "armeabi-v7a");
+			properties.put("ro.product.cpu.abilist", "arm64-v8a,armeabi-v7a,armeabi");
+			break;
+		case "arm":
+			properties.put("ro.product.cpu.abi", "armeabi-v7a");
+			properties.put("ro.product.cpu.abi2", "armeabi");
+			properties.put("ro.product.cpu.abilist", "armeabi-v7a,armeabi");
+			break;
 		}
 	}
 

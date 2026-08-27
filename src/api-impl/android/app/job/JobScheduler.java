@@ -9,11 +9,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class JobScheduler {
 	private static final String TAG = "JobScheduler";
 
-	static Map<Integer, JobInfo> pendingJobs = new HashMap<>();
+	/* getAllPendingJobs() is a Binder call on AOSP and callers use it from any
+	 * thread, so this map has to tolerate that. androidx.work's
+	 * SystemJobScheduler schedules on one executor and cancels from another;
+	 * over a plain HashMap `new ArrayList<>(values())` then either throws
+	 * ConcurrentModificationException or sizes its array from a stale size()
+	 * and hands back trailing nulls. */
+	static Map<Integer, JobInfo> pendingJobs = new ConcurrentHashMap<>();
 	private static Map<Class<? extends JobService>, JobService> runningServices = new HashMap<>();
 
 	private final Context context;
