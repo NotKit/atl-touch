@@ -256,9 +256,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Canvas_nDrawNinePatch(JNIEnv *env, 
 				canvas->drawImageRect(image, texture_bounds, sampling, &paint);
 				canvas->restore();
 			} else if (cell_color != TRANSPARENT_COLOR) {
+				/* a colour cell stands in for that part of the image, so it has
+				 * to be modulated by the paint's alpha like drawImageRect above.
+				 * setColor() alone replaces it, and a drawable faded out to
+				 * alpha 0 then still paints its cells at full strength. */
+				SkColor c = (SkColor)(uint32_t)cell_color;
 				SkPaint color_paint(paint);
 				color_paint.setShader(nullptr);
-				color_paint.setColor((SkColor)(uint32_t)cell_color);
+				color_paint.setColor(SkColorSetA(c, SkColorGetA(c) * paint.getAlpha() / 255));
 				canvas->drawRect(rect, color_paint);
 			}
 		}
