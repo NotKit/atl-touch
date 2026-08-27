@@ -86,10 +86,26 @@ public class Handler {
 	public void handleMessage(Message msg) {
 	}
 
+	/* ATL_DEBUG_HANDLER=<substring>: trace posts and dispatches whose Runnable
+	 * or Handler class name contains the substring - how a callback that never
+	 * arrives is told apart from one that is never posted */
+	private static final String DEBUG_HANDLER = System.getenv("ATL_DEBUG_HANDLER");
+
+	private void traceMessage(String what, Message msg) {
+		if (DEBUG_HANDLER == null)
+			return;
+		String who = (msg.callback != null ? msg.callback.getClass().getName()
+		                                   : getClass().getName() + "#" + msg.what);
+		if (who.contains(DEBUG_HANDLER))
+			System.err.println("ATLHandler: " + what + " " + who
+				+ " thread=" + Thread.currentThread().getName());
+	}
+
 	/**
 	 * Handle system messages here.
 	 */
 	public void dispatchMessage(Message msg) {
+		traceMessage("dispatch", msg);
 		if (msg.callback != null) {
 			handleCallback(msg);
 		} else {
@@ -607,6 +623,7 @@ public class Handler {
 
 	private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMillis) {
 		msg.target = this;
+		traceMessage("enqueue", msg);
 		if (mAsynchronous) {
 			msg.setAsynchronous(true);
 		}

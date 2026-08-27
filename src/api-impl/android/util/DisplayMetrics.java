@@ -276,6 +276,18 @@ public class DisplayMetrics {
 	}
 
 	private static int getDeviceDensity() {
+		/* An explicit dpi wins over the grid unit. GRID_UNIT_PX can only express
+		 * multiples of 20 dpi (see below), so matching another device's scale for
+		 * a side-by-side comparison usually needs a value it cannot reach. */
+		String densityDpi = System.getenv("ATL_DENSITY_DPI");
+		if (densityDpi != null) {
+			try {
+				int dpi = Integer.parseInt(densityDpi.trim());
+				if (dpi > 0)
+					return dpi;
+			} catch (NumberFormatException ignored) {}
+		}
+
 		/* Lomiri (Ubuntu Touch) does not use wl_output scaling; the UI scale
 		 * is communicated as GRID_UNIT_PX, pixels per grid unit (8 px = 1x). */
 		String gridUnitPx = System.getenv("GRID_UNIT_PX");
