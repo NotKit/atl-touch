@@ -331,17 +331,75 @@ public class KeyCharacterMap {
 	 * @param metaState The meta key modifier state.
 	 * @return The associated character or combining accent, or 0 if none.
 	 */
-	public int get(int keyCode, int metaState) {
-		return 0;
-		/*metaState = KeyEvent.normalizeMetaState(metaState);
-		char ch = nativeGetCharacter(mPtr, keyCode, metaState);
+	/* ATL has no per-device .kcm file, so the layout is this table: the US
+	 * ("qwerty") one AOSP falls back to. It exists because a KeyEvent that
+	 * carries no codepoint of its own -- ATL's key callback only fills one in
+	 * for letters, digits and space, and events synthesized by an IME backend
+	 * carry none at all -- still has to answer getUnicodeChar(), which is how
+	 * every real text widget (Compose included) types a character. */
+	private static char baseChar(int keyCode) {
+		if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9)
+			return (char)('0' + keyCode - KeyEvent.KEYCODE_0);
+		if (keyCode >= KeyEvent.KEYCODE_A && keyCode <= KeyEvent.KEYCODE_Z)
+			return (char)('a' + keyCode - KeyEvent.KEYCODE_A);
+		if (keyCode >= KeyEvent.KEYCODE_NUMPAD_0 && keyCode <= KeyEvent.KEYCODE_NUMPAD_9)
+			return (char)('0' + keyCode - KeyEvent.KEYCODE_NUMPAD_0);
+		switch (keyCode) {
+			case KeyEvent.KEYCODE_SPACE: return ' ';
+			case KeyEvent.KEYCODE_COMMA: return ',';
+			case KeyEvent.KEYCODE_PERIOD: return '.';
+			case KeyEvent.KEYCODE_MINUS: return '-';
+			case KeyEvent.KEYCODE_EQUALS: return '=';
+			case KeyEvent.KEYCODE_LEFT_BRACKET: return '[';
+			case KeyEvent.KEYCODE_RIGHT_BRACKET: return ']';
+			case KeyEvent.KEYCODE_BACKSLASH: return '\\';
+			case KeyEvent.KEYCODE_SEMICOLON: return ';';
+			case KeyEvent.KEYCODE_APOSTROPHE: return '\'';
+			case KeyEvent.KEYCODE_SLASH: return '/';
+			case KeyEvent.KEYCODE_GRAVE: return '`';
+			case KeyEvent.KEYCODE_AT: return '@';
+			case KeyEvent.KEYCODE_POUND: return '#';
+			case KeyEvent.KEYCODE_STAR: return '*';
+			case KeyEvent.KEYCODE_PLUS: return '+';
+			case KeyEvent.KEYCODE_NUMPAD_DIVIDE: return '/';
+			case KeyEvent.KEYCODE_NUMPAD_MULTIPLY: return '*';
+			case KeyEvent.KEYCODE_NUMPAD_SUBTRACT: return '-';
+			case KeyEvent.KEYCODE_NUMPAD_ADD: return '+';
+			case KeyEvent.KEYCODE_NUMPAD_DOT: return '.';
+			case KeyEvent.KEYCODE_NUMPAD_COMMA: return ',';
+			case KeyEvent.KEYCODE_NUMPAD_EQUALS: return '=';
+			// ENTER and TAB deliberately produce no character: a text field that
+			// typed them would insert a newline or a tab instead of acting on the
+			// key, which is what the app expects from them.
+			default: return 0;
+		}
+	}
 
-		int map = sCombiningToAccent.get(ch);
-		if (map != 0) {
-			return map | COMBINING_ACCENT;
-		} else {
-			return ch;
-		}*/
+	private static char shiftedChar(int keyCode) {
+		if (keyCode >= KeyEvent.KEYCODE_A && keyCode <= KeyEvent.KEYCODE_Z)
+			return (char)('A' + keyCode - KeyEvent.KEYCODE_A);
+		if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9)
+			return ")!@#$%^&*(".charAt(keyCode - KeyEvent.KEYCODE_0);
+		switch (keyCode) {
+			case KeyEvent.KEYCODE_COMMA: return '<';
+			case KeyEvent.KEYCODE_PERIOD: return '>';
+			case KeyEvent.KEYCODE_MINUS: return '_';
+			case KeyEvent.KEYCODE_EQUALS: return '+';
+			case KeyEvent.KEYCODE_LEFT_BRACKET: return '{';
+			case KeyEvent.KEYCODE_RIGHT_BRACKET: return '}';
+			case KeyEvent.KEYCODE_BACKSLASH: return '|';
+			case KeyEvent.KEYCODE_SEMICOLON: return ':';
+			case KeyEvent.KEYCODE_APOSTROPHE: return '"';
+			case KeyEvent.KEYCODE_SLASH: return '?';
+			case KeyEvent.KEYCODE_GRAVE: return '~';
+			default: return baseChar(keyCode);
+		}
+	}
+
+	public int get(int keyCode, int metaState) {
+		boolean shift = (metaState & (KeyEvent.META_SHIFT_ON | KeyEvent.META_SHIFT_LEFT_ON
+		                              | KeyEvent.META_SHIFT_RIGHT_ON)) != 0;
+		return shift ? shiftedChar(keyCode) : baseChar(keyCode);
 	}
 
 	/**
@@ -394,7 +452,8 @@ public class KeyCharacterMap {
 	 * @return The associated numeric or symbolic character, or 0 if none.
 	 */
 	public char getNumber(int keyCode) {
-		return nativeGetNumber(mPtr, keyCode);
+		char c = baseChar(keyCode);
+		return (c >= '0' && c <= '9') || c == '*' || c == '#' ? c : 0;
 	}
 
 	/**
@@ -429,7 +488,14 @@ public class KeyCharacterMap {
 		}
 
 		metaState = KeyEvent.normalizeMetaState(metaState);
-		return nativeGetMatch(mPtr, keyCode, chars, metaState);
+		char preferred = (char)get(keyCode, metaState);
+		for (char c : chars)
+			if (c == preferred)
+				return c;
+		for (char c : chars)
+			if (c == baseChar(keyCode) || c == shiftedChar(keyCode))
+				return c;
+		return 0;
 	}
 
 	/**
@@ -440,7 +506,7 @@ public class KeyCharacterMap {
 	 * @return The display label character, or 0 if none (eg. for non-printing keys).
 	 */
 	public char getDisplayLabel(int keyCode) {
-		return nativeGetDisplayLabel(mPtr, keyCode);
+		return shiftedChar(keyCode); // the label printed on the key, i.e. upper case
 	}
 
 	/**
@@ -534,18 +600,17 @@ public class KeyCharacterMap {
 			    "results.meta.length must be >= " + KeyData.META_LENGTH);
 		}
 
-		char displayLabel = nativeGetDisplayLabel(mPtr, keyCode);
+		char displayLabel = getDisplayLabel(keyCode);
 		if (displayLabel == 0) {
 			return false;
 		}
 
 		results.displayLabel = displayLabel;
-		results.number = nativeGetNumber(mPtr, keyCode);
-		results.meta[0] = nativeGetCharacter(mPtr, keyCode, 0);
-		results.meta[1] = nativeGetCharacter(mPtr, keyCode, KeyEvent.META_SHIFT_ON);
-		results.meta[2] = nativeGetCharacter(mPtr, keyCode, KeyEvent.META_ALT_ON);
-		results.meta[3] = nativeGetCharacter(mPtr, keyCode,
-		                                     KeyEvent.META_ALT_ON | KeyEvent.META_SHIFT_ON);
+		results.number = getNumber(keyCode);
+		results.meta[0] = baseChar(keyCode);
+		results.meta[1] = shiftedChar(keyCode);
+		results.meta[2] = baseChar(keyCode);
+		results.meta[3] = shiftedChar(keyCode);
 		return true;
 	}
 
@@ -574,7 +639,7 @@ public class KeyCharacterMap {
 		if (chars == null) {
 			throw new IllegalArgumentException("chars must not be null.");
 		}
-		return nativeGetEvents(mPtr, chars);
+		return null; // AOSP: "may fail to map characters to key codes"
 	}
 
 	/**
@@ -584,7 +649,7 @@ public class KeyCharacterMap {
 	 * @return True if the key is a printing key.
 	 */
 	public boolean isPrintingKey(int keyCode) {
-		int type = Character.getType(nativeGetDisplayLabel(mPtr, keyCode));
+		int type = Character.getType(getDisplayLabel(keyCode));
 
 		switch (type) {
 			case Character.SPACE_SEPARATOR:

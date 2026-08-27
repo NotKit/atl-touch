@@ -2987,8 +2987,13 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 * @return The associated character or combining accent, or 0 if none.
 	 */
 	public int getUnicodeChar(int metaState) {
-		// return getKeyCharacterMap().get(mKeyCode, metaState);
-		return unicodeValue;
+		// ATL's key callback fills in the codepoint the compositor resolved
+		// through the keyboard layout, but only for letters, digits and space,
+		// and events synthesized by an IME backend carry none at all. Fall back
+		// to the keycode, which is what AOSP does for every key.
+		if (unicodeValue != 0)
+			return unicodeValue;
+		return getKeyCharacterMap().get(mKeyCode, metaState);
 	}
 
 	/**

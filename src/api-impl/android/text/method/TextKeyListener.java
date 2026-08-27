@@ -12,5 +12,15 @@ public class TextKeyListener extends MetaKeyKeyListener implements KeyListener {
 
 	public static void clear(Editable content) {}
 
-	public static android.text.method.TextKeyListener getInstance() { return null; }
+	private static TextKeyListener instance;
+
+	/* AOSP hands out a singleton here; returning null made every caller that
+	 * types through a key listener crash. The inherited KeyListener methods
+	 * report "not handled", which leaves the key to the caller's own
+	 * handling - enough for GeckoView, whose editable takes it from there. */
+	public static android.text.method.TextKeyListener getInstance() {
+		if (instance == null)
+			instance = new TextKeyListener();
+		return instance;
+	}
 }
