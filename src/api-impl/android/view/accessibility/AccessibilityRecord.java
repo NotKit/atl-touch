@@ -1,113 +1,275 @@
 package android.view.accessibility;
 
-/* Shape matters: ART rejects any class whose bytecode treats an
- * AccessibilityEvent as an AccessibilityRecord if this supertype is absent. */
+import android.os.Parcelable;
+import android.view.View;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * The state an accessibility event carries. Nothing here observes it — we have no
+ * accessibility service — but androidx wraps it, so apps reach it through
+ * AccessibilityRecordCompat and it has to hold what it is given.
+ */
 public class AccessibilityRecord {
+	private CharSequence className;
+	private CharSequence contentDescription;
+	private CharSequence beforeText;
+	private Parcelable parcelableData;
+	private final List<CharSequence> text = new ArrayList<>();
+	private AccessibilityNodeInfo source;
+	private int windowId = -1;
+	private int addedCount = -1;
+	private int removedCount = -1;
+	private int currentItemIndex = -1;
+	private int itemCount;
+	private int fromIndex = -1;
+	private int toIndex = -1;
+	private int scrollX;
+	private int scrollY;
+	private int maxScrollX;
+	private int maxScrollY;
+	private boolean checked;
+	private boolean enabled;
+	private boolean password;
+	private boolean fullScreen;
+	private boolean scrollable;
+	private int scrollDeltaX;
+	private int scrollDeltaY;
 
-	public int getAddedCount() { return 0; }
+	public static AccessibilityRecord obtain() {
+		return new AccessibilityRecord();
+	}
 
-	public java.lang.CharSequence getBeforeText() { return null; }
+	public static AccessibilityRecord obtain(AccessibilityRecord record) {
+		AccessibilityRecord copy = new AccessibilityRecord();
+		copy.className = record.className;
+		copy.contentDescription = record.contentDescription;
+		copy.beforeText = record.beforeText;
+		copy.parcelableData = record.parcelableData;
+		copy.text.addAll(record.text);
+		copy.source = record.source;
+		copy.windowId = record.windowId;
+		copy.addedCount = record.addedCount;
+		copy.removedCount = record.removedCount;
+		copy.currentItemIndex = record.currentItemIndex;
+		copy.itemCount = record.itemCount;
+		copy.fromIndex = record.fromIndex;
+		copy.toIndex = record.toIndex;
+		copy.scrollX = record.scrollX;
+		copy.scrollY = record.scrollY;
+		copy.maxScrollX = record.maxScrollX;
+		copy.maxScrollY = record.maxScrollY;
+		copy.checked = record.checked;
+		copy.enabled = record.enabled;
+		copy.password = record.password;
+		copy.fullScreen = record.fullScreen;
+		copy.scrollable = record.scrollable;
+		return copy;
+	}
 
-	public java.lang.CharSequence getClassName() { return null; }
+	public void recycle() {}
 
-	public java.lang.CharSequence getContentDescription() { return null; }
+	public void setSource(View source) {
+		setSource(source, View.NO_ID);
+	}
 
-	public int getCurrentItemIndex() { return 0; }
+	public void setSource(View root, int virtualDescendantId) {
+		this.source = null;
+	}
 
-	public int getDisplayId() { return 0; }
+	public AccessibilityNodeInfo getSource() {
+		return source;
+	}
 
-	public int getFromIndex() { return 0; }
+	public int getWindowId() {
+		return windowId;
+	}
 
-	public int getItemCount() { return 0; }
+	public CharSequence getClassName() {
+		return className;
+	}
 
-	public int getMaxScrollX() { return 0; }
+	public void setClassName(CharSequence className) {
+		this.className = className;
+	}
 
-	public int getMaxScrollY() { return 0; }
+	public CharSequence getContentDescription() {
+		return contentDescription;
+	}
 
-	public android.os.Parcelable getParcelableData() { return null; }
+	public void setContentDescription(CharSequence contentDescription) {
+		this.contentDescription = contentDescription;
+	}
 
-	public int getRemovedCount() { return 0; }
+	public CharSequence getBeforeText() {
+		return beforeText;
+	}
 
-	public int getScrollDeltaX() { return 0; }
+	public void setBeforeText(CharSequence beforeText) {
+		this.beforeText = beforeText;
+	}
 
-	public int getScrollDeltaY() { return 0; }
+	public Parcelable getParcelableData() {
+		return parcelableData;
+	}
 
-	public int getScrollX() { return 0; }
+	public void setParcelableData(Parcelable parcelableData) {
+		this.parcelableData = parcelableData;
+	}
 
-	public int getScrollY() { return 0; }
+	public List<CharSequence> getText() {
+		return text;
+	}
 
-	public android.view.accessibility.AccessibilityNodeInfo getSource() { return null; }
+	public int getAddedCount() {
+		return addedCount;
+	}
 
-	public android.view.accessibility.AccessibilityNodeInfo getSource(int a0) { return null; }
+	public void setAddedCount(int addedCount) {
+		this.addedCount = addedCount;
+	}
 
-	public java.util.List getText() { return null; }
+	public int getRemovedCount() {
+		return removedCount;
+	}
 
-	public int getToIndex() { return 0; }
+	public void setRemovedCount(int removedCount) {
+		this.removedCount = removedCount;
+	}
 
-	public int getWindowId() { return 0; }
+	public int getCurrentItemIndex() {
+		return currentItemIndex;
+	}
 
-	public boolean isChecked() { return false; }
+	public void setCurrentItemIndex(int currentItemIndex) {
+		this.currentItemIndex = currentItemIndex;
+	}
 
-	public boolean isEnabled() { return false; }
+	public int getItemCount() {
+		return itemCount;
+	}
 
-	public boolean isFullScreen() { return false; }
+	public void setItemCount(int itemCount) {
+		this.itemCount = itemCount;
+	}
 
-	public boolean isPassword() { return false; }
+	public int getFromIndex() {
+		return fromIndex;
+	}
 
-	public boolean isScrollable() { return false; }
+	public void setFromIndex(int fromIndex) {
+		this.fromIndex = fromIndex;
+	}
 
-	public static android.view.accessibility.AccessibilityRecord obtain() { return null; }
+	public int getToIndex() {
+		return toIndex;
+	}
 
-	public static android.view.accessibility.AccessibilityRecord obtain(android.view.accessibility.AccessibilityRecord a0) { return null; }
+	public void setToIndex(int toIndex) {
+		this.toIndex = toIndex;
+	}
 
-	public void recycle() { }
+	public int getScrollX() {
+		return scrollX;
+	}
 
-	public void setAddedCount(int a0) { }
+	public void setScrollX(int scrollX) {
+		this.scrollX = scrollX;
+	}
 
-	public void setBeforeText(java.lang.CharSequence a0) { }
+	public int getScrollY() {
+		return scrollY;
+	}
 
-	public void setChecked(boolean a0) { }
+	public void setScrollY(int scrollY) {
+		this.scrollY = scrollY;
+	}
 
-	public void setClassName(java.lang.CharSequence a0) { }
+	public int getMaxScrollX() {
+		return maxScrollX;
+	}
 
-	public void setContentDescription(java.lang.CharSequence a0) { }
+	public void setMaxScrollX(int maxScrollX) {
+		this.maxScrollX = maxScrollX;
+	}
 
-	public void setCurrentItemIndex(int a0) { }
+	public int getMaxScrollY() {
+		return maxScrollY;
+	}
 
-	public void setEnabled(boolean a0) { }
+	public void setMaxScrollY(int maxScrollY) {
+		this.maxScrollY = maxScrollY;
+	}
 
-	public void setFromIndex(int a0) { }
+	public boolean isChecked() {
+		return checked;
+	}
 
-	public void setFullScreen(boolean a0) { }
+	public void setChecked(boolean checked) {
+		this.checked = checked;
+	}
 
-	public void setItemCount(int a0) { }
+	public boolean isEnabled() {
+		return enabled;
+	}
 
-	public void setMaxScrollX(int a0) { }
+	public void setEnabled(boolean enabled) {
+		this.enabled = enabled;
+	}
 
-	public void setMaxScrollY(int a0) { }
+	public boolean isPassword() {
+		return password;
+	}
 
-	public void setParcelableData(android.os.Parcelable a0) { }
+	public void setPassword(boolean password) {
+		this.password = password;
+	}
 
-	public void setPassword(boolean a0) { }
+	public boolean isFullScreen() {
+		return fullScreen;
+	}
 
-	public void setRemovedCount(int a0) { }
+	public void setFullScreen(boolean fullScreen) {
+		this.fullScreen = fullScreen;
+	}
 
-	public void setScrollDeltaX(int a0) { }
+	public boolean isScrollable() {
+		return scrollable;
+	}
 
-	public void setScrollDeltaY(int a0) { }
+	public void setScrollable(boolean scrollable) {
+		this.scrollable = scrollable;
+	}
 
-	public void setScrollX(int a0) { }
+	/* Kept from the generated stub: ATL has one display and no scroll deltas,
+	 * but a view that names these must still link. */
+	public int getDisplayId() {
+		return 0;
+	}
 
-	public void setScrollY(int a0) { }
+	public int getScrollDeltaX() {
+		return scrollDeltaX;
+	}
 
-	public void setScrollable(boolean a0) { }
+	public void setScrollDeltaX(int scrollDeltaX) {
+		this.scrollDeltaX = scrollDeltaX;
+	}
 
-	public void setSource(android.view.View a0) { }
+	public int getScrollDeltaY() {
+		return scrollDeltaY;
+	}
 
-	public void setSource(android.view.View a0, int a1) { }
+	public void setScrollDeltaY(int scrollDeltaY) {
+		this.scrollDeltaY = scrollDeltaY;
+	}
 
-	public void setToIndex(int a0) { }
+	public AccessibilityNodeInfo getSource(int windowId) {
+		return source;
+	}
 
-	public java.lang.String toString() { return null; }
-
+	@Override
+	public String toString() {
+		return "AccessibilityRecord[className=" + className + "]";
+	}
 }

@@ -49,9 +49,20 @@ public class AccessibilityNodeInfo {
 		public static final AccessibilityAction ACTION_SHOW_TEXT_SUGGESTIONS = new AccessibilityAction(0, null);
 		public static final AccessibilityAction ACTION_SCROLL_IN_DIRECTION = new AccessibilityAction(0, null);
 
-		public AccessibilityAction(int actionId, CharSequence label) {}
+		private final int id;
+		private final CharSequence label;
 
-		public int getId() { return 0; }
+		public AccessibilityAction(int actionId, CharSequence label) {
+			this.id = actionId;
+			this.label = label;
+		}
+
+		public int getId() { return id; }
+
+		/** androidx's ViewCompat.addAccessibilityAction() de-duplicates the
+		 *  actions already on a view by label, so this has to be the label
+		 *  the action was built with. */
+		public CharSequence getLabel() { return label; }
 	}
 
 	public static class RangeInfo {
