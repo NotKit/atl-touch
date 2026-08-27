@@ -82,3 +82,14 @@ JNIEXPORT void JNICALL Java_com_google_android_gles_1jni_GLImpl_glColor4f(JNIEnv
 {
 	glColor4f((GLfloat)red, (GLfloat)green, (GLfloat)blue, (GLfloat)alpha);
 }
+
+/*
+ * The GL10 interface an app gets from EGLContext.getGL(). Telegram reaches it
+ * for glGetError() alone -- its renderers take the GL10 argument as glUnused
+ * and drive android.opengl.GLES20 instead. The rest of GLImpl is fixed-function
+ * GL 1.x, which no GLES context here exposes, so it stays unimplemented.
+ */
+JNIEXPORT jint JNICALL Java_com_google_android_gles_1jni_GLImpl_glGetError(JNIEnv *env, jobject this)
+{
+	return (jint)glGetError();
+}

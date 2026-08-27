@@ -4,13 +4,17 @@
 #include <jni.h>
 #include <stdint.h>
 
+/* the NDK's AndroidBitmapFormat values. They are not a plain sequence, and
+ * they have to be these numbers: Bitmap.Config stores the same ones for
+ * AndroidBitmap_getInfo to report, and app code compares against the NDK's. */
 enum {
-	ANDROID_BITMAP_FORMAT_A_8,
-	ANDROID_BITMAP_FORMAT_RGBA_4444,
-	ANDROID_BITMAP_FORMAT_RGBA_8888,
-	ANDROID_BITMAP_FORMAT_RGB_565,
-	ANDROID_BITMAP_FORMAT_RGBA_F16,
-	ANDROID_BITMAP_FORMAT_RGBA_1010102,
+	ANDROID_BITMAP_FORMAT_NONE = 0,
+	ANDROID_BITMAP_FORMAT_RGBA_8888 = 1,
+	ANDROID_BITMAP_FORMAT_RGB_565 = 4,
+	ANDROID_BITMAP_FORMAT_RGBA_4444 = 7,
+	ANDROID_BITMAP_FORMAT_A_8 = 8,
+	ANDROID_BITMAP_FORMAT_RGBA_F16 = 9,
+	ANDROID_BITMAP_FORMAT_RGBA_1010102 = 10,
 };
 
 struct AndroidBitmapInfo {
@@ -23,5 +27,7 @@ struct AndroidBitmapInfo {
 
 int AndroidBitmap_getInfo(JNIEnv *env, jobject bitmap,
                           struct AndroidBitmapInfo *info);
+int AndroidBitmap_lockPixels(JNIEnv *env, jobject bitmap, void **pixels);
+int AndroidBitmap_unlockPixels(JNIEnv *env, jobject bitmap);
 
 #endif

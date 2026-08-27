@@ -73,7 +73,13 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1texImage2D(
 	GLsizei width = bitmap_info.width;
 	GLsizei height = bitmap_info.height;
 	GLenum format = get_pixel_format_from_internal_format(internalformat);
-	glTexImage2D(target, level, internalformat, width, height, border, format,
-	             type, _PTR(_GET_LONG_FIELD(bitmap, "bytes")));
+	/* Bitmap.bytes is never filled in; the pixels live in the SkBitmap, which
+	 * is what AndroidBitmap_lockPixels hands out */
+	void *pixels = NULL;
+	AndroidBitmap_lockPixels(env, bitmap, &pixels);
+
+	glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+
+	AndroidBitmap_unlockPixels(env, bitmap);
 	return 0;
 }
