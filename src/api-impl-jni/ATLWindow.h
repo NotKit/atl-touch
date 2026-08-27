@@ -21,11 +21,22 @@ void atl_windows_init(void);
 
 /* IME event injection, used by input method backends (src/api-impl-jni/input/):
  * text and key events go through the same dispatch as hardware keyboard
- * input; the inset shrinks the layout so the panel doesn't cover the UI. */
-void atl_windows_ime_commit_text(const char *utf8);
-void atl_windows_ime_set_composing(const char *utf8);
+ * input; the inset shrinks the layout so the panel doesn't cover the UI.
+ *
+ * commit/composing carry Maliit's replacement range: replace_length characters
+ * starting replace_start from the composing region (from the cursor when there
+ * is none) are deleted before the new text goes in, which is how a keyboard
+ * corrects a word it already committed. cursor_pos < 0 means "after the text". */
+void atl_windows_ime_commit_text(const char *utf8, int replace_start, int replace_length, int cursor_pos);
+void atl_windows_ime_set_composing(const char *utf8, int replace_start, int replace_length, int cursor_pos);
 void atl_windows_ime_finish_composing(void);
 void atl_windows_ime_key(int action, int keycode);
+void atl_windows_ime_set_selection(int start, int length);
+/* the focused editor's selected text, UTF-8; caller g_free()s. NULL if there is
+ * no editor */
+char *atl_windows_ime_get_selection(void);
+/* the input method closed its panel by itself: drop the editor's focus */
+void atl_windows_ime_initiated_hide(void);
 void atl_windows_set_ime_inset(int inset);
 bool atl_debug_ime(void);
 
@@ -37,7 +48,9 @@ void atl_window_show(ATLWindow *window);
 void atl_window_hide(ATLWindow *window);
 bool atl_window_is_visible(ATLWindow *window);
 void atl_window_focus(ATLWindow *window);
+void atl_display_set_window_size(JNIEnv *env, int width, int height);
 int atl_window_get_width(ATLWindow *window);
+int atl_window_get_height(ATLWindow *window);
 void atl_window_set_jobject(ATLWindow *window, JNIEnv *env, jobject window_obj);
 jobject atl_window_get_jobject(ATLWindow *window);
 void atl_window_focus(ATLWindow *window);
@@ -61,7 +74,6 @@ void atl_window_invalidate(ATLWindow *window);
 /* size of the primary monitor in pixels; false if there is no monitor
  * (or GLFW is not initialized yet), in which case *width/*height are
  * left untouched */
-bool atl_screen_size(int *width, int *height);
 
 /* WPE WebView offscreen integration. Called from the C++ WebView module, so
  * these must keep C linkage to match their definitions in ATLWindow.c. */

@@ -10,26 +10,42 @@ extern "C" {
 /*
  * Class:     android_view_inputmethod_InputMethodManager
  * Method:    nativeInit
- * Signature: ()J
+ * Signature: ()Z
  */
-JNIEXPORT jlong JNICALL Java_android_view_inputmethod_InputMethodManager_nativeInit
+JNIEXPORT jboolean JNICALL Java_android_view_inputmethod_InputMethodManager_nativeInit
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_view_inputmethod_InputMethodManager
+ * Method:    nativeUpdate
+ * Signature: (Ljava/lang/String;IIIIZZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_inputmethod_InputMethodManager_nativeUpdate
+  (JNIEnv *, jclass, jstring, jint, jint, jint, jint, jboolean, jboolean);
+
+/*
+ * Class:     android_view_inputmethod_InputMethodManager
+ * Method:    nativeReset
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_view_inputmethod_InputMethodManager_nativeReset
   (JNIEnv *, jclass);
 
 /*
  * Class:     android_view_inputmethod_InputMethodManager
  * Method:    nativeShowSoftInput
- * Signature: (JJLandroid/view/inputmethod/InputConnection;I)Z
+ * Signature: ()V
  */
-JNIEXPORT jboolean JNICALL Java_android_view_inputmethod_InputMethodManager_nativeShowSoftInput
-  (JNIEnv *, jobject, jlong, jlong, jobject, jint);
+JNIEXPORT void JNICALL Java_android_view_inputmethod_InputMethodManager_nativeShowSoftInput
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_view_inputmethod_InputMethodManager
  * Method:    nativeHideSoftInput
- * Signature: (J)V
+ * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_android_view_inputmethod_InputMethodManager_nativeHideSoftInput
-  (JNIEnv *, jclass, jlong);
+  (JNIEnv *, jclass);
 
 #ifdef __cplusplus
 }

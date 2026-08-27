@@ -31,13 +31,19 @@ struct ATLWindow {
 	jobject view_root; // global ref, NULL until attached
 	jmethodID perform_layout;
 	jmethodID set_ime_inset;
+	jmethodID dispatch_configuration_changed;
 	jmethodID perform_draw;
 	jmethodID dispatch_touch_event;
+	jmethodID dispatch_generic_motion_event;
 	jmethodID dispatch_key_event;
 	jmethodID dispatch_character;
 	jmethodID dispatch_commit_text;
 	jmethodID dispatch_composing_text;
 	jmethodID dispatch_finish_composing;
+	jmethodID dispatch_ime_set_selection;
+	jmethodID dispatch_ime_get_selection;
+	jmethodID dispatch_im_initiated_hide;
+	jmethodID dispatch_window_focus_changed;
 	jobject window_jobj;    // weak ref to the java android.view.Window
 	bool needs_redraw;
 	/* redraw everything: set by native-initiated invalidations (resize, show,
@@ -137,8 +143,25 @@ extern void activity_close_all(void); // app/android_app_Activity.c
 #define ACTION_UP     1
 #define ACTION_MOVE   2
 #define ACTION_CANCEL 3
+#define ACTION_POINTER_DOWN 5
+#define ACTION_POINTER_UP   6
+#define ACTION_SCROLL 8
+/* ACTION_POINTER_DOWN/UP carry the index of the pointer that went down or up in
+ * the high byte of the action (MotionEvent.ACTION_POINTER_INDEX_SHIFT). */
+#define ACTION_POINTER_INDEX_SHIFT 8
+
+#define ATL_MAX_CONTACTS 8
+
+/* one live contact: `id` is what web content sees as Touch.identifier, `wl_id`
+ * is the compositor's own numbering (which does not have to be dense) */
+struct atl_contact {
+	int32_t id;
+	int32_t wl_id;
+	double x, y;
+};
 
 #define SOURCE_TOUCHSCREEN 0x1002
+#define SOURCE_MOUSE       0x2002
 
 #define KEY_ACTION_DOWN 0
 #define KEY_ACTION_UP   1
@@ -157,17 +180,21 @@ static jlong atl_uptime_millis(void)
 	return (jlong)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 
-static void dispatch_pointer_event(ATLWindow *window, int action)
+/* Build one MotionEvent carrying every live contact and hand it to
+ * ViewRootImpl.dispatchTouchEvent. `action` is already packed with the pointer
+ * index for ACTION_POINTER_DOWN/UP; the array must still hold ALL contacts,
+ * including the one that is lifting, because the consumer reads the lifting
+ * pointer out of the array by action index. */
+static void dispatch_touch_contacts(ATLWindow *window, int action, int count, const struct atl_contact *c)
 {
-	if (!window->view_root)
+	if (!window->view_root || count <= 0 || count > ATL_MAX_CONTACTS)
 		return;
 	JNIEnv *env = get_jni_env();
 	/* A pending exception (e.g. thrown by an app callback under a nested native
 	 * frame that couldn't handle it) makes every JNI call below misbehave —
 	 * object creation returns NULL and the dispatch call aborts the runtime
 	 * ("with unexpected pending exception"). Surface and clear it instead. */
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	atl_report_pending_exception(env);
 	/* GLFW reports the cursor in window (logical) coordinates, but the scene is
 	 * laid out and rendered in framebuffer pixels. On a scaled/HiDPI output the
 	 * two differ by the content scale, so convert before dispatching or touches
@@ -177,27 +204,46 @@ static void dispatch_pointer_event(ATLWindow *window, int action)
 	glfwGetWindowSize(window->glfw_window, &win_w, &win_h);
 	float scale_x = win_w > 0 ? (float)fb_w / win_w : 1.0f;
 	float scale_y = win_h > 0 ? (float)fb_h / win_h : 1.0f;
-	float px = (float)window->pointer_x * scale_x;
-	float py = (float)window->pointer_y * scale_y;
-	if (getenv("ATL_DEBUG_INPUT"))
-		fprintf(stderr, "ATLWindow: pointer action=%d window=(%.1f,%.1f) scale=(%.2f,%.2f) scene=(%.1f,%.1f) fb=%dx%d win=%dx%d\n",
-		        action, window->pointer_x, window->pointer_y, scale_x, scale_y, px, py, fb_w, fb_h, win_w, win_h);
-	jint id = 1;
-	jfloat values[4] = {px, py, px, py};
-	jintArray ids = (*env)->NewIntArray(env, 1);
-	jfloatArray coords = (*env)->NewFloatArray(env, 4);
-	(*env)->SetIntArrayRegion(env, ids, 0, 1, &id);
-	(*env)->SetFloatArrayRegion(env, coords, 0, 4, values);
+	jint idv[ATL_MAX_CONTACTS];
+	jfloat values[4 * ATL_MAX_CONTACTS];
+	for (int i = 0; i < count; i++) {
+		float px = (float)c[i].x * scale_x;
+		float py = (float)c[i].y * scale_y;
+		idv[i] = c[i].id;
+		values[4 * i + 0] = px;
+		values[4 * i + 1] = py;
+		values[4 * i + 2] = px;
+		values[4 * i + 3] = py;
+	}
+	if (getenv("ATL_DEBUG_INPUT")) {
+		fprintf(stderr, "ATLWindow: pointer action=0x%x count=%d scale=(%.2f,%.2f) fb=%dx%d win=%dx%d",
+		        action, count, scale_x, scale_y, fb_w, fb_h, win_w, win_h);
+		for (int i = 0; i < count; i++)
+			fprintf(stderr, " [%d id=%d scene=(%.1f,%.1f)]", i, idv[i], values[4 * i], values[4 * i + 1]);
+		fprintf(stderr, "\n");
+	}
+	jintArray ids = (*env)->NewIntArray(env, count);
+	jfloatArray coords = (*env)->NewFloatArray(env, 4 * count);
+	(*env)->SetIntArrayRegion(env, ids, 0, count, idv);
+	(*env)->SetFloatArrayRegion(env, coords, 0, 4 * count, values);
 	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor,
 	                                         SOURCE_TOUCHSCREEN, action, atl_uptime_millis(), ids, coords);
 	jboolean handled = (*env)->CallBooleanMethod(env, window->view_root, window->dispatch_touch_event, motion_event);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	atl_report_pending_exception(env);
 	if (getenv("ATL_DEBUG_INPUT"))
 		fprintf(stderr, "ATLWindow: dispatchTouchEvent handled=%d\n", handled);
 	(*env)->DeleteLocalRef(env, motion_event);
 	(*env)->DeleteLocalRef(env, ids);
 	(*env)->DeleteLocalRef(env, coords);
+}
+
+/* the GLFW mouse path: one contact, at the cursor. Pointer id 0 so that a
+ * second contact can be id 1 - APZ only ever matches identifiers against each
+ * other, so the absolute value does not matter to it. */
+static void dispatch_pointer_event(ATLWindow *window, int action)
+{
+	struct atl_contact c = { .id = 0, .wl_id = -1, .x = window->pointer_x, .y = window->pointer_y };
+	dispatch_touch_contacts(window, action, 1, &c);
 }
 
 static void on_cursor_pos(GLFWwindow *glfw_window, double x, double y)
@@ -207,6 +253,38 @@ static void on_cursor_pos(GLFWwindow *glfw_window, double x, double y)
 	window->pointer_y = y;
 	if (window->pointer_down)
 		dispatch_pointer_event(window, ACTION_MOVE);
+}
+
+/* Wheel/two-finger scroll. Android delivers this as a SOURCE_MOUSE
+ * ACTION_SCROLL event on the generic-motion path, not the touch path, with the
+ * deltas on the HSCROLL/VSCROLL axes. Nothing dispatched it before, so a wheel
+ * did nothing in any app. */
+static void on_scroll(GLFWwindow *glfw_window, double dx, double dy)
+{
+	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	if (!window->view_root || !window->dispatch_generic_motion_event)
+		return;
+	JNIEnv *env = get_jni_env();
+	atl_report_pending_exception(env);
+	int fb_w = 0, fb_h = 0, win_w = 0, win_h = 0;
+	glfwGetFramebufferSize(window->glfw_window, &fb_w, &fb_h);
+	glfwGetWindowSize(window->glfw_window, &win_w, &win_h);
+	float scale_x = win_w > 0 ? (float)fb_w / win_w : 1.0f;
+	float scale_y = win_h > 0 ? (float)fb_h / win_h : 1.0f;
+	float px = (float)window->pointer_x * scale_x;
+	float py = (float)window->pointer_y * scale_y;
+	if (getenv("ATL_DEBUG_INPUT"))
+		fprintf(stderr, "ATLWindow: scroll d=(%.2f,%.2f) at (%.1f,%.1f)\n", dx, dy, px, py);
+	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class,
+	                                         handle_cache.motion_event.constructor_scroll,
+	                                         SOURCE_MOUSE, ACTION_SCROLL, atl_uptime_millis(),
+	                                         px, py, px, py, (jfloat)dx, (jfloat)dy);
+	jboolean handled = (*env)->CallBooleanMethod(env, window->view_root,
+	                                             window->dispatch_generic_motion_event, motion_event);
+	atl_report_pending_exception(env);
+	if (getenv("ATL_DEBUG_INPUT"))
+		fprintf(stderr, "ATLWindow: dispatchGenericMotionEvent handled=%d\n", handled);
+	(*env)->DeleteLocalRef(env, motion_event);
 }
 
 static void on_mouse_button(GLFWwindow *glfw_window, int button, int action, int mods)
@@ -223,15 +301,21 @@ static void on_mouse_button(GLFWwindow *glfw_window, int button, int action, int
 	}
 }
 
-/* --- wayland touch input ----------------------------------------------
+/* --- touch input, one or more contacts ---------------------------------
  * GLFW has no touch API; its wayland backend only listens to wl_pointer,
- * and Lomiri/Mir does not emulate a pointer for finger input. Bind our own
- * wl_touch from the seat and feed the existing dispatch path (first touch
- * point only for now). Events arrive through GLFW's wl_display, dispatched
- * from glfwPollEvents(). */
+ * and Lomiri/Mir does not emulate a pointer for finger input. So we bind our
+ * own wl_touch from the seat.
+ *
+ * The contact table below and the ACTION_POINTER_DOWN/UP packing are shared:
+ * the wl_touch callbacks are thin converters over atl_touch_{add,move,release}
+ * and so are the ATL_DEBUG_PINCH and ATL_DEBUG_TAP drivers, which are the only
+ * things that can drive contacts on a host with no touch device (see
+ * debug_pinch and debug_tap).
+ */
 
 static ATLWindow *atl_touch_window;
-static int32_t atl_touch_id = -1;
+static struct atl_contact atl_touches[ATL_MAX_CONTACTS];
+static int atl_touch_count;
 
 static ATLWindow *atl_window_from_wl_surface(struct wl_surface *surface)
 {
@@ -241,42 +325,124 @@ static ATLWindow *atl_window_from_wl_surface(struct wl_surface *surface)
 	return NULL;
 }
 
+static int atl_touch_slot(int32_t wl_id)
+{
+	for (int i = 0; i < atl_touch_count; i++)
+		if (atl_touches[i].wl_id == wl_id)
+			return i;
+	return -1;
+}
+
+/* Touch.identifier stays put for the life of a contact, so pick the lowest
+ * free one rather than the slot index: slots shift when an earlier finger
+ * lifts, and APZ tracks its cached touches by identifier. */
+static int32_t atl_touch_alloc_id(void)
+{
+	for (int32_t cand = 0; cand < ATL_MAX_CONTACTS; cand++) {
+		bool used = false;
+		for (int i = 0; i < atl_touch_count; i++)
+			if (atl_touches[i].id == cand)
+				used = true;
+		if (!used)
+			return cand;
+	}
+	return -1;
+}
+
+/* contact 0 mirrored into the GLFW pointer state, so the mouse path and the
+ * touch path do not disagree about where the pointer is */
+static void atl_touch_mirror_pointer(void)
+{
+	if (!atl_touch_window)
+		return;
+	atl_touch_window->pointer_down = atl_touch_count > 0;
+	if (atl_touch_count > 0) {
+		atl_touch_window->pointer_x = atl_touches[0].x;
+		atl_touch_window->pointer_y = atl_touches[0].y;
+	}
+}
+
+static void atl_touch_add(ATLWindow *window, int32_t wl_id, double x, double y)
+{
+	if (atl_touch_count && window != atl_touch_window)
+		return;
+	if (atl_touch_count >= ATL_MAX_CONTACTS || atl_touch_slot(wl_id) >= 0)
+		return;
+	atl_touch_window = window;
+	int slot = atl_touch_count;
+	atl_touches[slot].id = atl_touch_alloc_id();
+	atl_touches[slot].wl_id = wl_id;
+	atl_touches[slot].x = x;
+	atl_touches[slot].y = y;
+	atl_touch_count++;
+	atl_touch_mirror_pointer();
+	int action = slot == 0 ? ACTION_DOWN
+	                       : (ACTION_POINTER_DOWN | (slot << ACTION_POINTER_INDEX_SHIFT));
+	dispatch_touch_contacts(window, action, atl_touch_count, atl_touches);
+}
+
+static void atl_touch_move(int32_t wl_id, double x, double y)
+{
+	int slot = atl_touch_slot(wl_id);
+	if (slot < 0 || !atl_touch_window)
+		return;
+	atl_touches[slot].x = x;
+	atl_touches[slot].y = y;
+	atl_touch_mirror_pointer();
+	dispatch_touch_contacts(atl_touch_window, ACTION_MOVE, atl_touch_count, atl_touches);
+}
+
+static void atl_touch_release(int32_t wl_id)
+{
+	int slot = atl_touch_slot(wl_id);
+	if (slot < 0 || !atl_touch_window)
+		return;
+	ATLWindow *window = atl_touch_window;
+	/* dispatch BEFORE compacting: ACTION_POINTER_UP names the lifting pointer
+	 * by index into the array, so it has to still be in there. */
+	int action = atl_touch_count == 1 ? ACTION_UP
+	                                  : (ACTION_POINTER_UP | (slot << ACTION_POINTER_INDEX_SHIFT));
+	dispatch_touch_contacts(window, action, atl_touch_count, atl_touches);
+	for (int i = slot; i + 1 < atl_touch_count; i++)
+		atl_touches[i] = atl_touches[i + 1];
+	atl_touch_count--;
+	atl_touch_mirror_pointer();
+	if (!atl_touch_count) {
+		window->pointer_down = false;
+		atl_touch_window = NULL;
+	}
+}
+
+static void atl_touch_cancel_all(void)
+{
+	if (!atl_touch_window || !atl_touch_count)
+		return;
+	dispatch_touch_contacts(atl_touch_window, ACTION_CANCEL, atl_touch_count, atl_touches);
+	atl_touch_window->pointer_down = false;
+	atl_touch_window = NULL;
+	atl_touch_count = 0;
+}
+
 static void atl_wl_touch_down(void *data, struct wl_touch *touch, uint32_t serial,
                               uint32_t time, struct wl_surface *surface, int32_t id,
                               wl_fixed_t x, wl_fixed_t y)
 {
-	if (atl_touch_id != -1)
-		return;
 	ATLWindow *window = atl_window_from_wl_surface(surface);
 	if (!window)
 		return;
-	atl_touch_id = id;
-	atl_touch_window = window;
-	window->pointer_x = wl_fixed_to_double(x);
-	window->pointer_y = wl_fixed_to_double(y);
-	window->pointer_down = true;
-	dispatch_pointer_event(window, ACTION_DOWN);
+	atl_touch_add(window, id, wl_fixed_to_double(x), wl_fixed_to_double(y));
 }
 
 static void atl_wl_touch_up(void *data, struct wl_touch *touch, uint32_t serial,
                             uint32_t time, int32_t id)
 {
-	if (id != atl_touch_id || !atl_touch_window)
-		return;
-	dispatch_pointer_event(atl_touch_window, ACTION_UP);
-	atl_touch_window->pointer_down = false;
-	atl_touch_window = NULL;
-	atl_touch_id = -1;
+	atl_touch_release(id);
 }
 
 static void atl_wl_touch_motion(void *data, struct wl_touch *touch, uint32_t time,
                                 int32_t id, wl_fixed_t x, wl_fixed_t y)
 {
-	if (id != atl_touch_id || !atl_touch_window)
-		return;
-	atl_touch_window->pointer_x = wl_fixed_to_double(x);
-	atl_touch_window->pointer_y = wl_fixed_to_double(y);
-	dispatch_pointer_event(atl_touch_window, ACTION_MOVE);
+	atl_touch_move(id, wl_fixed_to_double(x), wl_fixed_to_double(y));
 }
 
 static void atl_wl_touch_frame(void *data, struct wl_touch *touch)
@@ -285,12 +451,7 @@ static void atl_wl_touch_frame(void *data, struct wl_touch *touch)
 
 static void atl_wl_touch_cancel(void *data, struct wl_touch *touch)
 {
-	if (!atl_touch_window)
-		return;
-	dispatch_pointer_event(atl_touch_window, ACTION_CANCEL);
-	atl_touch_window->pointer_down = false;
-	atl_touch_window = NULL;
-	atl_touch_id = -1;
+	atl_touch_cancel_all();
 }
 
 static const struct wl_touch_listener atl_wl_touch_listener = {
@@ -442,6 +603,9 @@ static int key_unicode(int key, int mods)
 static void on_key(GLFWwindow *glfw_window, int key, int scancode, int action, int mods)
 {
 	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	if (getenv("ATL_DEBUG_INPUT"))
+		fprintf(stderr, "ATLWindow: key key=%d action=%d mods=%d root=%p\n",
+		        key, action, mods, (void *)window->view_root);
 	if (!window->view_root)
 		return;
 	JNIEnv *env = get_jni_env();
@@ -456,8 +620,7 @@ static void on_key(GLFWwindow *glfw_window, int key, int scancode, int action, i
 	                                      map_key_code(key), repeat_count, meta_state);
 	_SET_INT_FIELD(key_event, "unicodeValue", key_unicode(key, mods));
 	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_key_event, key_event);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	atl_report_pending_exception(env);
 	(*env)->DeleteLocalRef(env, key_event);
 }
 
@@ -468,12 +631,14 @@ static void on_key(GLFWwindow *glfw_window, int key, int scancode, int action, i
 static void on_char(GLFWwindow *glfw_window, unsigned int codepoint)
 {
 	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	if (getenv("ATL_DEBUG_INPUT"))
+		fprintf(stderr, "ATLWindow: char U+%04X root=%p\n", codepoint,
+		        (void *)window->view_root);
 	if (!window->view_root || !window->dispatch_character)
 		return;
 	JNIEnv *env = get_jni_env();
 	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_character, (jint)codepoint);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	atl_report_pending_exception(env);
 }
 
 static bool debug_chrome(void);
@@ -490,6 +655,15 @@ static void on_framebuffer_size(GLFWwindow *glfw_window, int width, int height)
 	window->full_redraw = true;
 }
 
+static void atl_window_notify_focus(ATLWindow *window, bool has_focus);
+
+static void on_window_focus(GLFWwindow *glfw_window, int focused)
+{
+	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	if (window == windows) /* the window IME events are routed to, see atl_window_hide */
+		atl_window_notify_focus(window, focused != 0);
+}
+
 static void on_window_close(GLFWwindow *glfw_window)
 {
 	fprintf(stderr, "ATLWindow: window close event from compositor -> closing all activities and exiting\n");
@@ -499,29 +673,29 @@ static void on_window_close(GLFWwindow *glfw_window)
 
 /* --- IME event injection (used by input method backends) --- */
 
-void atl_windows_ime_commit_text(const char *utf8)
+void atl_windows_ime_commit_text(const char *utf8, int replace_start, int replace_length, int cursor_pos)
 {
 	ATLWindow *window = windows;
 	if (!window || !window->view_root || !utf8)
 		return;
 	JNIEnv *env = get_jni_env();
-	jstring str = (*env)->NewStringUTF(env, utf8);
-	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_commit_text, str);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	jstring str = utf8_to_jstring(env, utf8);
+	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_commit_text, str,
+	                          replace_start, replace_length, cursor_pos);
+	atl_report_pending_exception(env);
 	(*env)->DeleteLocalRef(env, str);
 }
 
-void atl_windows_ime_set_composing(const char *utf8)
+void atl_windows_ime_set_composing(const char *utf8, int replace_start, int replace_length, int cursor_pos)
 {
 	ATLWindow *window = windows;
 	if (!window || !window->view_root || !utf8)
 		return;
 	JNIEnv *env = get_jni_env();
-	jstring str = (*env)->NewStringUTF(env, utf8);
-	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_composing_text, str);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	jstring str = utf8_to_jstring(env, utf8);
+	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_composing_text, str,
+	                          replace_start, replace_length, cursor_pos);
+	atl_report_pending_exception(env);
 	(*env)->DeleteLocalRef(env, str);
 }
 
@@ -532,6 +706,59 @@ void atl_windows_ime_finish_composing(void)
 		return;
 	JNIEnv *env = get_jni_env();
 	(*env)->CallVoidMethod(env, window->view_root, window->dispatch_finish_composing);
+	atl_report_pending_exception(env);
+}
+
+void atl_windows_ime_set_selection(int start, int length)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root)
+		return;
+	JNIEnv *env = get_jni_env();
+	(*env)->CallVoidMethod(env, window->view_root, window->dispatch_ime_set_selection, start, length);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+}
+
+char *atl_windows_ime_get_selection(void)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root)
+		return NULL;
+	JNIEnv *env = get_jni_env();
+	jstring str = (*env)->CallObjectMethod(env, window->view_root, window->dispatch_ime_get_selection);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		return NULL;
+	}
+	if (!str)
+		return NULL;
+	char *utf8 = jstring_to_utf8(env, str);
+	(*env)->DeleteLocalRef(env, str);
+	return utf8;
+}
+
+void atl_windows_ime_initiated_hide(void)
+{
+	ATLWindow *window = windows;
+	if (!window || !window->view_root)
+		return;
+	JNIEnv *env = get_jni_env();
+	(*env)->CallVoidMethod(env, window->view_root, window->dispatch_im_initiated_hide);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+}
+
+/* The compositor moved keyboard focus, or the window was hidden. Both must
+ * reach the input method: a context left active goes on receiving the commits
+ * meant for whatever has focus now. */
+static void atl_window_notify_focus(ATLWindow *window, bool has_focus)
+{
+	if (!window || !window->view_root)
+		return;
+	JNIEnv *env = get_jni_env();
+	(*env)->CallVoidMethod(env, window->view_root, window->dispatch_window_focus_changed,
+	                       has_focus ? JNI_TRUE : JNI_FALSE);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 }
@@ -545,8 +772,7 @@ void atl_windows_ime_key(int action, int keycode)
 	jobject key_event = (*env)->NewObject(env, handle_cache.key_event.class, handle_cache.key_event.constructor,
 	                                      (jlong)0, (jlong)0, action, keycode, 0, 0);
 	(*env)->CallBooleanMethod(env, window->view_root, window->dispatch_key_event, key_event);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionDescribe(env);
+	atl_report_pending_exception(env);
 	(*env)->DeleteLocalRef(env, key_event);
 }
 
@@ -671,6 +897,162 @@ static bool debug_resize(int *w, int *h, double *after)
 	*h = rh;
 	*after = rt;
 	return true;
+}
+
+/* ATL_DEBUG_PINCH=<seconds>[:cx,cy,span0,span1,steps] - once, <seconds> after
+ * the first tick, walk two contacts apart (or together) about (cx,cy) from
+ * span0 to span1 pixels, one step every 8 ticks.
+ *
+ * This is an injector, not an input source, and it exists because a second
+ * real contact cannot be produced on a headless host: the compositor is
+ * started with no input devices, the only injection protocol available is
+ * zwlr_virtual_pointer_v1 (a pointer, not a touchscreen), and there is no
+ * virtual-touch protocol in wayland-protocols or wlroots at all. It drives the
+ * same atl_touch_add/move/release the wl_touch callbacks drive, so everything
+ * above the compositor socket - the contact table, the ACTION_POINTER_DOWN/UP
+ * packing, the MotionEvent arrays - is the real code path. Diagnostic only.
+ */
+static bool debug_pinch(double *after, int *cx, int *cy, int *span0, int *span1, int *steps)
+{
+	static int cached = -1;
+	static int pcx = 360, pcy = 800, ps0 = 120, ps1 = 600, pst = 10;
+	static double pt;
+
+	if (cached < 0) {
+		const char *s = getenv("ATL_DEBUG_PINCH");
+		char *end = NULL;
+		cached = 0;
+		if (s && *s) {
+			double t = strtod(s, &end);
+			if (end != s && t >= 0) {
+				cached = 1;
+				pt = t;
+				if (end && *end == ':') {
+					int a, b, c, d, e;
+					if (sscanf(end + 1, "%d,%d,%d,%d,%d", &a, &b, &c, &d, &e) == 5 && e > 1) {
+						pcx = a; pcy = b; ps0 = c; ps1 = d; pst = e;
+					}
+				}
+			}
+		}
+	}
+	if (!cached)
+		return false;
+	*after = pt;
+	*cx = pcx;
+	*cy = pcy;
+	*span0 = ps0;
+	*span1 = ps1;
+	*steps = pst;
+	return true;
+}
+
+/* one step of the injected two-contact sequence, driven off the 4 ms tick so
+ * layout and draw keep running between the events (a real gesture is spread
+ * over frames too, and APZ's pinch detector needs the moves to be separate). */
+static void debug_pinch_step(ATLWindow *window, int step, int cx, int cy, int span0, int span1, int steps)
+{
+	double half0 = span0 / 2.0;
+	if (step == 0) {
+		atl_touch_add(window, 100, cx - half0, cy);
+	} else if (step == 1) {
+		atl_touch_add(window, 101, cx + half0, cy);
+	} else if (step < 2 + steps) {
+		int k = step - 2;
+		double span = span0 + (span1 - span0) * (double)k / (steps - 1);
+		atl_touch_move(100, cx - span / 2.0, cy);
+		atl_touch_move(101, cx + span / 2.0, cy);
+	} else if (step == 2 + steps) {
+		atl_touch_release(101);
+	} else {
+		atl_touch_release(100);
+	}
+	fprintf(stderr, "ATLWindow: ATL_DEBUG_PINCH step=%d contacts=%d", step, atl_touch_count);
+	for (int i = 0; i < atl_touch_count; i++)
+		fprintf(stderr, " [id=%d %.0f,%.0f]", atl_touches[i].id, atl_touches[i].x, atl_touches[i].y);
+	fprintf(stderr, "\n");
+}
+
+/* ATL_DEBUG_TAP=<seconds>:<x>,<y>[-<x>,<y>][;<seconds>:<x>,<y>...] - a schedule
+ * of single contacts. At <seconds> after the first tick put a finger down at
+ * (x,y) and lift it again, or, when a second point is given, drag from the
+ * first to the second. The entries fire in order, so one run can walk several
+ * screens.
+ *
+ * The same injector argument as debug_pinch above, with one contact instead of
+ * two: on a headless host there is no touch device to tap with either, and the
+ * one injection protocol that exists, zwlr_virtual_pointer_v1, is a wlroots
+ * extension - Mir/Lomiri does not offer it, so on the phone this is the only
+ * way to drive a tap from inside. Coordinates are window pixels, the space
+ * dispatch_touch_contacts scales into scene=. Diagnostic only.
+ */
+#define ATL_DEBUG_TAP_MAX 16
+#define ATL_DEBUG_TAP_DRAG_STEPS 10
+#define ATL_DEBUG_TAP_WL_ID 200 /* not the pinch's 100/101 */
+
+struct atl_debug_tap {
+	double after;
+	int x, y, x1, y1;
+	int steps; /* moves from (x,y) to (x1,y1); 0 for a plain tap */
+};
+
+static int debug_tap(const struct atl_debug_tap **out)
+{
+	static struct atl_debug_tap taps[ATL_DEBUG_TAP_MAX];
+	static int count = -1;
+
+	if (count < 0) {
+		const char *s = getenv("ATL_DEBUG_TAP");
+		count = 0;
+		while (s && *s && count < ATL_DEBUG_TAP_MAX) {
+			char *end = NULL;
+			double t = strtod(s, &end);
+			int x, y, x1, y1, steps = 0;
+
+			if (end == s || *end != ':' || t < 0)
+				break;
+			if (sscanf(end + 1, "%d,%d-%d,%d", &x, &y, &x1, &y1) == 4) {
+				steps = ATL_DEBUG_TAP_DRAG_STEPS;
+			} else if (sscanf(end + 1, "%d,%d", &x, &y) == 2) {
+				x1 = x;
+				y1 = y;
+			} else {
+				break;
+			}
+			taps[count].after = t;
+			taps[count].x = x;
+			taps[count].y = y;
+			taps[count].x1 = x1;
+			taps[count].y1 = y1;
+			taps[count].steps = steps;
+			count++;
+			s = strchr(end, ';');
+			if (s)
+				s++;
+		}
+	}
+	*out = taps;
+	return count;
+}
+
+/* one step of one scheduled contact, paced off the tick like the pinch: down,
+ * then the drag moves (a plain tap has none), then the lift. Spreading it over
+ * frames is what makes it a gesture rather than two events in one frame. */
+static void debug_tap_step(ATLWindow *window, const struct atl_debug_tap *tap, int step)
+{
+	if (step == 0) {
+		atl_touch_add(window, ATL_DEBUG_TAP_WL_ID, tap->x, tap->y);
+	} else if (step <= tap->steps) {
+		double k = (double)step / tap->steps;
+		atl_touch_move(ATL_DEBUG_TAP_WL_ID, tap->x + (tap->x1 - tap->x) * k,
+		               tap->y + (tap->y1 - tap->y) * k);
+	} else {
+		atl_touch_release(ATL_DEBUG_TAP_WL_ID);
+	}
+	fprintf(stderr, "ATLWindow: ATL_DEBUG_TAP step=%d contacts=%d", step, atl_touch_count);
+	for (int i = 0; i < atl_touch_count; i++)
+		fprintf(stderr, " [id=%d %.0f,%.0f]", atl_touches[i].id, atl_touches[i].x, atl_touches[i].y);
+	fprintf(stderr, "\n");
 }
 
 /* the EGLConfig GLFW's context was created with, so the chrome's window surface
@@ -924,6 +1306,27 @@ static void atl_window_resync_toplevel(ATLWindow *window)
 		fprintf(stderr, "ATLWindow: toplevel resync commit %dx%d\n", width, height);
 }
 
+/* Every publisher of the window size goes through Display.setWindowSize():
+ * besides the two statics it updates Configuration, which was otherwise
+ * snapshotted once by Context's static initialiser and then frozen. */
+void atl_display_set_window_size(JNIEnv *env, int width, int height)
+{
+	static jclass display_class = NULL;
+	static jmethodID set_window_size = NULL;
+	if (!display_class) {
+		jclass local_display_class = (*env)->FindClass(env, "android/view/Display");
+		if (!local_display_class)
+			return;
+		display_class = (*env)->NewGlobalRef(env, local_display_class);
+		(*env)->DeleteLocalRef(env, local_display_class);
+		set_window_size = (*env)->GetStaticMethodID(env, display_class, "setWindowSize", "(II)V");
+	}
+	if (!set_window_size)
+		return;
+	(*env)->CallStaticVoidMethod(env, display_class, set_window_size, width, height);
+	atl_report_pending_exception(env);
+}
+
 static void atl_window_render(ATLWindow *window)
 {
 	if (!window->view_root || !glfwGetWindowAttrib(window->glfw_window, GLFW_VISIBLE))
@@ -939,16 +1342,22 @@ static void atl_window_render(ATLWindow *window)
 		window->layout_width = width;
 		window->layout_height = height;
 		full = true;
+		/* Display's statics back getMetrics()/getSize(), which is where an app
+		 * gets the size it lays itself out for; leaving them at the size the
+		 * window had before the compositor resized it is how a layout ends up
+		 * wider than the surface it is drawn into. Display.setWindowSize also
+		 * carries the new size into Configuration, which the app's resource
+		 * lookups are keyed on, so do it before the layout pass below. */
+		atl_display_set_window_size(env, width, height);
+		if (window->dispatch_configuration_changed)
+			(*env)->CallVoidMethod(env, window->view_root, window->dispatch_configuration_changed);
+		atl_report_pending_exception(env);
 		/* the window keeps its full size; the view root keeps the content clear
 		 * of the soft keyboard itself, per the activity's softInputMode */
 		(*env)->CallVoidMethod(env, window->view_root, window->set_ime_inset, ime_inset);
 		jlong t = debug_render() ? atl_uptime_millis() : 0;
 		(*env)->CallVoidMethod(env, window->view_root, window->perform_layout, width, height);
-		// clear, don't just describe: a pending exception would break the next JNI call
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
+		atl_report_pending_exception(env);
 		if (debug_render())
 			layout_ms = atl_uptime_millis() - t;
 	}
@@ -1037,10 +1446,7 @@ static void atl_window_render(ATLWindow *window)
 	void *canvas = window->canvas;
 	atl_canvas_begin_frame(canvas, dl, dt, dr, db);
 	(*env)->CallVoidMethod(env, window->view_root, window->perform_draw, _INTPTR(canvas), width, height);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
+	atl_report_pending_exception(env);
 	atl_canvas_end_frame(canvas);
 	jlong draw_ms = debug_render() ? atl_uptime_millis() - t_draw : 0;
 
@@ -1149,6 +1555,9 @@ static gboolean atl_windows_tick(gpointer user_data)
 {
 	int rw, rh;
 	double after;
+	int pcx, pcy, ps0, ps1, psteps;
+	const struct atl_debug_tap *taps;
+	int ntaps;
 
 	glfwPollEvents();
 	if (windows && debug_resize(&rw, &rh, &after)) {
@@ -1166,6 +1575,48 @@ static gboolean atl_windows_tick(gpointer user_data)
 			 * would otherwise sit pending forever and no configure would come */
 			if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
 				wl_surface_commit(glfwGetWaylandWindow(windows->glfw_window));
+		}
+	}
+	if (windows && debug_pinch(&after, &pcx, &pcy, &ps0, &ps1, &psteps)) {
+		static jlong t0;
+		static int step = -1, ticks;
+		jlong now = atl_uptime_millis();
+		if (!t0)
+			t0 = now;
+		if (step < 3 + psteps && (double)(now - t0) >= after * 1000.0 && ticks++ % 8 == 0) {
+			ATLWindow *target = NULL;
+			for (ATLWindow *w = windows; w; w = w->next)
+				if (w->view_root)
+					target = w;
+			if (!target) {
+				ticks = 0; /* nothing to aim at yet; wait for a view root */
+			} else {
+				step++;
+				debug_pinch_step(target, step, pcx, pcy, ps0, ps1, psteps);
+			}
+		}
+	}
+	if (windows && (ntaps = debug_tap(&taps))) {
+		static jlong t0;
+		static int index, step = -1, ticks;
+		jlong now = atl_uptime_millis();
+		if (!t0)
+			t0 = now;
+		if (index < ntaps && (double)(now - t0) >= taps[index].after * 1000.0 && ticks++ % 8 == 0) {
+			ATLWindow *target = NULL;
+			for (ATLWindow *w = windows; w; w = w->next)
+				if (w->view_root)
+					target = w;
+			if (!target) {
+				ticks = 0; /* nothing to aim at yet; wait for a view root */
+			} else {
+				debug_tap_step(target, &taps[index], ++step);
+				if (step > taps[index].steps) { /* lifted; on to the next entry */
+					index++;
+					step = -1;
+					ticks = 0;
+				}
+			}
 		}
 	}
 	for (ATLWindow *window = windows; window; window = window->next) {
@@ -1221,6 +1672,36 @@ void atl_windows_init(void)
 ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 {
 	ATLWindow *window = calloc(1, sizeof(ATLWindow));
+
+	/* ATL_FORCE_FULLSCREEN (doc/Envs.md): open at the monitor's size instead of
+	 * at the launcher's default. A phone shell gives every app the whole screen
+	 * anyway, and starting at the size we will keep means the layout, the canvas
+	 * and the surface never disagree -- opening small and being resized leaves a
+	 * window whose first frame was laid out for one size and drawn into a buffer
+	 * of another.
+	 *
+	 * Size the window rather than making it a fullscreen toplevel: a client-driven
+	 * state change leaves qtmir's previousState stale, and restoring the app from
+	 * minimised then aborts Lomiri. The shell gives us the whole screen unasked. */
+	bool size_to_monitor = false;
+	if (getenv("ATL_FORCE_FULLSCREEN")) {
+		GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+		int area_x, area_y, area_width, area_height;
+		/* the work area, not the video mode: a phone panel's mode is its
+		 * unrotated one (2856x1280 on a portrait screen), while the work area
+		 * is the output as the compositor presents it, rotation included */
+		if (monitor)
+			glfwGetMonitorWorkarea(monitor, &area_x, &area_y, &area_width, &area_height);
+		if (monitor && area_width > 0 && area_height > 0) {
+			width = area_width;
+			height = area_height;
+			size_to_monitor = true;
+			fprintf(stderr, "ATLWindow: sized to the primary monitor's work area, %dx%d\n", width, height);
+		} else {
+			fprintf(stderr, "atl_window_new: ATL_FORCE_FULLSCREEN set but no monitor work area, using %dx%d\n", width, height);
+		}
+	}
+
 	glfwDefaultWindowHints();
 	glfwWindowHint(GLFW_VISIBLE, visible ? GLFW_TRUE : GLFW_FALSE);
 	glfwWindowHint(GLFW_DECORATED, decorated ? GLFW_TRUE : GLFW_FALSE);
@@ -1284,10 +1765,12 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	glfwSetWindowUserPointer(window->glfw_window, window);
 	glfwSetCursorPosCallback(window->glfw_window, on_cursor_pos);
 	glfwSetMouseButtonCallback(window->glfw_window, on_mouse_button);
+	glfwSetScrollCallback(window->glfw_window, on_scroll);
 	glfwSetKeyCallback(window->glfw_window, on_key);
 	glfwSetCharCallback(window->glfw_window, on_char);
 	glfwSetFramebufferSizeCallback(window->glfw_window, on_framebuffer_size);
 	glfwSetWindowCloseCallback(window->glfw_window, on_window_close);
+	glfwSetWindowFocusCallback(window->glfw_window, on_window_focus);
 	if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
 		atl_wayland_init();
 	/* a SurfaceView's wl_egl_window only works on the display GLFW made its
@@ -1311,6 +1794,23 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 		glfwSwapBuffers(window->glfw_window);
 	}
 	glfwPollEvents();
+
+	/* Wait for the compositor's first configure before handing this window to
+	 * the caller. It is the configure, not our request, that sets the size, and
+	 * the launcher publishes the size to Display -- and the app caches it, in
+	 * Configuration and in its own fields -- before a single frame is drawn.
+	 * Only when we sized ourselves to the monitor: elsewhere the size we asked
+	 * for is the size we get, and this would be 300ms of start-up spent waiting
+	 * for an event that never comes. */
+	if (size_to_monitor) {
+		for (int i = 0; i < 30; i++) {
+			int configured_width, configured_height;
+			glfwGetFramebufferSize(window->glfw_window, &configured_width, &configured_height);
+			if (configured_width != width || configured_height != height)
+				break;
+			glfwWaitEventsTimeout(0.01);
+		}
+	}
 
 	window->next = windows;
 	windows = window;
@@ -1352,13 +1852,19 @@ void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
 	jclass view_root_class = (*env)->GetObjectClass(env, view_root);
 	window->perform_layout = (*env)->GetMethodID(env, view_root_class, "performLayout", "(II)V");
 	window->set_ime_inset = (*env)->GetMethodID(env, view_root_class, "setImeInset", "(I)V");
+	window->dispatch_configuration_changed = (*env)->GetMethodID(env, view_root_class, "dispatchConfigurationChanged", "()V");
 	window->perform_draw = (*env)->GetMethodID(env, view_root_class, "performDraw", "(JII)V");
 	window->dispatch_touch_event = (*env)->GetMethodID(env, view_root_class, "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z");
+	window->dispatch_generic_motion_event = (*env)->GetMethodID(env, view_root_class, "dispatchGenericMotionEvent", "(Landroid/view/MotionEvent;)Z");
 	window->dispatch_key_event = (*env)->GetMethodID(env, view_root_class, "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
 	window->dispatch_character = (*env)->GetMethodID(env, view_root_class, "dispatchCharacter", "(I)Z");
-	window->dispatch_commit_text = (*env)->GetMethodID(env, view_root_class, "dispatchCommitText", "(Ljava/lang/String;)Z");
-	window->dispatch_composing_text = (*env)->GetMethodID(env, view_root_class, "dispatchComposingText", "(Ljava/lang/String;)Z");
+	window->dispatch_commit_text = (*env)->GetMethodID(env, view_root_class, "dispatchCommitText", "(Ljava/lang/String;III)Z");
+	window->dispatch_composing_text = (*env)->GetMethodID(env, view_root_class, "dispatchComposingText", "(Ljava/lang/String;III)Z");
 	window->dispatch_finish_composing = (*env)->GetMethodID(env, view_root_class, "dispatchFinishComposing", "()V");
+	window->dispatch_ime_set_selection = (*env)->GetMethodID(env, view_root_class, "dispatchImeSetSelection", "(II)V");
+	window->dispatch_ime_get_selection = (*env)->GetMethodID(env, view_root_class, "dispatchImeGetSelection", "()Ljava/lang/String;");
+	window->dispatch_im_initiated_hide = (*env)->GetMethodID(env, view_root_class, "dispatchImInitiatedHide", "()V");
+	window->dispatch_window_focus_changed = (*env)->GetMethodID(env, view_root_class, "dispatchWindowFocusChanged", "(Z)V");
 	window->dirty_field = (*env)->GetFieldID(env, view_root_class, "mDirty", "Landroid/graphics/Rect;");
 	jclass rect_class = (*env)->FindClass(env, "android/graphics/Rect");
 	window->rect_left = (*env)->GetFieldID(env, rect_class, "left", "I");
@@ -1392,6 +1898,13 @@ void atl_window_show(ATLWindow *window)
 void atl_window_hide(ATLWindow *window)
 {
 	glfwHideWindow(window->glfw_window);
+	/* An unmapped surface gets no focus-lost callback from the compositor, so
+	 * release the input method here instead — but only for the window IME
+	 * events are actually routed to (the atl_windows_ime_* helpers all address
+	 * the list head), or hiding a second window would release the first's
+	 * context. */
+	if (window == windows)
+		atl_window_notify_focus(window, false);
 }
 
 bool atl_window_is_visible(ATLWindow *window)
@@ -1418,19 +1931,6 @@ const char *atl_window_get_clipboard(ATLWindow *window)
 bool atl_window_is_maximized(ATLWindow *window)
 {
 	return glfwGetWindowAttrib(window->glfw_window, GLFW_MAXIMIZED);
-}
-
-bool atl_screen_size(int *width, int *height)
-{
-	GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-	if (!monitor)
-		return false;
-	const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-	if (!mode)
-		return false;
-	*width = mode->width;
-	*height = mode->height;
-	return true;
 }
 
 /* --- what the subsurface layers need from their parent toplevel --- */
@@ -1467,6 +1967,13 @@ int atl_window_get_width(ATLWindow *window)
 	int width, height;
 	glfwGetFramebufferSize(window->glfw_window, &width, &height);
 	return width;
+}
+
+int atl_window_get_height(ATLWindow *window)
+{
+	int width, height;
+	glfwGetFramebufferSize(window->glfw_window, &width, &height);
+	return height;
 }
 
 void atl_window_set_jobject(ATLWindow *window, JNIEnv *env, jobject window_obj)
