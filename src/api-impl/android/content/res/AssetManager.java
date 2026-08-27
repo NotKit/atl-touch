@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import android.atl.FileDescriptorUtils;
 
 /**
  * Provides access to an application's raw asset files; see {@link Resources}
@@ -94,6 +95,9 @@ public final class AssetManager {
 
 	private ArrayList<String> asset_paths = new ArrayList<String>();
 
+	/** the apks resources are read from; see {@link #findApkPaths} */
+	private static ArrayList<String> apk_paths = null;
+
 	/**
 	 * Create a new AssetManager containing only the basic system assets.
 	 * Applications will not generally use this method, instead retrieving the
@@ -111,6 +115,34 @@ public final class AssetManager {
 			if (localLOGV)
 				Log.v(TAG, "New asset manager: " + this);
 			//            ensureSystemAssets()
+			asset_paths.addAll(findApkPaths());
+			asset_paths.add(android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/");
+			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
+			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
+		}
+	}
+
+	/**
+	 * The apks resources come from, framework-res.apk first so the app's own
+	 * resources override the framework's.
+	 *
+	 * The launcher names them in system properties. Only the dex launcher, which
+	 * sets none, still has to be asked through the class path — a jar-based
+	 * runtime need not have the apks on it at all, and a native image has no
+	 * class path to scan.
+	 */
+	private static synchronized ArrayList<String> findApkPaths() {
+		if (apk_paths != null)
+			return apk_paths;
+
+		ArrayList<String> found = new ArrayList<String>();
+		String apk_path = System.getProperty("atl.apk.path");
+		if (apk_path != null) {
+			String framework_res = System.getProperty("atl.framework.res.path");
+			if (framework_res != null)
+				found.add(framework_res);
+			found.add(apk_path);
+		} else {
 			try {
 				Enumeration<URL> resources = ClassLoader.getSystemClassLoader().getResources("AndroidManifest.xml");
 				ArrayList<String> paths = new ArrayList<String>();
@@ -126,16 +158,16 @@ public final class AssetManager {
 				for (String path : paths) {
 					if (path != null) {
 						path = path.substring(path.indexOf("file:") + 5, path.indexOf("!/AndroidManifest.xml"));
-						asset_paths.add(path);
+						found.add(path);
 					}
 				}
 			} catch (IOException e) {
 				Log.e(TAG, "failed to load resources.arsc" + e);
 			}
-			asset_paths.add(android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/");
-			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
-			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
 		}
+
+		apk_paths = found;
+		return apk_paths;
 	}
 
 	private static void ensureSystemAssets() {
@@ -440,7 +472,7 @@ public final class AssetManager {
 				throw new FileNotFoundException("file: " + fileName + ", error: " + asset);
 
 			FileDescriptor fd = new FileDescriptor();
-			fd.setInt$(asset);
+			FileDescriptorUtils.setInt(fd, asset);
 			ParcelFileDescriptor pfd = new ParcelFileDescriptor(fd);
 			if (pfd != null) {
 				AssetFileDescriptor afd = new AssetFileDescriptor(pfd, offset[0], length[0]);
@@ -631,28 +663,84 @@ public final class AssetManager {
 
 	private native final int addAssetPathNative(String path);
 
+	/**
+	 * Copy an apk entry (or a whole directory of them) into the app's data dir.
+	 * Both the listing and the bytes come from an apk, never from the class path.
+	 *
+	 * The caller's apk is tried first, then the other registered ones, because a
+	 * framework resource (android.R.drawable.*) lives in framework-res.apk. A path
+	 * no apk holds is a no-op: callers pass names that need not exist (SoundPool
+	 * passes a bare resource entry name), and so is an apk that cannot be opened.
+	 * Only a failure to write the copy throws.
+	 */
 	public static void extractFromAPK(String apk_path, String path, String target) throws IOException {
+		if (extract(apk_path, path, target))
+			return;
+		for (String other : findApkPaths()) {
+			if (!other.equals(apk_path) && extract(other, path, target))
+				return;
+		}
+	}
+
+	/** Returns whether the apk held the path at all. */
+	private static boolean extract(String apk_path, String path, String target) throws IOException {
+		JarFile apk = openApk(apk_path);
+		return apk != null && extract(apk, path, target);
+	}
+
+	/**
+	 * The apks {@link #extractFromAPK} reads, opened once and kept open for the
+	 * process: every miss walks all of them, and a miss is the common case
+	 * (SoundPool and MediaPlayer pass bare resource entry names), so opening per
+	 * call re-parsed the 62 MB app apk's central directory on every notification
+	 * sound. Null means "cannot be opened", cached too so it is not retried.
+	 */
+	private static final HashMap<String, JarFile> open_apks = new HashMap<String, JarFile>();
+
+	private static synchronized JarFile openApk(String apk_path) {
+		if (apk_path == null)
+			return null;
+		if (open_apks.containsKey(apk_path))
+			return open_apks.get(apk_path);
+
+		JarFile apk = null;
+		try {
+			/* no verification: this only copies data out, and verifying a v1-signed
+			 * apk hashes every entry that is read */
+			apk = new JarFile(apk_path, false);
+		} catch (IOException e) {
+			// not fatal: a launcher may name an apk that is not there
+			Log.w(TAG, "cannot read apk " + apk_path + ": " + e);
+		}
+		open_apks.put(apk_path, apk);
+		return apk;
+	}
+
+	private static boolean extract(JarFile apk, String path, String target) throws IOException {
 		if (path.endsWith("/")) { // directory
-			try (JarFile apk = new JarFile(apk_path)) {
-				Enumeration<JarEntry> entries = apk.entries();
-				while (entries.hasMoreElements()) {
-					JarEntry entry = entries.nextElement();
-					if (entry.getName().startsWith(path)) {
-						extractFromAPK(apk_path, entry.getName(), entry.getName().replace(path, target));
-					}
+			boolean found = false;
+			Enumeration<JarEntry> entries = apk.entries();
+			while (entries.hasMoreElements()) {
+				JarEntry entry = entries.nextElement();
+				if (entry.getName().startsWith(path)) {
+					found |= extract(apk, entry.getName(), entry.getName().replace(path, target));
 				}
 			}
-		} else { // single file
-			Path file = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), target);
-			if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(Paths.get(apk_path)).toMillis()) {
-				try (InputStream inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream(path)) {
-					if (inputStream != null) {
-						Files.createDirectories(file.getParent());
-						Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
-					}
-				}
+			return found;
+		}
+
+		// single file
+		JarEntry entry = apk.getJarEntry(path);
+		if (entry == null)
+			return false;
+		Path file = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), target);
+		if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(Paths.get(apk.getName())).toMillis()) {
+			Files.createDirectories(file.getParent());
+			try (InputStream inputStream = apk.getInputStream(entry)) {
+				Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
 			}
 		}
+		return true;
 	}
 
 	/**
@@ -731,7 +819,7 @@ public final class AssetManager {
 	/*package*/ native final void applyStyle(long theme, long parser,
 	                                         int defStyleAttr, int defStyleRes,
 	                                         int[] inAttrs, int length,
-	                                         long outValuesAddress, long outIndicesAddress);
+	                                         int[] outValues, int[] outIndices);
 
 	/*package*/ native final boolean resolveAttrs(long theme, int defStyleAttr,
 	                                              int defStyleRes, int[] inValues,
@@ -739,7 +827,7 @@ public final class AssetManager {
 	                                              int[] outIndices);
 	/*package*/ native final boolean retrieveAttributes(long xmlParser,
 	                                                    int[] inAttrs, int length,
-	                                                    long outValuesAddress, long outIndicesAddress);
+	                                                    int[] outValues, int[] outIndices);
 
 	/*package*/ native final int getArraySize(int resource);
 	/*package*/ native final int retrieveArray(int resource, int[] outValues);

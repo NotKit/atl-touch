@@ -26,7 +26,6 @@ import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import com.android.internal.util.XmlUtils;
-import dalvik.system.VMRuntime;
 import java.util.Arrays;
 
 /**
@@ -65,9 +64,7 @@ public class TypedArray {
 	/*package*/ XmlResourceParser mXml;
 	/*package*/ Resources.Theme mTheme;
 	/*package*/ int[] mData;
-	/*package*/ long mDataAddress;
 	/*package*/ int[] mIndices;
-	/*package*/ long mIndicesAddress;
 	/*package*/ int mLength;
 	/*package*/ TypedValue mValue = new TypedValue();
 
@@ -75,12 +72,9 @@ public class TypedArray {
 		mLength = len;
 		final int dataLen = len * AssetManager.STYLE_NUM_ENTRIES;
 		final int indicesLen = len + 1;
-		final VMRuntime runtime = VMRuntime.getRuntime();
 		if (mData == null || mData.length < dataLen) {
-			mData = (int[])runtime.newNonMovableArray(int.class, dataLen);
-			mDataAddress = runtime.addressOf(mData);
-			mIndices = (int[])runtime.newNonMovableArray(int.class, indicesLen);
-			mIndicesAddress = runtime.addressOf(mIndices);
+			mData = new int[dataLen];
+			mIndices = new int[indicesLen];
 		}
 	}
 
