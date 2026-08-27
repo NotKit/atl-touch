@@ -1127,6 +1127,10 @@ static void atl_window_drop_chrome_surface(ATLWindow *window, EGLDisplay display
 		if (eglGetCurrentSurface(EGL_DRAW) == window->chrome_surface)
 			eglMakeCurrent(display, window->glfw_surface, window->glfw_surface, window->glfw_context);
 		eglDestroySurface(display, window->chrome_surface);
+		/* the next frame goes somewhere else - a new chrome, or the toplevel,
+		 * whose buffer is the opaque black clear present_chrome left in it - so
+		 * it cannot be a damage-rect frame over what was there before */
+		window->full_redraw = true;
 	}
 	window->chrome_surface = NULL;
 	window->chrome_egl_window = NULL;
@@ -1410,8 +1414,9 @@ static void atl_window_render(ATLWindow *window)
 	 * rather than at present time so a chrome that was just (re)created gets its
 	 * first buffer even on a frame with no damage */
 	bool chrome = atl_window_bind_chrome(window, width, height);
-	if (chrome)
-		full = full || window->full_redraw;
+	/* not just when it bound one: dropping the chrome moves this frame to the
+	 * toplevel, and that needs the whole window as much as a new chrome does */
+	full = full || window->full_redraw;
 
 	/* foreign GL use on this context (WebView texture binds) invalidates the
 	 * state Ganesh caches between frames */

@@ -142,6 +142,11 @@ static void chrome_free(ATLSurfaceChrome *chrome)
  * not freed here: the EGLSurface the renderer holds must go first, because
  * destroying a wl_egl_window an EGLSurface still references is a use-after-free
  * inside the EGL driver.
+ *
+ * The frame that does the rebuild has to be asked for, like every other mutator
+ * in this file does: without it the chrome is only marked, and the sub-surface
+ * that was just created keeps sitting on top of it until some unrelated damage
+ * happens to arrive.
  */
 static void chrome_invalidate(ATLWindow *window)
 {
@@ -149,6 +154,7 @@ static void chrome_invalidate(ATLWindow *window)
 
 	if (chrome)
 		chrome->stale = true;
+	atl_window_invalidate(window);
 }
 
 bool atl_surface_layers_available(void)
@@ -166,6 +172,16 @@ bool atl_surface_layers_available(void)
 		        cached && !atl_wayland_viewporter() ? " (no wp_viewporter: no setFixedSize scaling)" : "");
 	}
 	return cached == 1;
+}
+
+static int count_layers(ATLWindow *window)
+{
+	int n = 0;
+
+	for (ATLSurfaceLayer *l = layers; l; l = l->next)
+		if (l->parent == window)
+			n++;
+	return n;
 }
 
 ATLSurfaceLayer *atl_surface_layer_new(ATLWindow *parent)
@@ -213,6 +229,9 @@ ATLSurfaceLayer *atl_surface_layer_new(ATLWindow *parent)
 
 	layer->next = layers;
 	layers = layer;
+	if (getenv("ATL_DEBUG_LAYER"))
+		fprintf(stderr, "ATLSurfaceLayer: content layer created (%d on this window)\n",
+		        count_layers(parent));
 	/* a sub-surface created after this one would land on top of it, so the
 	 * chrome has to be built again - creation order is the only ordering
 	 * primitive that works on Mir */
@@ -243,8 +262,12 @@ void atl_surface_layer_destroy(ATLSurfaceLayer *layer)
 		wl_subsurface_destroy(layer->subsurface);
 	if (layer->surface)
 		wl_surface_destroy(layer->surface);
-	if (layer->parent)
+	if (layer->parent) {
+		if (getenv("ATL_DEBUG_LAYER"))
+			fprintf(stderr, "ATLSurfaceLayer: content layer destroyed (%d left on this window)\n",
+			        count_layers(layer->parent));
 		atl_window_invalidate(layer->parent);
+	}
 	free(layer);
 }
 
@@ -503,6 +526,13 @@ struct wl_egl_window *atl_surface_chrome_ensure(ATLWindow *window, int fb_width,
 	 * under it), orphaned (its window's last SurfaceView went away) or disabled */
 	chrome = chrome_for(window);
 	if (chrome && (chrome->stale || !atl_surface_chrome_enabled() || !window_has_layer(window))) {
+		/* unconditional, like the creation line below: without it the window
+		 * silently stops compositing through the chrome and the log of a run
+		 * that went black says nothing at all about it */
+		fprintf(stderr, "ATLSurfaceChrome: chrome sub-surface freed (%s)\n",
+		        chrome->stale ? "a content layer appeared under it"
+		        : !atl_surface_chrome_enabled() ? "disabled"
+		        : "its window has no content layer left");
 		chrome_free(chrome);
 		chrome = NULL;
 	}
