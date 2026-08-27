@@ -28,9 +28,10 @@ public class Instrumentation {
 	private static final String TAG = "Instrumentation";
 	public static final String REPORT_KEY_IDENTIFIER = "id";
 	public static final String REPORT_KEY_STREAMRESULT = "stream";
+	private static final ExceptionHandler EXCEPTION_HANDLER = new ExceptionHandler();
 
 	private static Instrumentation create(String className, Intent arguments) throws Exception {
-		Thread.setUncaughtExceptionPreHandler(new ExceptionHandler());
+		Thread.setDefaultUncaughtExceptionHandler(EXCEPTION_HANDLER);
 		try {
 			String target_package = null;
 			for (PackageParser.Instrumentation instrumentation : Context.pkg.instrumentation) {
@@ -56,7 +57,7 @@ public class Instrumentation {
 			return i;
 		} catch (Exception e) {
 			/* there is no global handler for exceptions on the main thread */
-			Thread.getUncaughtExceptionPreHandler().uncaughtException(Thread.currentThread(), e);
+			EXCEPTION_HANDLER.uncaughtException(Thread.currentThread(), e);
 		}
 		return null; // we will never get here
 	}

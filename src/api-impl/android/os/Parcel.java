@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import android.atl.FileDescriptorUtils;
 
 public class Parcel {
 
@@ -726,7 +727,7 @@ public class Parcel {
 			writeInt(-1);
 			return;
 		}
-		writeInt(fd.getInt$());
+		writeInt(FileDescriptorUtils.getInt(fd));
 		hasFileDescriptors = true;
 	}
 
@@ -737,7 +738,7 @@ public class Parcel {
 		if (fd == -1)
 			return null;
 		FileDescriptor fd_ = new FileDescriptor();
-		fd_.setInt$(fd);
+		FileDescriptorUtils.setInt(fd_, fd);
 		return new ParcelFileDescriptor(fd_);
 	}
 
