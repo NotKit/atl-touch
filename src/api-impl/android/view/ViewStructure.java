@@ -47,4 +47,55 @@ public abstract class ViewStructure {
 	public void setAutofillValue(android.view.autofill.AutofillValue a0) { }
 
 	public void setHtmlInfo(android.view.ViewStructure.HtmlInfo a0) { }
+
+	/* The rest of AOSP's surface, as no-ops: a view that declares
+	 * onProvideStructure(ViewStructure) makes the runtime load this type as soon
+	 * as anything reflects over its declared methods, and androidx calls into it. */
+	public void setClickable(boolean state) { }
+
+	public void setLongClickable(boolean state) { }
+
+	public void setSelected(boolean state) { }
+
+	public void setActivated(boolean state) { }
+
+	public void setChecked(boolean state) { }
+
+	public void setContextClickable(boolean state) { }
+
+	public void setOpaque(boolean opaque) { }
+
+	public void setContentDescription(java.lang.CharSequence contentDescription) { }
+
+	public void setText(java.lang.CharSequence text) { }
+
+	public void setText(java.lang.CharSequence text, int selectionStart, int selectionEnd) { }
+
+	public void setTextStyle(float size, int fgColor, int bgColor, int style) { }
+
+	public void setTextLines(int[] charOffsets, int[] baselines) { }
+
+	public void setHint(java.lang.CharSequence hint) { }
+
+	public java.lang.CharSequence getText() { return null; }
+
+	public int getTextSelectionStart() { return -1; }
+
+	public int getTextSelectionEnd() { return -1; }
+
+	public java.lang.CharSequence getHint() { return null; }
+
+	public android.os.Bundle getExtras() { return null; }
+
+	public boolean hasExtras() { return false; }
+
+	public int addChildCount(int num) { return 0; }
+
+	public int getChildCount() { return 0; }
+
+	public android.view.ViewStructure asyncNewChild(int index) { return null; }
+
+	public void asyncCommit() { }
+
+	public android.graphics.Rect getTempRect() { return null; }
 }
