@@ -48,4 +48,12 @@ public final class RenderEffect {
 	public static RenderEffect createChainEffect(RenderEffect outer, RenderEffect inner) {
 		return new RenderEffect();
 	}
+
+	public static RenderEffect createBlendModeEffect(RenderEffect dst, RenderEffect src, BlendMode blendMode) {
+		return new RenderEffect();
+	}
+
+	public static RenderEffect createRuntimeShaderEffect(RuntimeShader shader, String uniformShaderName) {
+		return new RenderEffect();
+	}
 }

@@ -306,4 +306,9 @@ public class RenderNode {
 		projectionReceiver = shouldReceive;
 		return changed;
 	}
+
+	@Override
+	public String toString() {
+		return "RenderNode(" + name + ")";
+	}
 }
