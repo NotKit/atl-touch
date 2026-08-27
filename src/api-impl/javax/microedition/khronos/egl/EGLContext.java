@@ -19,4 +19,20 @@ public class EGLContext {
 	public EGLContext(long native_egl_context) {
 		this.native_egl_context = native_egl_context;
 	}
+
+	/* the handle is the identity, as it is for EGLSurfaceImpl: apps compare
+	 * their context with the one eglGetCurrentContext() hands back */
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (o == null || getClass() != o.getClass())
+			return false;
+		return native_egl_context == ((EGLContext)o).native_egl_context;
+	}
+
+	@Override
+	public int hashCode() {
+		return Long.hashCode(native_egl_context);
+	}
 }

@@ -33,6 +33,38 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCre
 
 /*
  * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglCreateWindowSurfaceTexture
+ * Signature: (JJLandroid/graphics/SurfaceTexture;[I)J
+ */
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreateWindowSurfaceTexture
+  (JNIEnv *, jobject, jlong, jlong, jobject, jintArray);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglGetCurrentContext
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentContext
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglGetCurrentSurface
+ * Signature: (I)J
+ */
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentSurface
+  (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglGetError
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetError
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
  * Method:    native_eglGetDisplay
  * Signature: (Ljava/lang/Object;)J
  */

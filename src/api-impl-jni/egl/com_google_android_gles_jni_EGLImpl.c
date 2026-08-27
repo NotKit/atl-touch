@@ -6,6 +6,8 @@
 
 #include "../../libandroid/native_window.h"
 
+#include "surface_texture_target.h"
+
 #include "../generated_headers/com_google_android_gles_jni_EGLImpl.h"
 
 // helpers from android source (TODO: either use GetIntArrayElements, or figure out if GetPrimitiveArrayCritical is superior and use it everywhere if so)
@@ -85,6 +87,16 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCre
 	return _INTPTR(ret);
 }
 
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreateWindowSurfaceTexture(JNIEnv *env, jobject this, jlong display, jlong config, jobject surface_texture, jintArray _attrib_list)
+{
+	/* not the critical variant: creating the surface calls back into JNI */
+	EGLint *attrib_list = _attrib_list ? (EGLint *)(*env)->GetIntArrayElements(env, _attrib_list, NULL) : NULL;
+	EGLSurface ret = atl_egl_surface_texture_create(env, _PTR(display), _PTR(config), surface_texture, attrib_list);
+	if (_attrib_list)
+		(*env)->ReleaseIntArrayElements(env, _attrib_list, (jint *)attrib_list, JNI_ABORT);
+	return _INTPTR(ret);
+}
+
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetDisplay(JNIEnv *env, jobject this, jobject display)
 {
 	return _INTPTR(bionic_eglGetDisplay(0)); // FIXME: why is display passed as an Object??? how do we get an integer from that
@@ -113,17 +125,35 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 
 JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglSwapBuffers(JNIEnv *env, jobject this, jlong display, jlong surface)
 {
+	if (atl_egl_surface_texture_swap(_PTR(display), _PTR(surface)))
+		return JNI_TRUE;
 	return bionic_eglSwapBuffers(_PTR(display), _PTR(surface));
 }
 
 JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglDestroySurface(JNIEnv *env, jobject this, jlong display, jlong surface)
 {
+	atl_egl_surface_texture_release(_PTR(surface));
 	return bionic_eglDestroySurface(_PTR(display), _PTR(surface));
 }
 
 JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglDestroyContext(JNIEnv *env, jobject this, jlong display, jlong context)
 {
 	return eglDestroyContext(_PTR(display), _PTR(context));
+}
+
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentContext(JNIEnv *env, jobject this)
+{
+	return _INTPTR(eglGetCurrentContext());
+}
+
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentSurface(JNIEnv *env, jobject this, jint readdraw)
+{
+	return _INTPTR(bionic_eglGetCurrentSurface(readdraw));
+}
+
+JNIEXPORT jint JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetError(JNIEnv *env, jobject this)
+{
+	return eglGetError();
 }
 
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreatePbufferSurface(JNIEnv *env, jobject this, jlong display, jlong config, jintArray _attrib_list)

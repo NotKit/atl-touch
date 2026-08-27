@@ -333,6 +333,14 @@ JNIEXPORT jlong JNICALL Java_android_opengl_EGL14_native_1eglCreateWindowSurface
 
 /*
  * Class:     android_opengl_EGL14
+ * Method:    native_eglCreateWindowSurfaceTexture
+ * Signature: (JJLandroid/graphics/SurfaceTexture;[I)J
+ */
+JNIEXPORT jlong JNICALL Java_android_opengl_EGL14_native_1eglCreateWindowSurfaceTexture
+  (JNIEnv *, jclass, jlong, jlong, jobject, jintArray);
+
+/*
+ * Class:     android_opengl_EGL14
  * Method:    native_eglCreatePbufferSurface
  * Signature: (JJ[I)J
  */

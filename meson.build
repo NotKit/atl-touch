@@ -182,6 +182,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/database/android_database_SQLiteGlobal.c',
                                                                   	'src/api-impl-jni/egl/android_opengl_EGL14.c',
                                                                   	'src/api-impl-jni/egl/com_google_android_gles_jni_EGLImpl.c',
+                                                                  	'src/api-impl-jni/egl/surface_texture_target.c',
                                                                   	'src/api-impl-jni/graphics/ATLCanvas.cpp',
 	'src/api-impl-jni/graphics/android_graphics_Canvas.cpp',
                                                                   	'src/api-impl-jni/hwui/android_graphics_Typeface.cpp',

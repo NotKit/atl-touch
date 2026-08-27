@@ -61,7 +61,6 @@ public final class Bitmap {
 	private Config config = Config.ARGB_8888;
 	private boolean hasMipMap = false;
 	private boolean hasAlpha = true;
-	long bytes = 0; // used by native function AndroidBitmap_lockPixels()
 	private boolean recycled = false;
 	boolean mutable = true;
 

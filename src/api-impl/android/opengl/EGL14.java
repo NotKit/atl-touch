@@ -219,8 +219,13 @@ public class EGL14 {
 			surface = ((SurfaceHolder)win).getSurface();
 		} else if (win instanceof Surface) {
 			surface = (Surface)win;
+		} else if (win instanceof android.graphics.SurfaceTexture) {
+			/* a pbuffer read back into the SurfaceTexture's mailbox, see
+			 * api-impl-jni/egl/surface_texture_target.c */
+			return surface(native_eglCreateWindowSurfaceTexture(dpy.getNativeHandle(), config.getNativeHandle(),
+			    (android.graphics.SurfaceTexture)win, slice(attrib_list, offset)));
 		} else {
-			throw new UnsupportedOperationException("eglCreateWindowSurface() can only be called with an instance of Surface, SurfaceView or SurfaceHolder at the moment.");
+			throw new UnsupportedOperationException("eglCreateWindowSurface() can only be called with an instance of Surface, SurfaceView, SurfaceHolder or SurfaceTexture at the moment.");
 		}
 		return surface(native_eglCreateWindowSurface(dpy.getNativeHandle(), config.getNativeHandle(), surface, slice(attrib_list, offset)));
 	}
@@ -304,6 +309,7 @@ public class EGL14 {
 	private static native long native_eglCreateContext(long dpy, long config, long share_context, int[] attrib_list);
 	private static native boolean native_eglDestroyContext(long dpy, long ctx);
 	private static native long native_eglCreateWindowSurface(long dpy, long config, Surface surface, int[] attrib_list);
+	private static native long native_eglCreateWindowSurfaceTexture(long dpy, long config, android.graphics.SurfaceTexture surface_texture, int[] attrib_list);
 	private static native long native_eglCreatePbufferSurface(long dpy, long config, int[] attrib_list);
 	private static native boolean native_eglDestroySurface(long dpy, long surface);
 	private static native boolean native_eglQuerySurface(long dpy, long surface, int attribute, int[] value);

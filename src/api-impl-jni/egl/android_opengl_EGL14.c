@@ -15,6 +15,8 @@
 
 #include "../../libandroid/native_window.h"
 
+#include "surface_texture_target.h"
+
 #include "../generated_headers/android_opengl_EGL14.h"
 #include "../generated_headers/android_opengl_EGLExt.h"
 
@@ -111,6 +113,14 @@ JNIEXPORT jlong JNICALL Java_android_opengl_EGL14_native_1eglCreateWindowSurface
 	return _INTPTR(egl_surface);
 }
 
+JNIEXPORT jlong JNICALL Java_android_opengl_EGL14_native_1eglCreateWindowSurfaceTexture(JNIEnv *env, jclass this, jlong dpy, jlong config, jobject surface_texture, jintArray attrib_list_ref)
+{
+	EGLint *attrib_list = get_attrib_list(env, attrib_list_ref);
+	EGLSurface egl_surface = atl_egl_surface_texture_create(env, _PTR(dpy), _PTR(config), surface_texture, attrib_list);
+	release_attrib_list(env, attrib_list_ref, attrib_list);
+	return _INTPTR(egl_surface);
+}
+
 JNIEXPORT jlong JNICALL Java_android_opengl_EGL14_native_1eglCreatePbufferSurface(JNIEnv *env, jclass this, jlong dpy, jlong config, jintArray attrib_list_ref)
 {
 	EGLint *attrib_list = get_attrib_list(env, attrib_list_ref);
@@ -121,6 +131,7 @@ JNIEXPORT jlong JNICALL Java_android_opengl_EGL14_native_1eglCreatePbufferSurfac
 
 JNIEXPORT jboolean JNICALL Java_android_opengl_EGL14_native_1eglDestroySurface(JNIEnv *env, jclass this, jlong dpy, jlong surface)
 {
+	atl_egl_surface_texture_release(_PTR(surface));
 	return bionic_eglDestroySurface(_PTR(dpy), _PTR(surface));
 }
 
@@ -154,6 +165,8 @@ JNIEXPORT jboolean JNICALL Java_android_opengl_EGL14_native_1eglMakeCurrent(JNIE
 
 JNIEXPORT jboolean JNICALL Java_android_opengl_EGL14_native_1eglSwapBuffers(JNIEnv *env, jclass this, jlong dpy, jlong surface)
 {
+	if (atl_egl_surface_texture_swap(_PTR(dpy), _PTR(surface)))
+		return JNI_TRUE;
 	return bionic_eglSwapBuffers(_PTR(dpy), _PTR(surface));
 }
 

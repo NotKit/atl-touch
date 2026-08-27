@@ -47,6 +47,9 @@ struct atl_surface_texture {
 	jweak self; /* weak: the app owns the SurfaceTexture's lifetime */
 
 	GMutex lock;
+	/* signalled whenever a frame leaves the mailbox, so a producer can pace
+	 * itself against the consumer instead of dropping frames */
+	GCond frame_taken;
 	bool released;
 	bool single_buffer;
 	bool listener_enabled;
@@ -121,6 +124,7 @@ static void texture_unref(struct atl_surface_texture *texture)
 
 	free(texture->pending);
 	free(texture->current);
+	g_cond_clear(&texture->frame_taken);
 	g_mutex_clear(&texture->lock);
 	free(texture);
 }
@@ -233,24 +237,20 @@ void atl_surface_texture_notify_frame_available(struct atl_surface_texture *text
 	g_mutex_unlock(&texture->lock);
 }
 
-void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8_t *nv21,
-                                int width, int height, int stride)
+/* the pending buffer, grown to hold one RGBA frame; call with the lock held */
+static uint8_t *pending_buffer_locked(struct atl_surface_texture *texture, size_t size)
 {
-	size_t size = (size_t)width * height * 4;
-
-	g_mutex_lock(&texture->lock);
-	if (texture->released)
-		goto out;
-
 	if (texture->pending_capacity < size) {
 		free(texture->pending);
 		texture->pending = malloc(size);
 		texture->pending_capacity = texture->pending ? size : 0;
 	}
-	if (!texture->pending)
-		goto out;
+	return texture->pending;
+}
 
-	atl_camera_nv21_to_rgba(nv21, width, height, stride, texture->pending);
+/* the pending buffer now holds a frame; call with the lock held */
+static void publish_pending_locked(struct atl_surface_texture *texture, int width, int height)
+{
 	if (texture->pending_valid) /* the consumer is behind: keep the newest frame only */
 		texture->dropped++;
 	texture->pending_valid = true;
@@ -260,7 +260,87 @@ void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8
 	texture->submitted++;
 
 	post_frame_available_locked(texture);
+}
+
+void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8_t *nv21,
+                                int width, int height, int stride)
+{
+	g_mutex_lock(&texture->lock);
+	if (texture->released)
+		goto out;
+
+	if (!pending_buffer_locked(texture, (size_t)width * height * 4))
+		goto out;
+
+	atl_camera_nv21_to_rgba(nv21, width, height, stride, texture->pending);
+	publish_pending_locked(texture, width, height);
 out:
+	g_mutex_unlock(&texture->lock);
+}
+
+void atl_surface_texture_submit_rgba(struct atl_surface_texture *texture, const uint8_t *rgba,
+                                     int width, int height, int stride, bool bottom_up)
+{
+	size_t row = (size_t)width * 4;
+
+	g_mutex_lock(&texture->lock);
+	if (texture->released)
+		goto out;
+
+	if (!pending_buffer_locked(texture, row * height))
+		goto out;
+
+	for (int y = 0; y < height; y++)
+		memcpy(texture->pending + y * row,
+		       rgba + (size_t)(bottom_up ? height - 1 - y : y) * stride, row);
+	publish_pending_locked(texture, width, height);
+out:
+	g_mutex_unlock(&texture->lock);
+}
+
+bool atl_surface_texture_frame_pending(struct atl_surface_texture *texture)
+{
+	bool pending;
+
+	if (!texture)
+		return false;
+	g_mutex_lock(&texture->lock);
+	pending = texture->pending_valid;
+	g_mutex_unlock(&texture->lock);
+	return pending;
+}
+
+bool atl_surface_texture_await_frame_taken(struct atl_surface_texture *texture, int64_t timeout_us)
+{
+	bool free_now;
+
+	if (!texture)
+		return false;
+
+	g_mutex_lock(&texture->lock);
+	if (texture->pending_valid && !texture->released) {
+		gint64 deadline = g_get_monotonic_time() + timeout_us;
+
+		/* g_cond_wait_until can return early, so loop on the predicate */
+		while (texture->pending_valid && !texture->released) {
+			if (!g_cond_wait_until(&texture->frame_taken, &texture->lock, deadline))
+				break;
+		}
+	}
+	free_now = !texture->pending_valid && !texture->released;
+	g_mutex_unlock(&texture->lock);
+	return free_now;
+}
+
+void atl_surface_texture_get_default_size(struct atl_surface_texture *texture, int *width, int *height)
+{
+	*width = 0;
+	*height = 0;
+	if (!texture)
+		return;
+	g_mutex_lock(&texture->lock);
+	*width = texture->default_width;
+	*height = texture->default_height;
 	g_mutex_unlock(&texture->lock);
 }
 
@@ -283,6 +363,7 @@ static void take_frame_locked(struct atl_surface_texture *texture)
 	texture->height = texture->pending_height;
 	texture->timestamp = texture->pending_timestamp;
 	texture->serial++;
+	g_cond_broadcast(&texture->frame_taken);
 }
 
 static void bitmap_release(struct st_bitmap *buffer, JNIEnv *env)
@@ -333,6 +414,7 @@ JNIEXPORT jlong JNICALL Java_android_graphics_SurfaceTexture_native_1create(JNIE
 	texture->refcount = 1;
 	(*env)->GetJavaVM(env, &texture->jvm);
 	g_mutex_init(&texture->lock);
+	g_cond_init(&texture->frame_taken);
 	texture->self = (*env)->NewWeakGlobalRef(env, this);
 	texture->tex_name = tex_name;
 	texture->attached = attached;
@@ -349,6 +431,7 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1release(JNIE
 
 	g_mutex_lock(&texture->lock);
 	texture->released = true;
+	g_cond_broadcast(&texture->frame_taken);
 	texture->listener_enabled = false;
 	texture->pending_valid = false;
 	texture->current_valid = false;

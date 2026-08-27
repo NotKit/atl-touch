@@ -16,6 +16,7 @@
 
 package com.google.android.gles_jni;
 
+import android.graphics.SurfaceTexture;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -70,14 +71,15 @@ public class EGLImpl implements EGL10 {
 		long eglSurfaceId;
 		if (sur != null) {
 			eglSurfaceId = native_eglCreateWindowSurface(display.native_egl_display, config.native_egl_config, sur, attrib_list);
-		} /*else if (native_window instanceof SurfaceTexture) {
-			eglSurfaceId = native_eglCreateWindowSurfaceTexture(display, config,
-								      native_window, attrib_list);
-		}*/
-		else {
+		} else if (native_window instanceof SurfaceTexture) {
+			/* a pbuffer read back into the SurfaceTexture's mailbox, see
+			 * api-impl-jni/egl/surface_texture_target.c */
+			eglSurfaceId = native_eglCreateWindowSurfaceTexture(display.native_egl_display, config.native_egl_config,
+			                                                    (SurfaceTexture)native_window, attrib_list);
+		} else {
 			throw new java.lang.UnsupportedOperationException(
 			    "eglCreateWindowSurface() can only be called with an instance of "
-			    + "Surface, SurfaceView, SurfaceHolder or [FIXME]SurfaceTexture at the moment.");
+			    + "Surface, SurfaceView, SurfaceHolder or SurfaceTexture at the moment.");
 		}
 
 		if (eglSurfaceId == 0) {
@@ -122,14 +124,31 @@ public class EGLImpl implements EGL10 {
 		return new EGLSurfaceImpl(native_eglCreatePbufferSurface(display.native_egl_display, config.native_egl_config, attrib_list));
 	}
 
+	/*
+	 * Apps compare what these return with the context and surface they made
+	 * (IntroActivity's draw loop skips an eglMakeCurrent when both still
+	 * match), so the objects have to compare equal by handle -- which is what
+	 * EGLSurfaceImpl.equals and EGLContext.equals do.
+	 */
+	public EGLContext eglGetCurrentContext() {
+		long context = native_eglGetCurrentContext();
+		return context == 0 ? EGL10.EGL_NO_CONTEXT : new EGLContext(context);
+	}
+
+	public EGLSurface eglGetCurrentSurface(int readdraw) {
+		long surface = native_eglGetCurrentSurface(readdraw);
+		return surface == 0 ? EGL10.EGL_NO_SURFACE : new EGLSurfaceImpl(surface);
+	}
+
+	public int eglGetError() {
+		return native_eglGetError();
+	}
+
 	/* STUBS */
 	public boolean eglCopyBuffers(EGLDisplay display, EGLSurface surface, Object native_pixmap) { return false; }
 	public EGLSurface eglCreatePixmapSurface(EGLDisplay display, EGLConfig config, Object native_pixmap, int[] attrib_list) { return null; }
 	public boolean eglGetConfigs(EGLDisplay display, EGLConfig[] configs, int config_size, int[] num_config) { return false; }
-	public EGLContext eglGetCurrentContext() { return null; }
 	public EGLDisplay eglGetCurrentDisplay() { return null; }
-	public EGLSurface eglGetCurrentSurface(int readdraw) { return null; }
-	public int eglGetError() { return EGL_SUCCESS; } // don't let yourself get fooled, this is also a stub :P
 	public boolean eglQueryContext(EGLDisplay display, EGLContext context, int attribute, int[] value) { return false; }
 	public String eglQueryString(EGLDisplay display, int name) { return "FIXME"; }
 	public boolean eglQuerySurface(EGLDisplay display, EGLSurface surface, int attribute, int[] value) { return false; }
@@ -142,6 +161,10 @@ public class EGLImpl implements EGL10 {
 	public boolean eglWaitNative(int engine, Object bindTarget) { return false; }
 
 	private native long native_eglCreateWindowSurface(long native_egl_display, long native_egl_config, Surface surface, int[] attrib_list);
+	private native long native_eglCreateWindowSurfaceTexture(long native_egl_display, long native_egl_config, SurfaceTexture surface_texture, int[] attrib_list);
+	private native long native_eglGetCurrentContext();
+	private native long native_eglGetCurrentSurface(int readdraw);
+	private native int native_eglGetError();
 	private native long native_eglGetDisplay(Object native_display);
 	private native boolean native_eglInitialize(long native_egl_display, int[] major_minor);
 	private native boolean native_eglGetConfigAttrib(long native_egl_display, long native_edl_config, int attribute, int[] value);

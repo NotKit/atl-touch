@@ -25,6 +25,30 @@ void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8
                                 int width, int height, int stride);
 
 /*
+ * The same, for a producer that already has RGBA rows (a GL renderer reading
+ * back its EGL surface). bottom_up flips them: glReadPixels starts at the
+ * bottom row, the mailbox keeps frames top row first.
+ */
+void atl_surface_texture_submit_rgba(struct atl_surface_texture *texture, const uint8_t *rgba,
+                                     int width, int height, int stride, bool bottom_up);
+
+/* true while a submitted frame is still waiting to be taken, which is a
+ * producer's cue that another one would only be dropped */
+bool atl_surface_texture_frame_pending(struct atl_surface_texture *texture);
+
+/*
+ * Block until the mailbox is free, i.e. the consumer has taken the frame in it,
+ * and return whether it is. This is the backpressure a BufferQueue would give a
+ * producer: without it a GL producer's eglSwapBuffers returns at once and the
+ * app free-runs. Never waits longer than timeout_us, so a consumer that has
+ * stopped drawing slows a producer down instead of stopping it.
+ */
+bool atl_surface_texture_await_frame_taken(struct atl_surface_texture *texture, int64_t timeout_us);
+
+/* what setDefaultBufferSize() last asked for, 0x0 if it never ran */
+void atl_surface_texture_get_default_size(struct atl_surface_texture *texture, int *width, int *height);
+
+/*
  * A producer that can fill the GL texture itself (the hybris preview-texture
  * fast path). update() is called from updateTexImage on the app's GL thread and
  * must bind and update tex_name; returning false drops the texture back to the
