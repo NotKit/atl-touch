@@ -4,6 +4,7 @@ import android.R;
 import android.animation.LayoutTransition;
 import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -94,8 +95,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void onViewRemoved(View view) {}
 
 	protected void addViewInternal(View child, int index, LayoutParams params, boolean callOnViewAdded) {
-		if (child.parent == this)
-			return;
+		// AOSP's addViewInner throws here. ATL used to overwrite child.parent
+		// and leave the child in the old parent's children list, so it drew
+		// twice and the old parent's removeView() silently no-oped.
+		if (child.parent != null)
+			throw new IllegalStateException("The specified child already has a parent. "
+				+ "You must call removeView() on the child's parent first.");
 		if (!checkLayoutParams(params))
 			params = generateLayoutParams(params);
 
@@ -130,6 +135,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	private View touchTarget;
 
+	/* ATL_DEBUG_INPUT: one line per level of the dispatch, so a touch that
+	 * reaches the window but not the view that should get it can be followed. */
+	private static final boolean DEBUG_TOUCH = System.getenv("ATL_DEBUG_INPUT") != null;
+
+	private void traceTouch(String what, View child, MotionEvent event) {
+		System.err.println("ATLInput: " + what + " " + getClass().getName()
+			+ "@" + Integer.toHexString(System.identityHashCode(this))
+			+ " -> " + (child == null ? "self" : child.getClass().getName()
+			+ "@" + Integer.toHexString(System.identityHashCode(child)))
+			+ " at=" + event.getX() + "," + event.getY()
+			+ " raw=" + event.getRawX() + "," + event.getRawY()
+			+ (child == null ? "" : " childRect=" + child.getLeft() + "," + child.getTop()
+			+ " " + child.getWidth() + "x" + child.getHeight()));
+	}
+
 	/** transform a MotionEvent into a child's coordinate space */
 	private MotionEvent transformEventForChild(MotionEvent event, View child) {
 		MotionEvent transformed = event.copy();
@@ -137,6 +157,23 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (!child.hasIdentityMatrix())
 			transformed.transform(child.getInverseMatrix());
 		return transformed;
+	}
+
+	/* Generic motion (a scroll wheel, say) goes to the topmost child under the
+	 * pointer, like AOSP: it is not part of a touch gesture, so there is no
+	 * captured target to reuse. */
+	@Override
+	public boolean dispatchGenericMotionEvent(MotionEvent event) {
+		for (int i = children.size() - 1; i >= 0; i--) {
+			View child = children.get(i);
+			if (child.getVisibility() != View.VISIBLE)
+				continue;
+			if (!isTransformedTouchPointInView(event, child))
+				continue;
+			if (child.dispatchGenericMotionEvent(transformEventForChild(event, child)))
+				return true;
+		}
+		return super.dispatchGenericMotionEvent(event);
 	}
 
 	private final float[] touchPoint = new float[2];
@@ -157,13 +194,20 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {
 		int action = event.getActionMasked();
-		if (action == MotionEvent.ACTION_DOWN)
+		if (action == MotionEvent.ACTION_DOWN) {
 			touchTarget = null;
+			// AOSP's resetTouchState(): a new gesture starts interceptable
+			disallowIntercept = false;
+		}
 
 		boolean intercepted = false;
 		if (touchTarget != null || action == MotionEvent.ACTION_DOWN) {
 			if (!disallowIntercept)
 				intercepted = onInterceptTouchEvent(event);
+			else if (DEBUG_TOUCH)
+				traceTouch("blocked-intercept", null, event);
+			if (DEBUG_TOUCH && intercepted)
+				traceTouch("intercept", null, event);
 		}
 		if (intercepted && touchTarget != null) {
 			MotionEvent cancel = event.copy();
@@ -180,6 +224,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 					continue;
 				if (!isTransformedTouchPointInView(event, child))
 					continue;
+				if (DEBUG_TOUCH)
+					traceTouch("down", child, event);
 				if (child.dispatchTouchEvent(transformEventForChild(event, child))) {
 					touchTarget = child;
 					handled = true;
@@ -190,8 +236,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			handled = touchTarget.dispatchTouchEvent(transformEventForChild(event, touchTarget));
 		}
 
-		if (!handled && touchTarget == null)
+		if (!handled && touchTarget == null) {
+			if (DEBUG_TOUCH && action == MotionEvent.ACTION_DOWN)
+				traceTouch("self", null, event);
 			handled = onTouchEventInternal(event, true);
+		}
 
 		if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
 			touchTarget = null;
@@ -262,7 +311,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	public void attachViewToParent(View view, int index, LayoutParams params) {
 		if (!detachedChildren.remove(view)) {
+			// Not one of ours to re-attach: addViewInternal already sets the
+			// parent and inserts into children, so the tail below would add a
+			// second entry for the same view.
 			addViewInternal(view, index, params, false);
+			return;
 		}
 		if (!checkLayoutParams(params))
 			params = generateLayoutParams(params);
@@ -349,6 +402,13 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		for (View child : children.toArray(new View[0]))
 			if (child.parent == this)
 				child.dispatchAttachedToWindow();
+	}
+
+	@Override
+	public void dispatchConfigurationChanged(Configuration newConfig) {
+		super.dispatchConfigurationChanged(newConfig);
+		for (View child : children.toArray(new View[0]))
+			child.dispatchConfigurationChanged(newConfig);
 	}
 
 	@Override
@@ -527,9 +587,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	protected void setChildrenDrawingOrderEnabled(boolean enabled) {}
 
+	/* Set this group's flag and pass the request *up* one level, as AOSP does,
+	 * rather than walking the ancestors and writing their fields directly: a
+	 * parent that overrides this method has to be able to stop the chain.
+	 * mozilla-components' VerticalSwipeRefreshLayout is exactly that - it keeps
+	 * the request to itself so that the CoordinatorLayout above it still sees
+	 * the gesture and can move Fenix's dynamic toolbar. */
 	public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
-		for (ViewGroup iter = this; iter != null; iter = iter.parent instanceof ViewGroup ? (ViewGroup)iter.parent : null)
-			iter.disallowIntercept = disallowIntercept;
+		if (DEBUG_TOUCH)
+			System.err.println("ATLInput: requestDisallowIntercept " + disallowIntercept
+				+ " on " + getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(this)));
+		if (this.disallowIntercept == disallowIntercept)
+			return;
+		this.disallowIntercept = disallowIntercept;
+		if (parent != null)
+			parent.requestDisallowInterceptTouchEvent(disallowIntercept);
 	}
 
 	protected boolean isChildrenDrawingOrderEnabled() { return false; }

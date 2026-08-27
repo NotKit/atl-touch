@@ -1421,6 +1421,10 @@ public final class MotionEvent extends InputEvent {
 	float scroll_dx;
 	float scroll_dy;
 
+	/* Gesture start time in the getEventTime() base, and the last one seen. */
+	private long downTime;
+	private static long sGestureDownTime;
+
 	private MotionEvent() {
 	}
 
@@ -1438,6 +1442,14 @@ public final class MotionEvent extends InputEvent {
 		this.source = source;
 		this.action = action;
 		this.eventTime = eventTime;
+		/* Remember when the gesture started: every event here is a fresh object,
+		 * so nothing else carries it. Apps compare getDownTime() across a stream
+		 * to tell events of one gesture apart - GeckoView's PanZoomController
+		 * drops every event whose down time differs from the ACTION_DOWN's, which
+		 * silently discarded all ACTION_MOVE and ACTION_UP. */
+		if ((action & ACTION_MASK) == ACTION_DOWN)
+			sGestureDownTime = eventTime;
+		this.downTime = sGestureDownTime;
 
 		this.ids = ids;
 		this.coords = coords;
@@ -1707,6 +1719,12 @@ public final class MotionEvent extends InputEvent {
 		ev.ids = other.ids.clone();
 		ev.coords = other.coords.clone();
 		ev.eventTime = other.eventTime;
+		/* A copy stays part of the same gesture: ViewGroup copies every event on
+		 * its way to a child, and an app that tells gestures apart by down time
+		 * (GeckoView does) sees the copy, not the original. */
+		ev.downTime = other.downTime;
+		ev.scroll_dx = other.scroll_dx;
+		ev.scroll_dy = other.scroll_dy;
 
 		return ev;
 	}
@@ -1888,8 +1906,8 @@ public final class MotionEvent extends InputEvent {
 	 * a stream of position events.
 	 */
 	public final long getDownTime() {
-		return getEventTime(); // FIXME?
-				       //		return nativeGetDownTimeNanos(mNativePtr) / NS_PER_MS;
+		/* 0 for events that came from obtain(), which has no gesture tracking. */
+		return downTime != 0 ? downTime : getEventTime();
 	}
 
 	/**
@@ -2089,7 +2107,10 @@ public final class MotionEvent extends InputEvent {
 	 * that pointer identifier.
 	 */
 	public final int findPointerIndex(int pointerId) {
-		return 0 /*nativeFindPointerIndex(mNativePtr, pointerId)*/;
+		for (int i = 0; i < ids.length; i++)
+			if (ids[i] == pointerId)
+				return i;
+		return -1;
 	}
 
 	/**

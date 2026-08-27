@@ -1270,6 +1270,16 @@ public class View implements Drawable.Callback {
 	 * themselves; skip recording and replaying empty display lists for them */
 	private static final Map<Class<?>, Boolean> overridesOnDrawCache = new HashMap<>();
 
+	/* An ahead-of-time image answers getDeclaredMethod for a class with no
+	 * reflection metadata as if the method did not exist, so this optimisation
+	 * would silently decide that every unregistered view draws nothing. Give it
+	 * up there and record unconditionally. The key is GraalVM's own
+	 * ImageInfo.PROPERTY_IMAGE_CODE_KEY; any value means an image (it reads
+	 * "buildtime" during the build and "runtime" after), and it is unset on ART
+	 * and on a stock JVM, so those keep the optimisation. */
+	private static final boolean IN_NATIVE_IMAGE =
+		System.getProperty("org.graalvm.nativeimage.imagecode") != null;
+
 	private boolean overridesOnDraw() {
 		Class<?> cls = getClass();
 		synchronized (overridesOnDrawCache) {
@@ -1297,7 +1307,7 @@ public class View implements Drawable.Callback {
 		// clear the flag before drawing: an invalidate() from inside onDraw
 		// (self-animating views) must dirty the new recording, not this one
 		displayListDirty = false;
-		if (background == null && !overridesOnDraw()) {
+		if (!IN_NATIVE_IMAGE && background == null && !overridesOnDraw()) {
 			if (contentDisplayList != null) {
 				contentDisplayList.discardDisplayList();
 				contentDisplayList = null;
@@ -1445,6 +1455,11 @@ public class View implements Drawable.Callback {
 		return clickable || longClickable || on_click_listener != null || on_long_click_listener != null;
 	}
 
+	/* the press that has lasted long enough becomes a long click, as in AOSP:
+	 * scheduled on ACTION_DOWN, dropped when the gesture ends or leaves the view */
+	private Runnable pending_long_press = null;
+	private boolean long_press_performed = false;
+
 	public boolean onTouchEvent(MotionEvent event) {
 		/* A clickable view consumes the whole gesture (so the parent keeps
 		 * routing events to it through to ACTION_UP) and fires performClick on
@@ -1454,20 +1469,50 @@ public class View implements Drawable.Callback {
 			switch (event.getActionMasked()) {
 				case MotionEvent.ACTION_DOWN:
 					setPressed(true);
+					long_press_performed = false;
+					scheduleLongPress(event.getX(), event.getY());
+					break;
+				case MotionEvent.ACTION_MOVE:
+					// a gesture that wandered off the view is no longer a press on it
+					if (!pointInView(event.getX(), event.getY(), ViewConfiguration.getTouchSlop())) {
+						cancelLongPress();
+						setPressed(false);
+					}
 					break;
 				case MotionEvent.ACTION_UP:
+					cancelLongPress();
 					if (isPressed()) {
-						performClick();
+						// a long click that was handled replaces the click, it does not precede it
+						if (!long_press_performed)
+							performClick();
 						setPressed(false);
 					}
 					break;
 				case MotionEvent.ACTION_CANCEL:
+					cancelLongPress();
 					setPressed(false);
 					break;
 			}
 			return true;
 		}
 		return false;
+	}
+
+	private void scheduleLongPress(float x, float y) {
+		cancelLongPress();
+		if (!isLongClickable())
+			return;
+		// an anonymous class, not a lambda: hax.jar is also dexed for ART with
+		// dx, which rejects invokedynamic below min-sdk 26
+		pending_long_press = new Runnable() {
+			public void run() {
+				pending_long_press = null;
+				// released, cancelled or detached in the meantime: no long click
+				if (isPressed() && parent != null)
+					long_press_performed = performLongClick(x, y);
+			}
+		};
+		postDelayed(pending_long_press, ViewConfiguration.getLongPressTimeout());
 	}
 
 	public void setOnTouchListener(OnTouchListener l) {
@@ -2260,9 +2305,25 @@ public class View implements Drawable.Callback {
 		return translationY;
 	}
 
+	/* ATL_DEBUG_TRANSLATE=1: every translation change, with the view's class -
+	 * how a dynamic toolbar's motion is read back out of a run */
+	private static final boolean DEBUG_TRANSLATE = System.getenv("ATL_DEBUG_TRANSLATE") != null;
+	private static final boolean DEBUG_TRANSLATE_STACK = "2".equals(System.getenv("ATL_DEBUG_TRANSLATE"));
+	private static int sTranslateStacks = 0;
+
+	private static void debugTranslateStack() {
+		if (!DEBUG_TRANSLATE_STACK || sTranslateStacks++ > 400)
+			return;
+		StackTraceElement[] st = Thread.currentThread().getStackTrace();
+		for (int i = 2; i < st.length && i < 18; i++)
+			System.err.println("ATLTranslate:   at " + st[i]);
+	}
+
 	public void setTranslationX(float translationX) {
 		if (this.translationX == translationX)
 			return;
+		if (DEBUG_TRANSLATE)
+			System.err.println("ATLTranslate: x " + getClass().getName() + " " + this.translationX + " -> " + translationX);
 		invalidateViewProperty(true, false); // damage the old position (maps through the old matrix)
 		this.translationX = translationX;
 		invalidateViewProperty(false, true);
@@ -2271,6 +2332,10 @@ public class View implements Drawable.Callback {
 	public void setTranslationY(float translationY) {
 		if (this.translationY == translationY)
 			return;
+		if (DEBUG_TRANSLATE) {
+			System.err.println("ATLTranslate: y " + getClass().getName() + " " + this.translationY + " -> " + translationY + " top=" + top + " h=" + (bottom - top));
+			debugTranslateStack();
+		}
 		invalidateViewProperty(true, false);
 		this.translationY = translationY;
 		invalidateViewProperty(false, true);
@@ -2885,7 +2950,12 @@ public class View implements Drawable.Callback {
 		return new ViewOverlay();
 	}
 
-	public void cancelLongPress() {}
+	public void cancelLongPress() {
+		if (pending_long_press != null) {
+			removeCallbacks(pending_long_press);
+			pending_long_press = null;
+		}
+	}
 
 	public int getTextAlignment() { return textAlignment; }
 
@@ -2976,9 +3046,17 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
-	/** A typed character (Unicode codepoint, post keyboard-layout). Editable views override. */
+	/* --- IME (input method) contract -------------------------------------
+	 *
+	 * These mirror what Maliit's Qt input context turns into QInputMethodEvents,
+	 * so the same replacement semantics apply: replaceStart is counted from the
+	 * start of the composing region (from the cursor when there is none), and
+	 * that range is deleted before the new text goes in. A keyboard correcting
+	 * an already-committed word ("teh" -> "the") arrives that way, not as a
+	 * backspace burst. */
+
 	/** IME committed text (finalized); default treats it as typed input. */
-	public boolean onCommitText(CharSequence text) {
+	public boolean onCommitText(CharSequence text, int replaceStart, int replaceLength, int cursorPos) {
 		boolean any = false;
 		for (int i = 0; i < text.length(); ) {
 			int cp = Character.codePointAt(text, i);
@@ -2988,13 +3066,33 @@ public class View implements Drawable.Callback {
 		return any;
 	}
 
-	/** IME composing (preedit) text; overridden by editable views. */
-	public boolean onComposingText(CharSequence text) {
+	/** IME composing (preedit) text; overridden by editable views. cursorPos is
+	 *  the caret's offset inside the composing text, or -1 for its end. */
+	public boolean onComposingText(CharSequence text, int replaceStart, int replaceLength, int cursorPos) {
 		return false;
 	}
 
 	/** Finalize any composing region, keeping its current text. */
 	public void onFinishComposing() {
+	}
+
+	/** The IME asked to move the selection (maliit's setSelection). */
+	public void onImeSetSelection(int start, int length) {
+	}
+
+	/** The editor content as the IME must see it: the committed text only, with
+	 *  any composing region taken out. Null when this view is not an editor. */
+	public CharSequence getImeSurroundingText() {
+		return null;
+	}
+
+	/** Caret and anchor as offsets into {@link #getImeSurroundingText}. */
+	public int getImeCursorPosition() {
+		return 0;
+	}
+
+	public int getImeAnchorPosition() {
+		return 0;
 	}
 
 	public boolean onTextInput(int codePoint) {
@@ -3103,6 +3201,13 @@ public class View implements Drawable.Callback {
 	public void setHasTransientState(boolean hasTransientState) {}
 
 	protected void onConfigurationChanged(Configuration newConfig) {}
+
+	/** ViewRootImpl calls this when the window's size, and with it Configuration,
+	 *  changed. Compose's AndroidComposeView overrides it to republish
+	 *  LocalConfiguration. */
+	public void dispatchConfigurationChanged(Configuration newConfig) {
+		onConfigurationChanged(newConfig);
+	}
 
 	public boolean isDrawingCacheEnabled() { return false; }
 
