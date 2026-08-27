@@ -67,6 +67,14 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_openAssetFd(JNIEnv 
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, file_name, mode);
 	android_log_printf(ANDROID_LOG_VERBOSE, "[" __FILE__ "]", "AssetManager_openAssetFd(%p, %s, %d, ...)\n", asset_manager, file_name, mode);
 
+	/* an asset the container does not hold comes back NULL, and
+	 * Asset_openFileDescriptor() would dereference it; AOSP's
+	 * openNonAssetFdNative throws here instead */
+	if (!asset) {
+		(*env)->ThrowNew(env, (*env)->FindClass(env, "java/io/FileNotFoundException"), file_name);
+		return -1;
+	}
+
 	fd = Asset_openFileDescriptor(asset, &offset, &size);
 
 	(*env)->SetLongArrayRegion(env, _offset, 0, 1, (jlong[]){offset});
@@ -403,16 +411,20 @@ JNIEXPORT jboolean JNICALL Java_android_content_res_AssetManager_resolveAttrs(JN
 JNIEXPORT jboolean JNICALL Java_android_content_res_AssetManager_retrieveAttributes(JNIEnv *env, jobject this,
                                                                                     jlong parser_ptr,
                                                                                     jintArray java_attrs, jint attrs_len,
-                                                                                    jlong out_values, jlong out_indices)
+                                                                                    jintArray java_values, jintArray java_indices)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
 	struct ResXMLParser *parser = (struct ResXMLParser *)_PTR(parser_ptr);
 
 	jint *attrs = (*env)->GetIntArrayElements(env, java_attrs, 0);
+	jint *values = (*env)->GetIntArrayElements(env, java_values, 0);
+	jint *indices = (*env)->GetIntArrayElements(env, java_indices, 0);
 
-	jboolean ret = RetrieveAttributes(asset_manager, parser, (uint32_t *)attrs, attrs_len, (uint32_t *)_PTR(out_values), (uint32_t *)_PTR(out_indices));
+	jboolean ret = RetrieveAttributes(asset_manager, parser, (uint32_t *)attrs, attrs_len, (uint32_t *)values, (uint32_t *)indices);
 
+	(*env)->ReleaseIntArrayElements(env, java_indices, indices, 0);
+	(*env)->ReleaseIntArrayElements(env, java_values, values, 0);
 	(*env)->ReleaseIntArrayElements(env, java_attrs, attrs, JNI_ABORT);
 
 	return ret;
@@ -422,7 +434,7 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_applyStyle(JNIEnv *
                                                                         jlong theme_ptr, jlong parser_ptr,
                                                                         jint def_style_attr, jint def_style_res,
                                                                         jintArray java_attrs, jint attrs_len,
-                                                                        jlong out_values, jlong out_indices)
+                                                                        jintArray java_values, jintArray java_indices)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
@@ -431,9 +443,13 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_applyStyle(JNIEnv *
 	struct ResXMLParser *parser = (struct ResXMLParser *)_PTR(parser_ptr);
 
 	jint *attrs = (*env)->GetIntArrayElements(env, java_attrs, 0);
+	jint *values = (*env)->GetIntArrayElements(env, java_values, 0);
+	jint *indices = (*env)->GetIntArrayElements(env, java_indices, 0);
 
-	ApplyStyle(theme, parser, def_style_attr, def_style_res, (uint32_t *)attrs, attrs_len, (uint32_t *)_PTR(out_values), (uint32_t *)_PTR(out_indices));
+	ApplyStyle(theme, parser, def_style_attr, def_style_res, (uint32_t *)attrs, attrs_len, (uint32_t *)values, (uint32_t *)indices);
 
+	(*env)->ReleaseIntArrayElements(env, java_indices, indices, 0);
+	(*env)->ReleaseIntArrayElements(env, java_values, values, 0);
 	(*env)->ReleaseIntArrayElements(env, java_attrs, attrs, JNI_ABORT);
 }
 

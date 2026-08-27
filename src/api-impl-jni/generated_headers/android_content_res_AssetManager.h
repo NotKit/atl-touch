@@ -214,10 +214,10 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceBagValu
 /*
  * Class:     android_content_res_AssetManager
  * Method:    applyStyle
- * Signature: (JJII[IIJJ)V
+ * Signature: (JJII[II[I[I)V
  */
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_applyStyle
-  (JNIEnv *, jobject, jlong, jlong, jint, jint, jintArray, jint, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jlong, jint, jint, jintArray, jint, jintArray, jintArray);
 
 /*
  * Class:     android_content_res_AssetManager
@@ -230,10 +230,10 @@ JNIEXPORT jboolean JNICALL Java_android_content_res_AssetManager_resolveAttrs
 /*
  * Class:     android_content_res_AssetManager
  * Method:    retrieveAttributes
- * Signature: (J[IIJJ)Z
+ * Signature: (J[II[I[I)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_content_res_AssetManager_retrieveAttributes
-  (JNIEnv *, jobject, jlong, jintArray, jint, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jintArray, jint, jintArray, jintArray);
 
 /*
  * Class:     android_content_res_AssetManager
