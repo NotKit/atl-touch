@@ -12,6 +12,20 @@ extern JavaVM *jvm;
 
 JNIEnv *get_jni_env(void);
 
+/* print a pending exception and clear it; see util.c */
+void atl_report_pending_exception(JNIEnv *env);
+
+/* FindClass, but a miss is fatal: the callers store the result and every use of
+ * it is a JNI call that crashes the VM on a NULL jclass. See util.c */
+jclass atl_find_class_or_exit(JNIEnv *env, const char *name);
+
+/* Conversions between java strings and *real* UTF-8, for anything that hands a
+ * string to GLib or takes one from it: JNI's GetStringUTFChars/NewStringUTF
+ * speak modified UTF-8 (CESU-8), which GLib rejects. Both return g_free-able
+ * memory / a local ref, or NULL for a NULL input. */
+char *jstring_to_utf8(JNIEnv *env, jstring str);
+jstring utf8_to_jstring(JNIEnv *env, const char *utf8);
+
 const char *attribute_set_get_string(JNIEnv *env, jobject attrs, char *attribute, char *schema);
 int attribute_set_get_int(JNIEnv *env, jobject attrs, char *attribute, char *schema, int default_value);
 void extract_from_apk(const char *path, const char *target);

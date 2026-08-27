@@ -1,6 +1,8 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <gio/gio.h>
 
@@ -40,9 +42,75 @@ JNIEnv *get_jni_env(void)
 	return env;
 }
 
+/* JNI's "UTF-8" is not UTF-8: a character outside the BMP comes out as the
+ * 6-byte CESU-8 encoding of its surrogate pair, and U+0000 as 0xC0 0x80. GLib
+ * validates strictly, so GetStringUTFChars into g_variant_new_string() fails on
+ * the first emoji. Go through UTF-16, which both sides agree on. */
+char *jstring_to_utf8(JNIEnv *env, jstring str)
+{
+	if (!str)
+		return NULL;
+	const jchar *chars = (*env)->GetStringChars(env, str, NULL);
+	if (!chars)
+		return NULL;
+	char *utf8 = g_utf16_to_utf8((const gunichar2 *)chars, (*env)->GetStringLength(env, str),
+	                             NULL, NULL, NULL);
+	(*env)->ReleaseStringChars(env, str, chars);
+	return utf8 ? utf8 : g_strdup("");
+}
+
+/* the same hazard in reverse: NewStringUTF takes modified UTF-8, so real UTF-8
+ * from outside (an emoji committed by the keyboard) has to be converted */
+jstring utf8_to_jstring(JNIEnv *env, const char *utf8)
+{
+	if (!utf8)
+		return NULL;
+	glong len = 0;
+	gunichar2 *utf16 = g_utf8_to_utf16(utf8, -1, NULL, &len, NULL);
+	if (!utf16) /* not valid UTF-8 at all: nothing sensible to hand to java */
+		return (*env)->NewStringUTF(env, "");
+	jstring str = (*env)->NewString(env, (const jchar *)utf16, len);
+	g_free(utf16);
+	return str;
+}
+
 JNIEnv *_gdb_get_jni_env(void)
 {
 	return get_jni_env();
+}
+
+/* Print a pending exception and clear it.
+ *
+ * ART's ExceptionDescribe puts the exception back after printing it
+ * (art/runtime/jni/jni_internal.cc), so describing alone leaves it pending. The
+ * next call into managed code then unwinds out of its first bytecode instead of
+ * running, which is how one throwing app callback silently swallows the rest of
+ * a lifecycle. Native call sites entered from the event loop have no Java frame
+ * to propagate to, so they all have to clear. */
+void atl_report_pending_exception(JNIEnv *env)
+{
+	if (!(*env)->ExceptionCheck(env))
+		return;
+	(*env)->ExceptionDescribe(env);
+	(*env)->ExceptionClear(env);
+}
+
+/* Resolve a class the runtime cannot run without.
+ *
+ * A NULL jclass is not something a later JNI call survives: GetMethodID
+ * dereferences it inside the VM, so the miss surfaces as a SIGSEGV in a libjvm
+ * frame instead of as the name that was not found. On ART these all come off the
+ * boot class path; on a stock JVM one missing class path entry is enough to make
+ * a framework class fail its <clinit>. */
+jclass atl_find_class_or_exit(JNIEnv *env, const char *name)
+{
+	jclass class = (*env)->FindClass(env, name);
+	if (class)
+		return class;
+
+	fprintf(stderr, "error: the framework needs %s and it did not load:\n", name);
+	atl_report_pending_exception(env);
+	exit(1);
 }
 
 void _gdb_get_java_stack_trace(void)
@@ -64,6 +132,12 @@ void extract_from_apk(const char *path, const char *target)
 {
 	JNIEnv *env = get_jni_env();
 	(*env)->CallStaticVoidMethod(env, handle_cache.asset_manager.class, handle_cache.asset_manager.extractFromAPK, _JSTRING(apk_path), _JSTRING(path), _JSTRING(target));
+	/* extractFromAPK throws if the copy itself fails; clear it here, or it would
+	 * be delivered at whatever JNI call this caller makes next */
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 /* logging with fallback to stderr */
@@ -113,6 +187,41 @@ int android_log_printf(android_LogPriority prio, const char *tag, const char *fm
 	return ret;
 }
 
+/*
+ * How wide one element of this buffer is, as a shift. libcore's Buffer carries
+ * it as the _elementSizeShift field and every GL binding reads it from there;
+ * the JDK's Buffer has no such field, so ask what kind of buffer it is.
+ */
+static int nio_element_size_shift(JNIEnv *env, jobject buffer)
+{
+	static const struct {
+		const char *name;
+		int shift;
+	} kinds[] = {
+		{"java/nio/ByteBuffer", 0},
+		{"java/nio/ShortBuffer", 1},
+		{"java/nio/CharBuffer", 1},
+		{"java/nio/IntBuffer", 2},
+		{"java/nio/FloatBuffer", 2},
+		{"java/nio/LongBuffer", 3},
+		{"java/nio/DoubleBuffer", 3},
+	};
+
+	for (size_t i = 0; i < sizeof(kinds) / sizeof(kinds[0]); i++) {
+		jclass class = (*env)->FindClass(env, kinds[i].name);
+		if (!class) {
+			(*env)->ExceptionClear(env);
+			continue;
+		}
+		jboolean is_kind = (*env)->IsInstanceOf(env, buffer, class);
+		(*env)->DeleteLocalRef(env, class);
+		if (is_kind)
+			return kinds[i].shift;
+	}
+
+	return 0; /* bytes: the only guess that cannot overrun the buffer */
+}
+
 void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **array)
 {
 	jclass class;
@@ -125,7 +234,7 @@ void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **arr
 	}
 	class = _CLASS(buffer);
 	pointer = _PTR((*env)->GetLongField(env, buffer, _FIELD_ID(class, "address", "J")));
-	elementSizeShift = (*env)->GetIntField(env, buffer, _FIELD_ID(class, "_elementSizeShift", "I"));
+	elementSizeShift = nio_element_size_shift(env, buffer);
 	position = (*env)->GetIntField(env, buffer, _FIELD_ID(class, "position", "I"));
 	if (pointer) { // buffer is direct
 		*array_ref = NULL;
@@ -176,11 +285,13 @@ GVariant *intent_serialize(JNIEnv *env, jobject intent)
 		jobject value_jobj = (*env)->CallObjectMethod(env, extras, handle_cache.bundle.get, key_jstr);
 		if (!key_jstr || !value_jobj)
 			continue;
-		const char *key = (*env)->GetStringUTFChars(env, key_jstr, NULL);
+		char *key = jstring_to_utf8(env, key_jstr);
 		if ((*env)->IsInstanceOf(env, value_jobj, _CLASS(key_jstr))) {
-			const char *value = (*env)->GetStringUTFChars(env, value_jobj, NULL);
+			// a string extra can hold anything the app put there, so it takes the
+			// UTF-16 route as well (see jstring_to_utf8 above)
+			char *value = jstring_to_utf8(env, value_jobj);
 			g_variant_builder_add(&extras_builder, "{sv}", key, g_variant_new_string(value));
-			(*env)->ReleaseStringUTFChars(env, value_jobj, value);
+			g_free(value);
 		} else if ((*env)->IsInstanceOf(env, value_jobj, parcelable_class)) {
 			GVariantBuilder parcel_builder;
 			g_variant_builder_init(&parcel_builder, G_VARIANT_TYPE_TUPLE);
@@ -192,22 +303,19 @@ GVariant *intent_serialize(JNIEnv *env, jobject intent)
 		} else {
 			printf("intent_serialize: skipping non-string, non-parcelable extra: %s\n", key);
 		}
-		(*env)->ReleaseStringUTFChars(env, key_jstr, key);
+		g_free(key);
 		(*env)->DeleteLocalRef(env, key_jstr);
 		(*env)->DeleteLocalRef(env, value_jobj);
 	}
 
-	const char *action = action_jstr ? (*env)->GetStringUTFChars(env, action_jstr, NULL) : NULL;
-	const char *className = className_jstr ? (*env)->GetStringUTFChars(env, className_jstr, NULL) : NULL;
-	const char *data = data_jstr ? (*env)->GetStringUTFChars(env, data_jstr, NULL) : NULL;
+	char *action = jstring_to_utf8(env, action_jstr);
+	char *className = jstring_to_utf8(env, className_jstr);
+	char *data = jstring_to_utf8(env, data_jstr);
 	const char *dbus_name = g_application_get_application_id(g_application_get_default());
 	GVariant *variant = g_variant_new(INTENT_G_VARIANT_TYPE_STRING, action ?: "", className ?: "", data ?: "", &extras_builder, dbus_name);
-	if (action_jstr)
-		(*env)->ReleaseStringUTFChars(env, action_jstr, action);
-	if (className_jstr)
-		(*env)->ReleaseStringUTFChars(env, className_jstr, className);
-	if (data_jstr)
-		(*env)->ReleaseStringUTFChars(env, data_jstr, data);
+	g_free(action);
+	g_free(className);
+	g_free(data);
 	return variant;
 }
 

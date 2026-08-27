@@ -34,6 +34,10 @@ static gboolean dispatch_func(GSource *source, GSourceFunc callback, gpointer us
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
+		// Looper.loop() was left mid-message, so MessageQueue.mBlocked is
+		// still false and nothing will call nativeWake for us again. Without
+		// this the main looper goes deaf for the rest of the process.
+		g_source_set_ready_time(source, 0);
 	}
 
 	return G_SOURCE_CONTINUE;
