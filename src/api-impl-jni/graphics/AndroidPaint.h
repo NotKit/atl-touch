@@ -13,12 +13,19 @@ struct Typeface;
 struct AndroidPaint {
 	SkPaint paint;
 	SkFont font;
+
+	/* SkPaint's antialias defaults to false while SkFont's edging defaults to
+	 * kAntiAlias; AOSP's Paint() starts them in step the same way, and
+	 * apply_flags() keeps them there. */
+	AndroidPaint() { font.setEdging(SkFont::Edging::kAlias); }
+
 	/* matches android.graphics.Paint.Align ordinals */
 	int text_align = 0;
 
 	/* minikin shaping state (see hwui/MinikinGlue.h); typeface is owned by
-	 * the Java android.graphics.Typeface holding it */
-	android::Typeface *typeface = nullptr;
+	 * the Java android.graphics.Typeface holding it, or is the process-wide
+	 * default a paint starts on */
+	const android::Typeface *typeface = nullptr;
 	float letter_spacing = 0;
 	float word_spacing = 0;
 	std::string font_feature_settings;

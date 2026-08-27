@@ -319,3 +319,17 @@ install_data([
              	'res/fonts.xml'
              ],
              install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/etc')
+
+# The Roboto faces res/fonts.xml names for sans-serif. TypefaceCollection.cpp
+# builds the generic families from these instead of asking fontconfig, so text
+# is laid out against the same fonts Android uses.
+install_data(['res/fonts/NOTICE'] +
+             files(
+             	'res/fonts/Roboto-Thin.ttf', 'res/fonts/Roboto-ThinItalic.ttf',
+             	'res/fonts/Roboto-Light.ttf', 'res/fonts/Roboto-LightItalic.ttf',
+             	'res/fonts/Roboto-Regular.ttf', 'res/fonts/Roboto-Italic.ttf',
+             	'res/fonts/Roboto-Medium.ttf', 'res/fonts/Roboto-MediumItalic.ttf',
+             	'res/fonts/Roboto-Black.ttf', 'res/fonts/Roboto-BlackItalic.ttf',
+             	'res/fonts/Roboto-Bold.ttf', 'res/fonts/Roboto-BoldItalic.ttf',
+             ),
+             install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/fonts')

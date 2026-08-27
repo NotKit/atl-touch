@@ -20,7 +20,12 @@ namespace android {
 /* the default typeface, building the fontconfig collection on first use */
 const Typeface *typeface_init_default(void);
 Typeface *typeface_create_named(const char *name);
-std::shared_ptr<minikin::FontFamily> typeface_family_from_file(const char *path);
+std::shared_ptr<minikin::FontFamily> typeface_family_from_file(const char *path, int weight,
+                                                               int italic);
+
+/* the SkTypeface a Typeface lays out with (the default one for nullptr), for
+ * the SkFont a Paint keeps beside its minikin state */
+sk_sp<SkTypeface> typeface_sk_typeface(const Typeface *typeface);
 
 minikin::MinikinPaint minikin_paint_for(const AndroidPaint *paint);
 

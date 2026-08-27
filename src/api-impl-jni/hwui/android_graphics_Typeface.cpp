@@ -31,13 +31,23 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateRelative(JNIE
 	return _INTPTR(Typeface::createRelative((Typeface *)_PTR(base_ptr), (Typeface::Style)style));
 }
 
-JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateFromFile(JNIEnv *env, jclass, jstring path)
+JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateFromTypefaceWithExactStyle(JNIEnv *env, jclass, jlong base_ptr, jint weight, jboolean italic)
+{
+	android::typeface_init_default();
+	return _INTPTR(Typeface::createAbsolute((Typeface *)_PTR(base_ptr), weight, italic));
+}
+
+/* weight/italic are RESOLVE_BY_FONT_TABLE unless Typeface.Builder declared them;
+ * the declared value labels the face in the family and is the style asked of it,
+ * so an exact match is found and minikin adds no fake bold or oblique */
+JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateFromFile(JNIEnv *env, jclass, jstring path, jint weight, jint italic)
 {
 	android::typeface_init_default();
 	if (!path)
 		return 0;
 	const char *path_str = env->GetStringUTFChars(path, NULL);
-	std::shared_ptr<minikin::FontFamily> family = android::typeface_family_from_file(path_str);
+	std::shared_ptr<minikin::FontFamily> family =
+	    android::typeface_family_from_file(path_str, weight, italic);
 	env->ReleaseStringUTFChars(path, path_str);
 	if (!family)
 		return 0;
@@ -46,6 +56,17 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateFromFile(JNIE
 	const Typeface *fallback = Typeface::resolveDefault(nullptr);
 	for (const auto &family_ptr : fallback->fFontCollection->getFamilies())
 		families.push_back(family_ptr);
-	return _INTPTR(Typeface::createFromFamilies(std::move(families), android::RESOLVE_BY_FONT_TABLE,
-	                                            android::RESOLVE_BY_FONT_TABLE));
+	return _INTPTR(Typeface::createFromFamilies(std::move(families), weight, italic));
+}
+
+JNIEXPORT jint JNICALL Java_android_graphics_Typeface_nativeGetStyle(JNIEnv *env, jclass, jlong typeface_ptr)
+{
+	const Typeface *typeface = Typeface::resolveDefault((Typeface *)_PTR(typeface_ptr));
+	return typeface->fAPIStyle;
+}
+
+JNIEXPORT jint JNICALL Java_android_graphics_Typeface_nativeGetWeight(JNIEnv *env, jclass, jlong typeface_ptr)
+{
+	const Typeface *typeface = Typeface::resolveDefault((Typeface *)_PTR(typeface_ptr));
+	return typeface->fStyle.weight();
 }

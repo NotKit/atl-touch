@@ -15,6 +15,8 @@ extern "C" {
 #define android_graphics_Typeface_ITALIC 2L
 #undef android_graphics_Typeface_BOLD_ITALIC
 #define android_graphics_Typeface_BOLD_ITALIC 3L
+#undef android_graphics_Typeface_RESOLVE_BY_FONT_TABLE
+#define android_graphics_Typeface_RESOLVE_BY_FONT_TABLE -1L
 /*
  * Class:     android_graphics_Typeface
  * Method:    nativeCreateNamed
@@ -33,11 +35,35 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateRelative
 
 /*
  * Class:     android_graphics_Typeface
+ * Method:    nativeCreateFromTypefaceWithExactStyle
+ * Signature: (JIZ)J
+ */
+JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateFromTypefaceWithExactStyle
+  (JNIEnv *, jclass, jlong, jint, jboolean);
+
+/*
+ * Class:     android_graphics_Typeface
  * Method:    nativeCreateFromFile
- * Signature: (Ljava/lang/String;)J
+ * Signature: (Ljava/lang/String;II)J
  */
 JNIEXPORT jlong JNICALL Java_android_graphics_Typeface_nativeCreateFromFile
-  (JNIEnv *, jclass, jstring);
+  (JNIEnv *, jclass, jstring, jint, jint);
+
+/*
+ * Class:     android_graphics_Typeface
+ * Method:    nativeGetStyle
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_graphics_Typeface_nativeGetStyle
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Typeface
+ * Method:    nativeGetWeight
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_graphics_Typeface_nativeGetWeight
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

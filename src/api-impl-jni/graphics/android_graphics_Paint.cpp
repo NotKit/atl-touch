@@ -4,6 +4,7 @@
 #include "ATLCanvas.h"
 #include "ATLShader.h"
 #include "AndroidPaint.h"
+#include "porter_duff.h"
 #include "../hwui/MinikinGlue.h"
 
 #include <vector>
@@ -43,40 +44,27 @@ static const int STRIKE_THRU_TEXT_FLAG = 1 << 4;
 static const int FAKE_BOLD_TEXT_FLAG = 1 << 5;
 static const int LINEAR_TEXT_FLAG = 1 << 6;
 static const int SUBPIXEL_TEXT_FLAG = 1 << 7;
-
-/* PorterDuff.Mode nativeInt values (see android.graphics.PorterDuff) */
-static SkBlendMode porter_duff_to_blend_mode(int mode)
-{
-	switch (mode) {
-		case 0: return SkBlendMode::kClear;
-		case 1: return SkBlendMode::kSrc;
-		case 2: return SkBlendMode::kDst;
-		case 3: return SkBlendMode::kSrcOver;
-		case 4: return SkBlendMode::kDstOver;
-		case 5: return SkBlendMode::kSrcIn;
-		case 6: return SkBlendMode::kDstIn;
-		case 7: return SkBlendMode::kSrcOut;
-		case 8: return SkBlendMode::kDstOut;
-		case 9: return SkBlendMode::kSrcATop;
-		case 10: return SkBlendMode::kDstATop;
-		case 11: return SkBlendMode::kXor;
-		case 12: return SkBlendMode::kDarken;
-		case 13: return SkBlendMode::kLighten;
-		case 14: return SkBlendMode::kModulate; // PorterDuff MULTIPLY
-		case 15: return SkBlendMode::kScreen;
-		case 16: return SkBlendMode::kPlus; // PorterDuff ADD
-		case 17: return SkBlendMode::kOverlay;
-		default: return SkBlendMode::kSrcOver;
-	}
-}
+static const int EMBEDDED_BITMAP_TEXT_FLAG = 1 << 10;
+static const int AUTO_HINTING_TEXT_FLAG = 1 << 11;
 
 /* --- lifecycle --- */
+
+/* Keep both halves of the paint on the same face: minikin shapes from
+ * `typeface`, while the metrics Paint reports come from the SkFont. nullptr
+ * means the default family, not fontconfig's idea of one. */
+static void paint_set_typeface(AndroidPaint *paint, const android::Typeface *typeface)
+{
+	if (!typeface)
+		typeface = android::typeface_init_default();
+	paint->typeface = typeface;
+	paint->font.setTypeface(android::typeface_sk_typeface(typeface));
+}
 
 JNIEXPORT jlong JNICALL Java_android_graphics_Paint_nInit(JNIEnv *env, jclass)
 {
 	AndroidPaint *paint = new AndroidPaint();
 	paint->paint.setColor(SK_ColorBLACK);
-	paint->font.setTypeface(atl_default_typeface());
+	paint_set_typeface(paint, nullptr);
 	return _INTPTR(paint);
 }
 
@@ -100,7 +88,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_nReset(JNIEnv *env, jclass, j
 	AndroidPaint *paint = PAINT(paint_ptr);
 	*paint = AndroidPaint();
 	paint->paint.setColor(SK_ColorBLACK);
-	paint->font.setTypeface(atl_default_typeface());
+	paint_set_typeface(paint, nullptr);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_nSet(JNIEnv *env, jclass, jlong dst_ptr, jlong src_ptr)
@@ -119,6 +107,12 @@ static void apply_flags(AndroidPaint *paint)
 	paint->font.setEmbolden(paint->flags & FAKE_BOLD_TEXT_FLAG);
 	paint->font.setLinearMetrics(paint->flags & LINEAR_TEXT_FLAG);
 	paint->font.setSubpixel(paint->flags & SUBPIXEL_TEXT_FLAG);
+	paint->font.setEmbeddedBitmaps(paint->flags & EMBEDDED_BITMAP_TEXT_FLAG);
+	paint->font.setForceAutoHinting(paint->flags & AUTO_HINTING_TEXT_FLAG);
+	/* text is rasterised from SkFont's edging, not from SkPaint's antialias,
+	 * so ANTI_ALIAS_FLAG has to reach both (AOSP applyLegacyFlagsToFont) */
+	paint->font.setEdging(paint->flags & ANTI_ALIAS_FLAG ? SkFont::Edging::kAntiAlias
+	                                                     : SkFont::Edging::kAlias);
 }
 
 static void set_flag(AndroidPaint *paint, int flag, bool enable)
@@ -276,20 +270,7 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Paint_nSetMaskFilter(JNIEnv *env, 
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_nSetTypeface(JNIEnv *env, jclass, jlong paint_ptr, jlong typeface_ptr)
 {
-	AndroidPaint *paint = PAINT(paint_ptr);
-	paint->typeface = (android::Typeface *)_PTR(typeface_ptr);
-	/* keep the SkFont in sync for legacy draw paths */
-	if (paint->typeface) {
-		const auto &families = paint->typeface->fFontCollection->getFamilies();
-		if (!families.empty()) {
-			auto closest = families[0]->getClosestMatch(paint->typeface->fStyle);
-			paint->font.setTypeface(
-			    static_cast<const android::MinikinFontSkia *>(closest.font->typeface().get())
-			        ->RefSkTypeface());
-		}
-	} else {
-		paint->font.setTypeface(atl_default_typeface());
-	}
+	paint_set_typeface(PAINT(paint_ptr), (const android::Typeface *)_PTR(typeface_ptr));
 }
 
 /* --- shadow layer --- */

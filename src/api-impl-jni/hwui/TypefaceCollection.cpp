@@ -1,6 +1,11 @@
 /*
- * Builds minikin FontCollections from the host's fontconfig fonts (via
- * Skia's fontconfig SkFontMgr), replacing Android's fonts.xml parsing.
+ * Builds minikin FontCollections, replacing Android's fonts.xml parsing.
+ *
+ * The generic families (sans-serif and its weight aliases, serif, monospace)
+ * come from the Roboto faces installed beside the framework, so that text is
+ * laid out against the same fonts Android uses. Everything else -- named
+ * families and the script/emoji fallback chain -- still comes from the host's
+ * fontconfig via Skia's SkFontMgr.
  */
 
 #include "MinikinSkia.h"
@@ -12,6 +17,12 @@
 #include <log/log.h>
 #include <minikin/FontCollection.h>
 #include <minikin/FontFamily.h>
+
+#include <dlfcn.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <map>
@@ -53,6 +64,111 @@ static std::shared_ptr<minikin::MinikinFont> make_minikin_font(sk_sp<SkTypeface>
 	                                         std::vector<minikin::FontVariation>());
 }
 
+/* --- the bundled Roboto faces ------------------------------------------- */
+
+/* What res/fonts.xml declares for the sans-serif family: the file, the weight
+ * the family gives it, and its slant. The weights are the family's, not the
+ * files' -- Roboto-Thin's own OS/2 says 250. Order matters too: minikin keeps
+ * the first of two equally distant faces, so Black has to precede Bold for a
+ * bolded 500 (which asks for 800) to land on Black rather than Bold. */
+static const struct {
+	const char *file;
+	uint16_t weight;
+	bool italic;
+} BUNDLED_SANS[] = {
+    {"Roboto-Thin.ttf", 100, false},         {"Roboto-ThinItalic.ttf", 100, true},
+    {"Roboto-Light.ttf", 300, false},        {"Roboto-LightItalic.ttf", 300, true},
+    {"Roboto-Regular.ttf", 400, false},      {"Roboto-Italic.ttf", 400, true},
+    {"Roboto-Medium.ttf", 500, false},       {"Roboto-MediumItalic.ttf", 500, true},
+    {"Roboto-Black.ttf", 900, false},        {"Roboto-BlackItalic.ttf", 900, true},
+    {"Roboto-Bold.ttf", 700, false},         {"Roboto-BoldItalic.ttf", 700, true},
+};
+
+/* The names that resolve to that family, and the weight each one starts from,
+ * so Typeface.create("sans-serif-medium", ...) really is a 500. These are
+ * fonts.xml's sans-serif family and its aliases. */
+static const struct {
+	const char *name;
+	uint16_t weight;
+} BUNDLED_SANS_NAMES[] = {
+    {"sans-serif", 400},        {"sans-serif-thin", 100},  {"sans-serif-light", 300},
+    {"sans-serif-medium", 500}, {"sans-serif-black", 900}, {"Roboto", 400},
+    {"arial", 400},             {"helvetica", 400},        {"tahoma", 400},
+    {"verdana", 400},
+};
+
+/* Where those faces are installed: system/fonts beside the framework's own
+ * library, which is how build-atlas.sh and the click both lay it out.
+ * ATL_FONT_DIR overrides it; nothing there means fall back to fontconfig. */
+static const char *bundled_font_dir(void)
+{
+	static std::string dir;
+	static std::once_flag once;
+	std::call_once(once, [] {
+		const char *env = getenv("ATL_FONT_DIR");
+		if (env && *env) {
+			dir = env;
+		} else {
+			Dl_info info;
+			if (!dladdr((const void *)&bundled_font_dir, &info) || !info.dli_fname)
+				return;
+			std::string path(info.dli_fname);
+			size_t slash = path.rfind('/');
+			if (slash == std::string::npos)
+				return;
+			dir = path.substr(0, slash) + "/system/fonts";
+		}
+		struct stat st;
+		if (stat(dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+			ALOGW("no bundled fonts at %s, falling back to fontconfig", dir.c_str());
+			dir.clear();
+		}
+	});
+	return dir.empty() ? nullptr : dir.c_str();
+}
+
+/* The base weight a generic name starts from, 0 if it is not one of ours. */
+static uint16_t bundled_base_weight(const char *name)
+{
+	if (!name)
+		return 0;
+	for (const auto &entry : BUNDLED_SANS_NAMES)
+		if (!strcasecmp(name, entry.name))
+			return entry.weight;
+	return 0;
+}
+
+/* The sans-serif family built from the bundled faces; nullptr if they are not
+ * installed. Called under g_font_cache_mutex, so the memo needs no lock. */
+static std::shared_ptr<minikin::FontFamily> bundled_sans(void)
+{
+	static std::shared_ptr<minikin::FontFamily> family;
+	static bool tried = false;
+	if (tried)
+		return family;
+	tried = true;
+	const char *dir = bundled_font_dir();
+	if (!dir)
+		return nullptr;
+	std::vector<std::shared_ptr<minikin::Font>> fonts;
+	for (const auto &face : BUNDLED_SANS) {
+		std::string path = std::string(dir) + "/" + face.file;
+		std::shared_ptr<minikin::MinikinFont> font =
+		    make_minikin_font(atl_fontmgr()->makeFromFile(path.c_str()));
+		if (!font) {
+			ALOGW("bundled font missing or unreadable: %s", path.c_str());
+			continue;
+		}
+		minikin::FontStyle style(face.weight, face.italic ? minikin::FontStyle::Slant::ITALIC
+		                                                  : minikin::FontStyle::Slant::UPRIGHT);
+		fonts.push_back(minikin::Font::Builder(font).setStyle(style).build());
+	}
+	if (fonts.empty())
+		return nullptr;
+	family = std::make_shared<minikin::FontFamily>(std::move(fonts));
+	return family;
+}
+
 /* Each matchFamilyStyle() is a fontconfig query against the whole font
  * database. build_collection() asks for ~22 families x 4 styles, and both the
  * per-name families and the (identical) fallback chain would otherwise be
@@ -66,6 +182,10 @@ static std::map<std::string, std::shared_ptr<minikin::FontCollection>> g_collect
 
 static std::shared_ptr<minikin::FontFamily> make_family(const char *name)
 {
+	if (bundled_base_weight(name)) {
+		if (auto family = bundled_sans())
+			return family;
+	}
 	sk_sp<SkFontMgr> mgr = atl_fontmgr();
 	std::vector<std::shared_ptr<minikin::Font>> fonts;
 	/* only the four canonical styles: families like Noto Sans ship dozens of
@@ -155,8 +275,12 @@ static Typeface *make_typeface(const char *primary)
 	Typeface *typeface = new Typeface();
 	typeface->fFontCollection = collection_cached(primary);
 	typeface->fAPIStyle = Typeface::kNormal;
-	typeface->fBaseWeight = SkFontStyle::kNormal_Weight;
-	typeface->fStyle = minikin::FontStyle();
+	/* sans-serif-medium and friends are the same family at another weight */
+	uint16_t weight = bundled_base_weight(primary);
+	if (!weight)
+		weight = SkFontStyle::kNormal_Weight;
+	typeface->fBaseWeight = weight;
+	typeface->fStyle = minikin::FontStyle(weight, minikin::FontStyle::Slant::UPRIGHT);
 	return typeface;
 }
 
@@ -170,15 +294,40 @@ const Typeface *typeface_init_default(void)
 	return Typeface::resolveDefault(nullptr);
 }
 
-/* load a single font file into a minikin family (Typeface.createFromFile) */
-std::shared_ptr<minikin::FontFamily> typeface_family_from_file(const char *path)
+/* The face a Typeface's primary family resolves to. Paint's SkFont has to name
+ * this one: its metrics are what Paint.getFontMetrics() reports, so a face that
+ * differs from the collection's gives the right glyphs at the wrong line box. */
+sk_sp<SkTypeface> typeface_sk_typeface(const Typeface *typeface)
+{
+	if (!typeface)
+		typeface = typeface_init_default();
+	const auto &families = typeface->fFontCollection->getFamilies();
+	if (families.empty())
+		return nullptr;
+	auto closest = families[0]->getClosestMatch(typeface->fStyle);
+	return static_cast<const MinikinFontSkia *>(closest.font->typeface().get())->RefSkTypeface();
+}
+
+/* Load a single font file into a minikin family (Typeface.createFromFile and
+ * Typeface.Builder). weight/italic are RESOLVE_BY_FONT_TABLE unless the caller
+ * declared them; a declared one overrides the file's OS/2 value, so a face
+ * relabelled 700 matches a request for 700 and is not synthetically emboldened.
+ * Same override the bundled sans-serif family above is built with. */
+std::shared_ptr<minikin::FontFamily> typeface_family_from_file(const char *path, int weight,
+                                                               int italic)
 {
 	sk_sp<SkTypeface> sk_typeface = atl_fontmgr()->makeFromFile(path);
 	std::shared_ptr<minikin::MinikinFont> font = make_minikin_font(std::move(sk_typeface));
 	if (!font)
 		return nullptr;
+	minikin::Font::Builder builder(font);
+	if (weight != RESOLVE_BY_FONT_TABLE)
+		builder.setWeight(std::clamp(weight, 1, 1000));
+	if (italic != RESOLVE_BY_FONT_TABLE)
+		builder.setSlant(italic ? minikin::FontStyle::Slant::ITALIC
+		                        : minikin::FontStyle::Slant::UPRIGHT);
 	std::vector<std::shared_ptr<minikin::Font>> fonts;
-	fonts.push_back(minikin::Font::Builder(font).build());
+	fonts.push_back(builder.build());
 	return std::make_shared<minikin::FontFamily>(std::move(fonts));
 }
 

@@ -14,8 +14,12 @@ public class Typeface {
 	public static final int ITALIC = 2;
 	public static final int BOLD_ITALIC = 3;
 
+	/** Read the weight or the italic bit out of the font's own tables. */
+	public static final int RESOLVE_BY_FONT_TABLE = -1;
+
 	public long native_instance = 0; // android::Typeface*; directly accessed by androidx
 	private int style;
+	private int weight;
 
 	/**
 	 * The default NORMAL typeface object
@@ -40,38 +44,45 @@ public class Typeface {
 	 */
 	public static final Typeface MONOSPACE = create("monospace", NORMAL);
 
-	private Typeface(long native_instance, int style) {
+	/* the style and the weight are whatever the native face resolved to, not
+	 * what the caller asked for: a 500 face asked for as NORMAL is still a 500 */
+	private Typeface(long native_instance) {
 		this.native_instance = native_instance;
-		this.style = style;
+		this.style = nativeGetStyle(native_instance);
+		this.weight = nativeGetWeight(native_instance);
 	}
 
 	public Typeface() {
-		this(nativeCreateNamed(null, NORMAL), NORMAL);
+		this(nativeCreateNamed(null, NORMAL));
 	}
 
 	public static Typeface create(String familyName, int style) {
-		return new Typeface(nativeCreateNamed(familyName, style), style);
+		return new Typeface(nativeCreateNamed(familyName, style));
 	}
 
 	public static Typeface create(Typeface family, int style) {
 		long base = family != null ? family.native_instance : 0;
-		return new Typeface(nativeCreateRelative(base, style), style);
+		return new Typeface(nativeCreateRelative(base, style));
 	}
 
 	public static Typeface create(Typeface family, int weight, boolean italic) {
-		// map the exact weight onto the nearest legacy style until exact-weight
-		// derivation is wired through minikin
-		int style = (weight >= 600 ? BOLD : NORMAL) | (italic ? ITALIC : NORMAL);
-		return create(family, style);
+		long base = family != null ? family.native_instance : 0;
+		return new Typeface(nativeCreateFromTypefaceWithExactStyle(base, weight, italic));
 	}
 
 	public int getWeight() {
-		return isBold() ? 700 : 400;
+		return weight;
 	}
 
 	public static Typeface createFromFile(String path) {
-		long instance = nativeCreateFromFile(path);
-		return instance != 0 ? new Typeface(instance, NORMAL) : DEFAULT;
+		return createFromFile(path, RESOLVE_BY_FONT_TABLE, RESOLVE_BY_FONT_TABLE);
+	}
+
+	/* weight/italic override the file's own OS/2 values, so the face the family
+	 * holds is declared as the caller says it is and needs no synthesis */
+	private static Typeface createFromFile(String path, int weight, int italic) {
+		long instance = path != null ? nativeCreateFromFile(path, weight, italic) : 0;
+		return instance != 0 ? new Typeface(instance) : DEFAULT;
 	}
 
 	public static Typeface createFromAsset(AssetManager mgr, String path) {
@@ -117,9 +128,20 @@ public class Typeface {
 	}
 
 	public static class Builder {
+		public static final int NORMAL_WEIGHT = 400;
+		public static final int BOLD_WEIGHT = 700;
+
 		private final String path;
-		private int weight = -1;
-		private boolean italic = false;
+		private int weight = RESOLVE_BY_FONT_TABLE;
+		private int italic = RESOLVE_BY_FONT_TABLE;
+
+		public Builder(String path) {
+			this.path = path;
+		}
+
+		public Builder(java.io.File path) {
+			this.path = path.getAbsolutePath();
+		}
 
 		public Builder(AssetManager mgr, String path) {
 			this.path = mgr.extractAsset(path);
@@ -135,23 +157,19 @@ public class Typeface {
 		}
 
 		public Builder setItalic(boolean italic) {
-			this.italic = italic;
+			this.italic = italic ? 1 : 0;
 			return this;
 		}
 
 		public Typeface build() {
-			Typeface base = path != null ? createFromFile(path) : DEFAULT;
-			if (weight < 0 && !italic) {
-				return base;
-			}
-			// map exact weight/italic onto the nearest legacy style until
-			// exact-weight derivation is wired through minikin
-			int style = ((weight >= 600) ? BOLD : NORMAL) | (italic ? ITALIC : NORMAL);
-			return create(base, style);
+			return createFromFile(path, weight, italic);
 		}
 	}
 
 	private static native long nativeCreateNamed(String familyName, int style);
 	private static native long nativeCreateRelative(long base, int style);
-	private static native long nativeCreateFromFile(String path);
+	private static native long nativeCreateFromTypefaceWithExactStyle(long base, int weight, boolean italic);
+	private static native long nativeCreateFromFile(String path, int weight, int italic);
+	private static native int nativeGetStyle(long native_instance);
+	private static native int nativeGetWeight(long native_instance);
 }

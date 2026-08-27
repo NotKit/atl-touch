@@ -173,12 +173,6 @@ sk_sp<SkFontMgr> atl_fontmgr(void)
 	return fontmgr;
 }
 
-sk_sp<SkTypeface> atl_default_typeface(void)
-{
-	static sk_sp<SkTypeface> typeface = atl_fontmgr()->legacyMakeTypeface(nullptr, SkFontStyle());
-	return typeface;
-}
-
 /* --- C bridge --- */
 
 extern "C" void *atl_canvas_new_raster(int width, int height)

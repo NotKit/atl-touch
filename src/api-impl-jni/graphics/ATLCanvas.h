@@ -83,7 +83,6 @@ protected:
 sk_sp<SkImage> atl_image_for_draw(ATLCanvas *atl_canvas, SkBitmap *bitmap);
 
 sk_sp<SkFontMgr> atl_fontmgr(void);
-sk_sp<SkTypeface> atl_default_typeface(void);
 
 extern "C" {
 #endif
