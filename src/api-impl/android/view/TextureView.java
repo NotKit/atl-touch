@@ -98,8 +98,12 @@ public class TextureView extends View {
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
 		super.onSizeChanged(w, h, oldw, oldh);
-		if (surfaceTexture == null || w <= 0 || h <= 0)
+		if (w <= 0 || h <= 0)
 			return;
+		if (surfaceTexture == null) {
+			createSurfaceTexture();
+			return;
+		}
 		surfaceTexture.setDefaultBufferSize(w, h);
 		if (surfaceTextureListener != null)
 			surfaceTextureListener.onSurfaceTextureSizeChanged(surfaceTexture, w, h);
@@ -113,14 +117,19 @@ public class TextureView extends View {
 			                  new Rect(0, 0, getWidth(), getHeight()), null);
 	}
 
+	/*
+	 * Only once the view has a size: what the listener is handed is the size
+	 * its producer renders at (an EGL surface for a SurfaceTexture cannot be
+	 * resized afterwards), and AOSP likewise only reports the texture as
+	 * available from the first draw. onSizeChanged calls this again.
+	 */
 	private void createSurfaceTexture() {
-		if (surfaceTexture != null)
+		if (surfaceTexture != null || getWidth() <= 0 || getHeight() <= 0)
 			return;
 
 		/* detached: nothing here samples it from GL, frames are drawn as bitmaps */
 		surfaceTexture = new SurfaceTexture(false);
-		if (getWidth() > 0 && getHeight() > 0)
-			surfaceTexture.setDefaultBufferSize(getWidth(), getHeight());
+		surfaceTexture.setDefaultBufferSize(getWidth(), getHeight());
 		listenForFrames();
 		available = true;
 		if (surfaceTextureListener != null)

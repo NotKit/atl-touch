@@ -181,13 +181,19 @@ public class SurfaceView extends View {
 
 	/* View.getLocationInWindow() goes through getGlobalVisibleRect(), which is
 	 * only right once everything above has been laid out; the layer's position
-	 * has to be exact from the first frame, so walk the parents like AOSP does */
+	 * has to be exact from the first frame, so walk the parents like AOSP does.
+	 *
+	 * Translation counts as much as layout does: a view moved with
+	 * setTranslationY() draws where the translation puts it and takes touches
+	 * there too, so a layer positioned from getTop() alone lands somewhere the
+	 * view is not. GeckoView under Fenix is exactly that case - the engine view
+	 * is laid out at 0 and translated down by the toolbar's height. */
 	private void locationInWindow(int[] out) {
 		View v = this;
-		int x = 0, y = 0;
+		float x = 0, y = 0;
 		while (true) {
-			x += v.getLeft();
-			y += v.getTop();
+			x += v.getLeft() + v.getTranslationX();
+			y += v.getTop() + v.getTranslationY();
 			ViewParent parent = v.getParent();
 			if (!(parent instanceof View))
 				break;
@@ -195,8 +201,8 @@ public class SurfaceView extends View {
 			x -= v.getScrollX();
 			y -= v.getScrollY();
 		}
-		out[0] = x;
-		out[1] = y;
+		out[0] = (int)x;
+		out[1] = (int)y;
 	}
 
 	private void destroyLayer() {
