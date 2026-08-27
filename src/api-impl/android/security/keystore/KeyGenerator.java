@@ -13,15 +13,29 @@ public abstract class KeyGenerator extends KeyGeneratorSpi {
 	protected javax.crypto.KeyGenerator keyGenerator;
 	protected AlgorithmParameterSpec params;
 
+	/**
+	 * "BC" is libcore's BouncyCastle, so naming it is an ART assumption: on any
+	 * other runtime there is no such provider and the NoSuchProviderException
+	 * used to surface as an UnsupportedOperationException from engineInit().
+	 * Ask for it first anyway, so ART keeps the provider it had.
+	 */
+	private static javax.crypto.KeyGenerator generatorFor(String algorithm) throws NoSuchAlgorithmException {
+		try {
+			return javax.crypto.KeyGenerator.getInstance(algorithm, "BC");
+		} catch (NoSuchProviderException e) {
+			return javax.crypto.KeyGenerator.getInstance(algorithm);
+		}
+	}
+
 	public static class AES extends KeyGenerator {
 		@Override
 		protected void engineInit(AlgorithmParameterSpec params, SecureRandom random)
 		    throws InvalidAlgorithmParameterException {
 			try {
-				keyGenerator = javax.crypto.KeyGenerator.getInstance("AES", "BC");
+				keyGenerator = generatorFor("AES");
 				this.params = params;
 				keyGenerator.init(random);
-			} catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+			} catch (NoSuchAlgorithmException e) {
 				e.printStackTrace();
 				throw new UnsupportedOperationException("Unimplemented method 'engineInit'");
 			}
@@ -33,10 +47,10 @@ public abstract class KeyGenerator extends KeyGeneratorSpi {
 		protected void engineInit(AlgorithmParameterSpec params, SecureRandom random)
 		    throws InvalidAlgorithmParameterException {
 			try {
-				keyGenerator = javax.crypto.KeyGenerator.getInstance("HmacSHA512", "BC");
+				keyGenerator = generatorFor("HmacSHA512");
 				this.params = params;
 				keyGenerator.init(random);
-			} catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+			} catch (NoSuchAlgorithmException e) {
 				e.printStackTrace();
 				throw new UnsupportedOperationException("Unimplemented method 'engineInit'");
 			}

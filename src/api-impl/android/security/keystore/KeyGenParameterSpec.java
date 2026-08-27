@@ -1,6 +1,11 @@
 package android.security.keystore;
 
-public class KeyGenParameterSpec {
+import java.security.spec.AlgorithmParameterSpec;
+
+/* the SDK's class implements AlgorithmParameterSpec; without it
+ * javax.crypto.KeyGenerator.init(spec) fails the cast at its first call,
+ * which no class-loading sweep can see */
+public class KeyGenParameterSpec implements AlgorithmParameterSpec {
 
 	private String keystoreAlias;
 	private int purposes;
