@@ -249,11 +249,15 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	/** Where onDraw() puts the text layout horizontally; subclasses place carets by it. */
 	protected float getLayoutOffsetX() {
 		float tx = getCompoundPaddingLeft();
+		if (text_layout == null)
+			return tx;
 		int innerWidth = getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight();
 		int horizontalGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
 		if (horizontalGravity == Gravity.CENTER_HORIZONTAL || horizontalGravity == Gravity.RIGHT) {
-			int desired = (int)Math.ceil(Layout.getDesiredWidth(text, paint));
-			int free = Math.max(0, innerWidth - desired);
+			/* the layout box, not the text: getLayoutAlignment() derives the line
+			 * alignment from the same gravity, so measuring the text here as well
+			 * applied it twice and centred text came out flush right. */
+			int free = Math.max(0, innerWidth - text_layout.getWidth());
 			tx += horizontalGravity == Gravity.CENTER_HORIZONTAL ? free / 2 : free;
 		}
 		return tx;
@@ -265,7 +269,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	private float verticalOffset(int height) {
-		float ty = getCompoundPaddingTop();
+		/* the extended padding, not the compound one: AOSP's onDraw starts from it
+		 * too, and an app that pre-translates by it (EditTextBoldCursor) suppresses
+		 * the next read to avoid applying it twice */
+		float ty = getExtendedPaddingTop();
 		if (text_layout == null)
 			return ty;
 		int innerHeight = height - getCompoundPaddingTop() - getCompoundPaddingBottom();
@@ -407,7 +414,38 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return inputType;
 	}
 	public void setFilters(InputFilter[] filters) {}
-	public void setCursorVisible(boolean visible) {}
+
+	/* The caret, as API 29 models it: the drawable is the app's, and EditText
+	 * draws it at the caret rect. Telegram's EditTextBoldCursor overrides the
+	 * getter to hand back a transparent marker whose draw() tells it that the
+	 * caret was reached, and paints its own styled one from there -- so the
+	 * getter is called per frame rather than cached, as AOSP's Editor does. */
+	private Drawable cursorDrawable = null;
+	private boolean cursorVisible = true;
+
+	public void setTextCursorDrawable(Drawable drawable) {
+		cursorDrawable = drawable;
+		invalidate();
+	}
+
+	public void setTextCursorDrawable(int resId) {
+		setTextCursorDrawable(resId == 0 ? null : getContext().getDrawable(resId));
+	}
+
+	public Drawable getTextCursorDrawable() {
+		return cursorDrawable;
+	}
+
+	public void setCursorVisible(boolean visible) {
+		if (cursorVisible == visible)
+			return;
+		cursorVisible = visible;
+		invalidate();
+	}
+
+	public boolean isCursorVisible() {
+		return cursorVisible;
+	}
 
 	private boolean showSoftInputOnFocus = true;
 	public void setShowSoftInputOnFocus(boolean show) {
@@ -416,7 +454,17 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public final boolean getShowSoftInputOnFocus() {
 		return showSoftInputOnFocus;
 	}
-	public void setImeOptions(int imeOptions) {}
+	private int imeOptions = 0;
+
+	/** Kept because the input method needs it: it decides the action key's
+	 *  label (Send, Search, Done) from EditorInfo.imeOptions. */
+	public void setImeOptions(int imeOptions) {
+		this.imeOptions = imeOptions;
+	}
+
+	public int getImeOptions() {
+		return imeOptions;
+	}
 
 	public void setImeHintLocales(android.os.LocaleList hintLocales) {}
 
@@ -749,7 +797,11 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public void setCustomInsertionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
-	public int getExtendedPaddingTop() { return 0; }
+	/* No ellipsizing layout here, so the extended padding is the compound one --
+	 * AOSP only grows it to hide the clipped lines of a maxLines ellipsis. */
+	public int getExtendedPaddingTop() { return getCompoundPaddingTop(); }
+
+	public int getExtendedPaddingBottom() { return getCompoundPaddingBottom(); }
 
 	public void setRawInputType(int type) {}
 
@@ -815,15 +867,19 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		System.out.println("ERROR: " + error);
 	}
 
-	public int getTotalPaddingLeft() { return 0; }
+	public int getTotalPaddingLeft() { return getCompoundPaddingLeft(); }
 
-	public int getTotalPaddingTop() { return 0; }
+	/* the extended padding plus what vertical gravity adds, i.e. where onDraw
+	 * puts the layout. An app places its own caret from the difference between
+	 * this and getExtendedPaddingTop(). */
+	public int getTotalPaddingTop() { return (int)getLayoutOffsetY(); }
 
-	public int getTotalPaddingRight() { return 0; }
+	public int getTotalPaddingRight() { return getCompoundPaddingRight(); }
 
-	public int getTotalPaddingBottom() { return 0; }
-
-	public int getImeOptions() { return 0; }
+	public int getTotalPaddingBottom() {
+		int used = (int)getLayoutOffsetY() + (text_layout == null ? 0 : text_layout.getHeight());
+		return Math.max(getCompoundPaddingBottom(), getHeight() - used);
+	}
 
 	public void setShadowLayer(float radius, float dx, float dy, int color) {}
 

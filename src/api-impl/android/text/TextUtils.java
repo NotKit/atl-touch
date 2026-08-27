@@ -775,12 +775,43 @@ public class TextUtils {
 		return s;
 	}
 
-	public static CharSequence concat(CharSequence[] array) {
+	/**
+	 * Returns the pieces joined together, keeping any spans they carry. A
+	 * caller that concatenates an icon placeholder with a label (a one-char
+	 * string under an ImageSpan, say) gets the drawable back, not the
+	 * placeholder character.
+	 */
+	public static CharSequence concat(CharSequence... array) {
+		if (array.length == 0) {
+			return "";
+		}
+		if (array.length == 1) {
+			return array[0];
+		}
+		boolean spanned = false;
+		for (CharSequence cs : array) {
+			if (cs instanceof Spanned) {
+				spanned = true;
+				break;
+			}
+		}
 		StringBuilder sb = new StringBuilder();
 		for (CharSequence cs : array) {
 			sb.append(cs);
 		}
-		return sb;
+		if (!spanned) {
+			return sb.toString();
+		}
+		SpannableString ss = new SpannableString(sb);
+		int off = 0;
+		for (CharSequence cs : array) {
+			int len = cs.length();
+			if (cs instanceof Spanned) {
+				copySpansFrom((Spanned) cs, 0, len, Object.class, ss, off);
+			}
+			off += len;
+		}
+		return new SpannedString(ss);
 	}
 
 	public static String substring(CharSequence s, int start, int end) {

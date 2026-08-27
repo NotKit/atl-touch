@@ -53,6 +53,11 @@ public class ImageView extends View {
 	}
 
 	public void setImageResource(final int resid) {
+		if (resid == 0) {
+			// Resource id 0 is how an app clears the image, not a lookup failure.
+			setImageDrawable(null);
+			return;
+		}
 		if (Context.this_application.getResources().getString(resid).endsWith(".xml")) {
 			setImageDrawable(getContext().getDrawable(resid));
 			return;
@@ -252,7 +257,21 @@ public class ImageView extends View {
 		int innerHeight = getHeight() - paddingTop - paddingBottom;
 		int contentWidth = contentWidth();
 		int contentHeight = contentHeight();
-		if (innerWidth <= 0 || innerHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
+		if (innerWidth <= 0 || innerHeight <= 0)
+			return;
+		if (bitmap == null && drawable != null && (contentWidth <= 0 || contentHeight <= 0)) {
+			// A drawable with no intrinsic size (Drawable.getIntrinsicWidth() is -1
+			// unless overridden) is stretched over the whole view and the scale type
+			// is ignored, as in AOSP's configureBounds().
+			canvas.save();
+			canvas.clipRect(paddingLeft, paddingTop, paddingLeft + innerWidth, paddingTop + innerHeight);
+			canvas.translate(paddingLeft, paddingTop);
+			drawable.setBounds(0, 0, innerWidth, innerHeight);
+			drawable.draw(canvas);
+			canvas.restore();
+			return;
+		}
+		if (contentWidth <= 0 || contentHeight <= 0)
 			return;
 		float scaleX;
 		float scaleY;

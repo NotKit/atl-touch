@@ -91,6 +91,11 @@ public class EditText extends TextView {
 			super.setText(next, type);
 		}
 		selStart = selEnd = next.length();
+		// The app replaced the content (a sent message clearing the field, a
+		// draft being restored): the composing region and everything the input
+		// method still holds refer to text that no longer exists.
+		composeStart = composeEnd = -1;
+		InputMethodManager.onEditorContentReplaced(this);
 	}
 
 	// --- editing primitives ---
@@ -100,6 +105,7 @@ public class EditText extends TextView {
 		super.setText(next, BufferType.NORMAL);
 		selStart = selEnd = Math.max(0, Math.min(caret, next.length()));
 		fireTextChanged(next);
+		InputMethodManager.onEditorStateChanged(this);
 		invalidate();
 	}
 
@@ -134,16 +140,31 @@ public class EditText extends TextView {
 		}
 	}
 
+	/**
+	 * A caret move the input method did not cause invalidates its composing
+	 * region: the next preedit update would splice into where the word used to
+	 * be instead of at the caret. Drop the region and tell the IME.
+	 */
+	private void caretMoved() {
+		if (composeStart >= 0) {
+			composeStart = composeEnd = -1;
+			InputMethodManager.onEditorCaretMoved(this);
+		} else {
+			InputMethodManager.onEditorStateChanged(this);
+		}
+		invalidate();
+	}
+
 	private void moveCaret(int delta) {
 		int len = content().length();
 		selStart = selEnd = Math.max(0, Math.min(selEnd + delta, len));
-		invalidate();
+		caretMoved();
 	}
 
 	private void setCaret(int pos) {
 		int len = content().length();
 		selStart = selEnd = Math.max(0, Math.min(pos, len));
-		invalidate();
+		caretMoved();
 	}
 
 	// --- key / touch input ---
@@ -180,45 +201,137 @@ public class EditText extends TextView {
 		return super.onKeyDown(keyCode, event);
 	}
 
-	@Override
-	public boolean onComposingText(CharSequence text) {
+	/**
+	 * Take the composing region (and, if the IME asked for one, a replacement
+	 * range around it) out of the text and return where the new text goes.
+	 * Result: {content without those ranges, insertion offset}.
+	 */
+	private Object[] removeComposingAndReplacement(int replaceStart, int replaceLength) {
 		String cur = content();
-		int s, e;
+		int at, end;
 		if (composeStart >= 0) {
-			s = Math.max(0, Math.min(composeStart, cur.length()));
-			e = Math.max(0, Math.min(composeEnd, cur.length()));
+			at = clamp(composeStart, cur.length());
+			end = clamp(composeEnd, cur.length());
 		} else {
-			s = Math.max(0, Math.min(Math.min(selStart, selEnd), cur.length()));
-			e = Math.max(0, Math.min(Math.max(selStart, selEnd), cur.length()));
+			at = clamp(Math.min(selStart, selEnd), cur.length());
+			// with no composing region, a plain commit replaces the selection
+			end = replaceLength > 0 ? at : clamp(Math.max(selStart, selEnd), cur.length());
 		}
+		cur = cur.substring(0, at) + cur.substring(end);
+		// replaceStart counts from the start of the composing region, i.e. from
+		// where the composing text just was, and is normally negative (replace
+		// the word just before the cursor). A range that starts before the text
+		// is dropped rather than clamped, which would delete from the start of
+		// the field instead — the reference guards it the same way.
+		if (replaceLength > 0 && at + replaceStart >= 0) {
+			int from = clamp(at + replaceStart, cur.length());
+			int to = clamp(from + replaceLength, cur.length());
+			cur = cur.substring(0, from) + cur.substring(to);
+			at = from;
+		}
+		return new Object[] {cur, Integer.valueOf(at)};
+	}
+
+	private static int clamp(int v, int len) {
+		return Math.max(0, Math.min(v, len));
+	}
+
+	@Override
+	public boolean onComposingText(CharSequence text, int replaceStart, int replaceLength, int cursorPos) {
+		Object[] r = removeComposingAndReplacement(replaceStart, replaceLength);
+		String cur = (String)r[0];
+		int at = ((Integer)r[1]).intValue();
 		String ins = text == null ? "" : text.toString();
-		composeStart = s;
-		composeEnd = s + ins.length();
-		setContent(cur.substring(0, s) + ins + cur.substring(e), composeEnd);
+		// an empty preedit means there is none, not a zero-length one
+		composeStart = ins.isEmpty() ? -1 : at;
+		composeEnd = ins.isEmpty() ? -1 : at + ins.length();
+		// cursorPos is an offset inside the composing text, -1 meaning its end
+		int caret = cursorPos >= 0 ? at + Math.min(cursorPos, ins.length()) : at + ins.length();
+		setContent(cur.substring(0, at) + ins + cur.substring(at), caret);
 		return true;
 	}
 
 	@Override
-	public boolean onCommitText(CharSequence text) {
-		String cur = content();
-		int s, e;
-		if (composeStart >= 0) {
-			s = Math.max(0, Math.min(composeStart, cur.length()));
-			e = Math.max(0, Math.min(composeEnd, cur.length()));
-		} else {
-			s = Math.max(0, Math.min(Math.min(selStart, selEnd), cur.length()));
-			e = Math.max(0, Math.min(Math.max(selStart, selEnd), cur.length()));
-		}
+	public boolean onCommitText(CharSequence text, int replaceStart, int replaceLength, int cursorPos) {
+		Object[] r = removeComposingAndReplacement(replaceStart, replaceLength);
+		String cur = (String)r[0];
+		int at = ((Integer)r[1]).intValue();
 		String ins = text == null ? "" : text.toString();
 		composeStart = composeEnd = -1;
-		setContent(cur.substring(0, s) + ins + cur.substring(e), s + ins.length());
+		int caret = cursorPos >= 0 ? at + cursorPos : at + ins.length();
+		setContent(cur.substring(0, at) + ins + cur.substring(at), caret);
 		return true;
 	}
 
 	@Override
 	public void onFinishComposing() {
+		if (composeStart < 0)
+			return;
 		composeStart = composeEnd = -1;
+		// the text itself is unchanged, but it is committed text now, so the
+		// input method's copy of the surrounding text has to grow by it
+		InputMethodManager.onEditorStateChanged(this);
 		invalidate();
+	}
+
+	@Override
+	public void onImeSetSelection(int start, int length) {
+		// the input method counts in surrounding-text coordinates, which skip
+		// the composing region; this must not go through caretMoved(), the
+		// region is still the IME's own
+		selStart = fromSurrounding(start);
+		selEnd = fromSurrounding(start + length);
+		InputMethodManager.onEditorStateChanged(this);
+		invalidate();
+	}
+
+	/* --- the editor state the input method mirrors ---
+	 *
+	 * The composing region is the input method's own, unconfirmed text: Qt keeps
+	 * it outside the widget's content and maliit's server expects the same, so
+	 * report the text without it and put the cursor where it starts. Leaving it
+	 * in would make the keyboard see its own preedit as context and type it
+	 * twice. */
+
+	@Override
+	public CharSequence getImeSurroundingText() {
+		String cur = content();
+		if (composeStart < 0)
+			return cur;
+		int s = clamp(composeStart, cur.length()), e = clamp(composeEnd, cur.length());
+		return cur.substring(0, s) + cur.substring(e);
+	}
+
+	/** Map an offset in the surrounding text back into the content. */
+	private int fromSurrounding(int pos) {
+		String cur = content();
+		if (composeStart < 0)
+			return clamp(pos, cur.length());
+		int s = clamp(composeStart, cur.length()), e = clamp(composeEnd, cur.length());
+		pos = clamp(pos, cur.length() - (e - s));
+		return pos <= s ? pos : pos + (e - s);
+	}
+
+	/** Map an offset in the content onto the same spot in the surrounding text. */
+	private int toSurrounding(int pos) {
+		String cur = content();
+		if (composeStart < 0)
+			return clamp(pos, cur.length());
+		int s = clamp(composeStart, cur.length()), e = clamp(composeEnd, cur.length());
+		pos = clamp(pos, cur.length());
+		if (pos <= s)
+			return pos;
+		return pos >= e ? pos - (e - s) : s;
+	}
+
+	@Override
+	public int getImeCursorPosition() {
+		return toSurrounding(selEnd);
+	}
+
+	@Override
+	public int getImeAnchorPosition() {
+		return toSurrounding(selStart);
 	}
 
 	@Override
@@ -251,6 +364,9 @@ public class EditText extends TextView {
 	@Override
 	public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
 		outAttrs.inputType = getInputType();
+		outAttrs.imeOptions = getImeOptions();
+		outAttrs.initialSelStart = getSelectionStart();
+		outAttrs.initialSelEnd = getSelectionEnd();
 		return new BaseInputConnection(this, true);
 	}
 
@@ -280,9 +396,20 @@ public class EditText extends TextView {
 			float y = oy + layout.getLineBaseline(line) + getPaint().getUnderlinePosition();
 			canvas.drawLine(x0, y, x1, y, getPaint());
 		}
+		if (!isCursorVisible())
+			return;
 		float cursorX = ox + layout.getPrimaryHorizontal(caret);
-		canvas.drawLine(cursorX, oy + layout.getLineTop(caretLine),
-		                cursorX, oy + layout.getLineBottom(caretLine), cursorPaint);
+		float top = oy + layout.getLineTop(caretLine), bottom = oy + layout.getLineBottom(caretLine);
+		Drawable cursor = getTextCursorDrawable();
+		if (cursor == null) {
+			canvas.drawLine(cursorX, top, cursorX, bottom, cursorPaint);
+			return;
+		}
+		/* the drawable is the caret (API 29+), so it decides its own width; an
+		 * intrinsic-less one gets the hairline the fallback above would draw */
+		int width = Math.max(1, cursor.getIntrinsicWidth());
+		cursor.setBounds((int)cursorX, (int)top, (int)cursorX + width, (int)bottom);
+		cursor.draw(canvas);
 	}
 
 	// --- TextWatcher plumbing ---
@@ -334,14 +461,14 @@ public class EditText extends TextView {
 	public void selectAll() {
 		selStart = 0;
 		selEnd = content().length();
-		invalidate();
+		caretMoved();
 	}
 
 	public void setSelection(int start, int stop) {
 		int len = content().length();
 		selStart = Math.max(0, Math.min(start, len));
 		selEnd = Math.max(0, Math.min(stop, len));
-		invalidate();
+		caretMoved();
 	}
 
 	public void setSelection(int index) {
