@@ -81,8 +81,22 @@ qt6_webengine_dep = dependency('qt6',
 	modules: ['Core', 'Gui', 'Network', 'Qml', 'Quick', 'OpenGL', 'WebEngineQuick', 'WebEngineCore'],
 	required: false)
 
-# Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap
-skia_dep = dependency('skia')
+# Skia (rendering): built as a subproject via GN+Ninja, see subprojects/skia.wrap.
+# -Dskia-prebuilt=DIR links against a libskia.so that is already built for the
+# target instead, taking skia's headers from the same DIR/include. A cross build
+# needs this: skia's own gn build is not driven from this meson at all.
+skia_prebuilt = get_option('skia-prebuilt')
+if skia_prebuilt == ''
+	skia_dep = dependency('skia')
+else
+	# -I, not include_directories(): the directory is outside both trees, and
+	# atlas includes skia's headers as "include/core/SkCanvas.h", i.e. relative
+	# to the skia root itself.
+	skia_dep = declare_dependency(
+		dependencies: cc.find_library('skia', dirs: skia_prebuilt, required: true),
+		compile_args: ['-I' + skia_prebuilt],
+	)
+endif
 
 # minikin (text shaping/measurement/line breaking), vendored from AOSP-13
 subdir('third_party/minikin')
