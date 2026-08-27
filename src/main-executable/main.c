@@ -159,8 +159,13 @@ JNIEnv *create_vm(char *apk_classpath, char *framework_res_apk, char *test_runne
 
 	int option_counter = 2; // slots 0 and 1 are always filled below
 
+	/* Absolute, because BaseDexClassLoader.findLibrary() hands the path it
+	 * finds straight to the app, and a caller that takes dirname() of it gets
+	 * "." - which Gecko, for one, then rejects as MOZ_ANDROID_LIBDIR */
 	if (getenv("RUN_FROM_BUILDDIR")) {
-		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){"./", app_lib_dir}, 2);
+		char *builddir = g_get_current_dir();
+		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){builddir, app_lib_dir}, 2);
+		g_free(builddir);
 	} else {
 		options[0].optionString = construct_classpath("-Djava.library.path=", (char *[]){api_impl_natives_dir, app_lib_dir}, 2);
 	}
@@ -428,6 +433,11 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 
 	free(app_lib_dir);
 
+	/* the size we are about to ask for, so that anything reading Display before
+	 * the window exists sees something sane. The fields directly and not
+	 * Display.setWindowSize(): that pulls in android.content.Context, whose
+	 * static initialiser calls native methods libtranslation_layer_main.so has
+	 * not been loaded for yet. The window's real size is published below. */
 	jclass display_class = (*env)->FindClass(env, "android/view/Display");
 	_SET_STATIC_INT_FIELD(display_class, "window_width", d->window_width);
 	_SET_STATIC_INT_FIELD(display_class, "window_height", d->window_height);
@@ -451,6 +461,9 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 
 	(*env)->GetJavaVM(env, &jvm);
 	set_up_handle_cache(env);
+	/* it leaves the first member it could not find pending; report it here rather
+	 * than delivering it to whatever managed call comes next */
+	atl_report_pending_exception(env);
 
 	/* -- misc -- */
 
@@ -463,6 +476,13 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	atl_window = atl_window_new(d->window_width ? d->window_width : 540,
 	                            d->window_height ? d->window_height : 960,
 	                            true, decorated);
+
+	/* the compositor has the last word on the size (ATL_FORCE_FULLSCREEN, or a
+	 * shell that tiles us), so correct Display with what we actually got: it
+	 * backs getMetrics()/getSize(), which is what apps lay themselves out from.
+	 * Through setWindowSize(), because android.content.Context is already
+	 * initialised by now -- its Configuration snapshot has to be corrected too */
+	atl_display_set_window_size(env, atl_window_get_width(atl_window), atl_window_get_height(atl_window));
 
 	/* Our windows are GLFW windows, so the GApplication has no windows of its
 	 * own and would auto-quit as soon as `activate`/`open` returns, making

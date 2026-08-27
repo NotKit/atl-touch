@@ -58,11 +58,16 @@ The following environment variables are recognized by the main executable:
 
 ---
 
-`ATL_FORCE_FULLSCREEN` - if set, will fullscreen the app window on start;
+`ATL_FORCE_FULLSCREEN` - if set, will open the app window at the size of the primary
+                         monitor's work area on start;
                          this is useful for saving screen space on phone screens,
                          as well as making apps that can't handle arbitrary screen dimensions
                          for some reason happier (may need gamescope if the hardcoded resolution
                          doesn't match your device)
+
+                         the window is sized to the monitor, not made a fullscreen
+                         toplevel: that aborts Lomiri when the app is restored from
+                         minimised
 
 ---
 
