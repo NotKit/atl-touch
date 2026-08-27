@@ -1,5 +1,7 @@
 package android.os;
 
+import java.io.IOException;
+
 import dalvik.system.VMDebug;
 
 public final class Debug {
@@ -37,4 +39,13 @@ public final class Debug {
 	}
 
 	public static void getMemoryInfo(android.os.Debug.MemoryInfo a0) { }
+	/**
+	 * Writes no heap dump: the layer has no ART heap dumper, and nothing here
+	 * reads hprof. It exists so an app that asks for one links and takes its
+	 * documented IOException path, instead of dying on a NoSuchMethodError that
+	 * its {@code catch (Exception)} cannot catch.
+	 */
+	public static void dumpHprofData(String fileName) throws IOException {
+		throw new IOException("android.os.Debug.dumpHprofData is not implemented: " + fileName);
+	}
 }

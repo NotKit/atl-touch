@@ -83,6 +83,17 @@ public final class StrictMode {
 			public Builder penaltyDeath() {
 				return this;
 			}
+			/**
+			 * API 28. Records the listener and executor the way build() already
+			 * expects them; nothing detects a violation here, so neither is ever
+			 * called. org.mozilla.fenix.perf.StrictModeManagerKt's
+			 * penaltyDeathWithIgnores calls this on every SDK_INT >= P.
+			 */
+			public Builder penaltyListener(Executor executor, OnThreadViolationListener listener) {
+				this.executor = executor;
+				this.listener = listener;
+				return this;
+			}
 			public ThreadPolicy build() {
 				return new ThreadPolicy(mask, listener, executor);
 			}
@@ -100,6 +111,13 @@ public final class StrictMode {
 	public static final class VmPolicy {
 		public static final VmPolicy LAX;
 		public static final class Builder {
+			public Builder() {
+			}
+
+			/** Apps extend the policy in force rather than starting from nothing. */
+			public Builder(VmPolicy policy) {
+			}
+
 			public Builder detectActivityLeaks() {
 				return this;
 			}
@@ -116,6 +134,26 @@ public final class StrictMode {
 				return this;
 			}
 			public Builder detectFileUriExposure() {
+				return this;
+			}
+			/**
+			 * API 26. Detects nothing, like every other detect* here.
+			 * org.mozilla.fenix.perf.StrictModeManager.buildVmPolicy calls it
+			 * ungated, so no --sdk-int avoids it.
+			 */
+			public Builder detectContentUriWithoutPermission() {
+				return this;
+			}
+			/** API 28, from the same method behind an SDK_INT check. */
+			public Builder detectNonSdkApiUsage() {
+				return this;
+			}
+			/** API 31, same method, same gate. */
+			public Builder detectUnsafeIntentLaunch() {
+				return this;
+			}
+			/** API 31. com.google.android.gms.common.util's StrictMode helper. */
+			public Builder permitUnsafeIntentLaunch() {
 				return this;
 			}
 			public Builder penaltyDeath() {
