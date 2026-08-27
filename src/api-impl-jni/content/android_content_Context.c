@@ -52,12 +52,6 @@ static XdpSettings *xdp_settings = NULL;
 
 JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv *env, jclass this, jobject config)
 {
-	int width;
-	int height;
-	if (atl_screen_size(&width, &height)) {
-		_SET_INT_FIELD(config, "screenWidthDp", width);
-		_SET_INT_FIELD(config, "screenHeightDp", height);
-	}
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
 	if (!xdp_settings) {
 		GError *error = NULL;
@@ -117,9 +111,11 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeComposeEmail(JNIEnv *e
 	GVariantBuilder opt_builder;
 	g_variant_builder_init(&opt_builder, G_VARIANT_TYPE_VARDICT);
 	if (text_jstr) {
-		const char *text = (*env)->GetStringUTFChars(env, text_jstr, NULL);
+		// shared text is whatever the user is sharing, emoji included, so it goes
+		// through UTF-16 (see jstring_to_utf8)
+		char *text = jstring_to_utf8(env, text_jstr);
 		g_variant_builder_add(&opt_builder, "{sv}", "body", g_variant_new_string(text));
-		(*env)->ReleaseStringUTFChars(env, text_jstr, text);
+		g_free(text);
 	}
 	if (fd != -1) {
 		int fd_handle = g_unix_fd_list_append(fd_list, fd, NULL);

@@ -97,14 +97,14 @@ JNIEXPORT jlong JNICALL Java_android_app_NotificationManager_nativeInitBuilder(J
 JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeAddAction(JNIEnv *env, jobject this, jlong builder_ptr, jstring name_jstr, jint type, jobject intent)
 {
 	GNotification *notification = _PTR(builder_ptr);
-	const char *name = "";
-	if (name_jstr)
-		name = (*env)->GetStringUTFChars(env, name_jstr, NULL);
+	/* jstring_to_utf8, not GetStringUTFChars: everything set on a GNotification
+	 * ends up in a GVariant, and modified UTF-8 fails g_variant_new_string() on
+	 * any character outside the BMP (an emoji in a chat name or a message) */
+	char *name = name_jstr ? jstring_to_utf8(env, name_jstr) : NULL;
 	const char *action = intent_actionname_from_type(type);
 	if (action)
-		g_notification_add_button_with_target_value(notification, name, action, intent_serialize(env, intent));
-	if (name_jstr)
-		(*env)->ReleaseStringUTFChars(env, name_jstr, name);
+		g_notification_add_button_with_target_value(notification, name ? name : "", action, intent_serialize(env, intent));
+	g_free(name);
 }
 
 JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotification(JNIEnv *env, jobject this, jlong builder_ptr, jint id, jstring title_jstr, jstring text_jstr, jstring icon_jstr, jboolean ongoing, jint type, jobject intent)
@@ -112,14 +112,14 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotificati
 	GNotification *notification = _PTR(builder_ptr);
 
 	if (title_jstr) {
-		const char *title = (*env)->GetStringUTFChars(env, title_jstr, NULL);
+		char *title = jstring_to_utf8(env, title_jstr);
 		g_notification_set_title(notification, title);
-		(*env)->ReleaseStringUTFChars(env, title_jstr, title);
+		g_free(title);
 	}
 	if (text_jstr) {
-		const char *text = (*env)->GetStringUTFChars(env, text_jstr, NULL);
+		char *text = jstring_to_utf8(env, text_jstr);
 		g_notification_set_body(notification, text);
-		(*env)->ReleaseStringUTFChars(env, text_jstr, text);
+		g_free(text);
 	}
 	if (icon_jstr) {
 		const char *icon_path = (*env)->GetStringUTFChars(env, icon_jstr, NULL);
@@ -211,9 +211,10 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowMPRIS(JNIE
 		(*env)->ReleaseStringUTFChars(env, package_name_jstr, package_name);
 	}
 	if (identity_jstr) {
-		const char *identity = (*env)->GetStringUTFChars(env, identity_jstr, NULL);
+		// a D-Bus property, so the same UTF-8 requirement as a notification's
+		char *identity = jstring_to_utf8(env, identity_jstr);
 		media_player2_set_identity(mpris, identity);
-		(*env)->ReleaseStringUTFChars(env, identity_jstr, identity);
+		g_free(identity);
 	}
 }
 
