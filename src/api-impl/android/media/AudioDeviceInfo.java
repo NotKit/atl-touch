@@ -37,11 +37,25 @@ public class AudioDeviceInfo {
 	public static final int TYPE_WIRED_HEADPHONES = 4;
 	public static final int TYPE_WIRED_HEADSET = 3;
 
+	private final int type;
+
+	public AudioDeviceInfo() {
+		this(TYPE_UNKNOWN);
+	}
+
+	public AudioDeviceInfo(int type) {
+		this.type = type;
+	}
+
 	public boolean isSource() { return false; }
+
+	public boolean isSink() { return false; }
+
+	public CharSequence getProductName() { return ""; }
 
 	public int getId() { return 0; }
 
-	public int getType() { return 0; }
+	public int getType() { return type; }
 
 	public int[] getChannelCounts() { return null; }
 

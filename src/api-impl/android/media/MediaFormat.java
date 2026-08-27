@@ -48,7 +48,23 @@ public class MediaFormat {
 		return (long)map.get(name);
 	}
 
-	public static android.media.MediaFormat createVideoFormat(java.lang.String a0, int a1, int a2) { return null; }
+	// Gecko's AndroidDecoderModule calls these before it can create any decoder,
+	// and a missing method or a null format is a MOZ_CRASH in GetStaticMethodID.
+	public static android.media.MediaFormat createAudioFormat(java.lang.String mime, int sampleRate, int channelCount) {
+		MediaFormat format = new MediaFormat();
+		format.setString(KEY_MIME, mime);
+		format.setInteger(KEY_SAMPLE_RATE, sampleRate);
+		format.setInteger(KEY_CHANNEL_COUNT, channelCount);
+		return format;
+	}
+
+	public static android.media.MediaFormat createVideoFormat(java.lang.String mime, int width, int height) {
+		MediaFormat format = new MediaFormat();
+		format.setString(KEY_MIME, mime);
+		format.setInteger(KEY_WIDTH, width);
+		format.setInteger(KEY_HEIGHT, height);
+		return format;
+	}
 
 	public static final int VIDEO_ENCODING_STATISTICS_LEVEL_1 = 1;
 

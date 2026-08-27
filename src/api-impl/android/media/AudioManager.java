@@ -6,6 +6,11 @@ public class AudioManager {
 
 	public static final int STREAM_MUSIC = 0x3;
 
+	/* getDevices() filters, values match AOSP */
+	public static final int GET_DEVICES_INPUTS = 0x1;
+	public static final int GET_DEVICES_OUTPUTS = 0x2;
+	public static final int GET_DEVICES_ALL = GET_DEVICES_INPUTS | GET_DEVICES_OUTPUTS;
+
 	private native void nativeSetStreamVolume(int volume);
 
 	public boolean isBluetoothA2dpOn() {
@@ -47,6 +52,14 @@ public class AudioManager {
 		return /*AUDIOFOCUS_REQUEST_GRANTED*/ 1;
 	}
 
+	public int requestAudioFocus(AudioFocusRequest request) {
+		return /*AUDIOFOCUS_REQUEST_GRANTED*/ 1;
+	}
+
+	public int abandonAudioFocusRequest(AudioFocusRequest request) {
+		return /*AUDIOFOCUS_REQUEST_GRANTED*/ 1;
+	}
+
 	public boolean isWiredHeadsetOn() {
 		return false;
 	}
@@ -54,6 +67,13 @@ public class AudioManager {
 	public void setStreamVolume(int streamType, int index, int flags) {
 		nativeSetStreamVolume(index);
 	}
+
+	/**
+	 * Ignored: the argument is a direction, not a level, and there is no system
+	 * volume UI to raise for FLAG_SHOW_UI either. Apps call this to nudge the
+	 * volume they are about to play at.
+	 */
+	public void adjustStreamVolume(int streamType, int direction, int flags) {}
 
 	public boolean isStreamMute(int streamType) {
 		return false;
@@ -75,6 +95,17 @@ public class AudioManager {
 		return false;
 	}
 
+	/**
+	 * There is no SCO route here — capture goes straight to ALSA — so an app that
+	 * offers "record over Bluetooth" is told the route does not exist rather than
+	 * being left to start a link that never carries audio.
+	 */
+	public boolean isBluetoothScoAvailableOffCall() {
+		return false;
+	}
+
+	public void startBluetoothSco() {}
+
 	public void stopBluetoothSco() {}
 
 	public void setMode(int mode) {}
@@ -92,6 +123,15 @@ public class AudioManager {
 	}
 	public void unloadSoundEffects() {}
 
+	/* no device hotplug notifications here, so a callback is only ever remembered */
+	public void registerAudioDeviceCallback(AudioDeviceCallback callback, android.os.Handler handler) {}
+
+	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
+
+	public AudioDeviceInfo[] getDevices(int flags) {
+		return new AudioDeviceInfo[0];
+	}
+
 	public int generateAudioSessionId() {
 		return 0;
 	}
@@ -101,8 +141,6 @@ public class AudioManager {
 	public java.util.List getActiveRecordingConfigurations() { return null; }
 
 	public static final int AUDIO_SESSION_ID_GENERATE = 0;
-
-	public static final int GET_DEVICES_ALL = 3;
 
 	public static final int MODE_IN_COMMUNICATION = 3;
 
@@ -119,10 +157,6 @@ public class AudioManager {
 	public static final int STREAM_VOICE_CALL = 0;
 
 	public void dispatchMediaKeyEvent(android.view.KeyEvent a0) { }
-
-	public void startBluetoothSco() { }
-
-	public android.media.AudioDeviceInfo[] getDevices(int a0) { return null; }
 
 	public static final int MODE_IN_CALL = 2;
 

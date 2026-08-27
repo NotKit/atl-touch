@@ -11,6 +11,7 @@ public class AudioRecord {
 	private int channels; // set by native constructor
 	private int recordingState = RECORDSTATE_STOPPED;
 	private int sampleRateInHz;
+	private short[] scratch; // reused by read(ByteBuffer, int), which runs per frame
 
 	private native long native_constructor(int streamType, int sampleRateInHz, int num_channels, int audioFormat, int bufferSizeInBytes);
 	private native void native_record(long pcm_handle);
@@ -52,6 +53,37 @@ public class AudioRecord {
 		}
 
 		return native_read(pcm_handle, audioData, offsetInShorts, sizeInShorts / channels) * channels;
+	}
+
+	/**
+	 * The overload recording loops use, so that the frames can be handed to a
+	 * native encoder without copying them out of a direct buffer again. As in
+	 * AOSP the data lands at the start of the buffer and the position is left
+	 * alone; native_read() takes a short[], hence the scratch array.
+	 */
+	public int read(java.nio.ByteBuffer audioBuffer, int sizeInBytes) {
+		if (audioBuffer == null || sizeInBytes < 0) {
+			return ERROR_BAD_VALUE;
+		}
+
+		int sizeInShorts = Math.min(sizeInBytes, audioBuffer.capacity()) / 2;
+		if (scratch == null || scratch.length < sizeInShorts) {
+			scratch = new short[sizeInShorts];
+		}
+
+		int shortsRead = read(scratch, 0, sizeInShorts);
+		if (shortsRead <= 0) {
+			return shortsRead;
+		}
+
+		// duplicate() so the caller's position survives; it does not inherit the
+		// byte order, and asShortBuffer() honours whatever order is set here.
+		java.nio.ByteBuffer dup = audioBuffer.duplicate();
+		dup.order(audioBuffer.order());
+		dup.position(0);
+		dup.asShortBuffer().put(scratch, 0, shortsRead);
+
+		return shortsRead * 2;
 	}
 
 	public void stop() {
@@ -111,6 +143,4 @@ public class AudioRecord {
 	public static final int SUCCESS = 0;
 
 	public int getTimestamp(android.media.AudioTimestamp a0, int a1) { return 0; }
-
-	public int read(java.nio.ByteBuffer a0, int a1) { return 0; }
 }
