@@ -7,6 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_view_ViewRootImpl_DRAW_THROW_RETRIES
+#define android_view_ViewRootImpl_DRAW_THROW_RETRIES 3L
 #undef android_view_ViewRootImpl_LIGHT_Z_DP
 #define android_view_ViewRootImpl_LIGHT_Z_DP 500.0f
 #undef android_view_ViewRootImpl_LIGHT_RADIUS_DP

@@ -77,6 +77,7 @@ struct ATLWindow {
 	EGLSurface glfw_surface;
 	int toplevel_width, toplevel_height; /* size of the last buffer it was given */
 	bool toplevel_resync;      /* its last commit went out at the previous size */
+	bool in_render;            /* atl_window_render is on the stack */
 	struct ATLWindow *next;
 };
 
@@ -845,6 +846,25 @@ static bool debug_damage(void)
 	return cached;
 }
 
+/*
+ * ATL_NO_INVALIDATE_FIX=1 restores the old order, in which a frame cleared
+ * needs_redraw *after* the Java draw. A SurfaceView layer created, moved or
+ * destroyed during that draw invalidates synchronously (atl_window_invalidate,
+ * not the idle-posted nativeInvalidate), so the old order threw that request
+ * away and the frame it asked for never came. Kept as a knob so the defect can
+ * be reproduced against the same binary that fixes it.
+ */
+static bool invalidate_fix_enabled(void)
+{
+	static int cached = -1;
+
+	if (cached < 0) {
+		const char *v = getenv("ATL_NO_INVALIDATE_FIX");
+		cached = !(v && *v && strcmp(v, "0"));
+	}
+	return cached == 1;
+}
+
 /* ATL_DEBUG_CHROME=1 traces the chrome sub-surface's presents */
 static bool debug_chrome(void)
 {
@@ -1331,7 +1351,7 @@ void atl_display_set_window_size(JNIEnv *env, int width, int height)
 	atl_report_pending_exception(env);
 }
 
-static void atl_window_render(ATLWindow *window)
+static void atl_window_render_inner(ATLWindow *window)
 {
 	if (!window->view_root || !glfwGetWindowAttrib(window->glfw_window, GLFW_VISIBLE))
 		return;
@@ -1447,6 +1467,15 @@ static void atl_window_render(ATLWindow *window)
 		fprintf(stderr, "ATLWindow: damage %d,%d-%d,%d%s of %dx%d\n", dl, dt, dr, db,
 		        full ? " (full)" : "", width, height);
 
+	/* Consume this frame's request *before* the Java draw, the way performDraw
+	 * empties mDirty at its first statement. Anything the draw invalidates -- a
+	 * SurfaceView layer created, moved or destroyed by the layout it runs --
+	 * belongs to the next frame, and clearing these afterwards discarded it. */
+	if (invalidate_fix_enabled()) {
+		window->needs_redraw = false;
+		window->full_redraw = false;
+	}
+
 	jlong t_draw = debug_render() ? atl_uptime_millis() : 0;
 	void *canvas = window->canvas;
 	atl_canvas_begin_frame(canvas, dl, dt, dr, db);
@@ -1466,8 +1495,10 @@ static void atl_window_render(ATLWindow *window)
 			}
 			glfwSwapBuffers(window->glfw_window);
 		}
-		window->needs_redraw = false;
-		window->full_redraw = false;
+		if (!invalidate_fix_enabled()) {
+			window->needs_redraw = false;
+			window->full_redraw = false;
+		}
 		if (debug_render() && (layout_ms > 50 || draw_ms > 50))
 			fprintf(stderr, "ATLWindow: slow frame: layout %lldms, draw %lldms (%dx%d, damage %d,%d-%d,%d)\n",
 			        (long long)layout_ms, (long long)draw_ms, width, height, dl, dt, dr, db);
@@ -1543,8 +1574,10 @@ static void atl_window_render(ATLWindow *window)
 		glfwSwapBuffers(window->glfw_window);
 	}
 
-	window->needs_redraw = false;
-	window->full_redraw = false;
+	if (!invalidate_fix_enabled()) {
+		window->needs_redraw = false;
+		window->full_redraw = false;
+	}
 
 	/* Only a handful of frames should ever be slow (the first layout, genuine
 	 * resizes); a steady stream of these means something is scheduling
@@ -1552,6 +1585,15 @@ static void atl_window_render(ATLWindow *window)
 	if (debug_render() && (layout_ms > 50 || draw_ms > 50))
 		fprintf(stderr, "ATLWindow: slow frame: layout %lldms, draw %lldms (%dx%d, damage %d,%d-%d,%d)\n",
 		        (long long)layout_ms, (long long)draw_ms, width, height, dl, dt, dr, db);
+}
+
+/* mark the frame, so an invalidate raised from inside it can say so: that is
+ * the window in which the old order lost the repaint (ATL_DEBUG_LAYER) */
+static void atl_window_render(ATLWindow *window)
+{
+	window->in_render = true;
+	atl_window_render_inner(window);
+	window->in_render = false;
 }
 
 /* --- event pump on the GLib main loop --- */
@@ -1962,6 +2004,10 @@ double atl_window_scale(ATLWindow *window)
 void atl_window_invalidate(ATLWindow *window)
 {
 	if (window) {
+		if (window->in_render && getenv("ATL_DEBUG_LAYER"))
+			fprintf(stderr, "ATLWindow: invalidate raised inside the frame%s\n",
+			        invalidate_fix_enabled() ? " (kept for the next one)"
+			                                 : " -- this frame will clear it");
 		window->needs_redraw = true;
 		window->full_redraw = true;
 	}
