@@ -99,6 +99,50 @@ bool atl_surface_opaque_region_enabled(void)
 	return cached == 1;
 }
 
+/*
+ * A chrome outlives the content layers it was created for.
+ *
+ * Freeing it when the last SurfaceView goes away hands the scene back to the
+ * toplevel -- and in chrome mode that toplevel has not been committed since the
+ * chrome went up ("chrome present ..., parent commit no", every frame). It
+ * still holds the opaque black clear atl_window_present_chrome left in it, and
+ * on Mir the frames drawn into it afterwards never reach the screen: measured
+ * on the oneplus11, 181 full-window frames after the free with the window
+ * uniformly #000000, byte-identical on the GPU and the raster path -- and the
+ * raster path clears to opaque white before it blits, so this is not an empty
+ * scene, it is a surface that is not being presented.
+ *
+ * So keep the chrome. It covers the whole window, it is the surface the
+ * compositor is already showing, and the layer it was made for usually comes
+ * straight back (a fragment swap out of the browser and back into it).
+ *
+ * ATL_FREE_CHROME_WITH_LAYERS=1 restores the old behaviour, so the black can be
+ * reproduced against the same binary that fixes it.
+ */
+static bool window_has_layer(ATLWindow *window);
+
+static bool free_chrome_with_layers(void)
+{
+	static int cached = -1;
+
+	if (cached < 0) {
+		const char *v = getenv("ATL_FREE_CHROME_WITH_LAYERS");
+		cached = v && *v && strcmp(v, "0") ? 1 : 0;
+	}
+	return cached == 1;
+}
+
+/* the chrome is dropped when it must be rebuilt on top of a newer layer, or
+ * when it is switched off -- not merely because no layer is up right now */
+static bool chrome_should_go(ATLWindow *window, ATLSurfaceChrome *chrome)
+{
+	if (!chrome)
+		return false;
+	if (chrome->stale || !atl_surface_chrome_enabled())
+		return true;
+	return free_chrome_with_layers() && !window_has_layer(window);
+}
+
 /* "toplevel" keeps asking for place_below; "none" reproduces Mir's ordering */
 static bool layers_place_below(void)
 {
@@ -525,7 +569,7 @@ struct wl_egl_window *atl_surface_chrome_ensure(ATLWindow *window, int fb_width,
 	/* free a chrome the renderer has already let go of: stale (a layer appeared
 	 * under it), orphaned (its window's last SurfaceView went away) or disabled */
 	chrome = chrome_for(window);
-	if (chrome && (chrome->stale || !atl_surface_chrome_enabled() || !window_has_layer(window))) {
+	if (chrome_should_go(window, chrome)) {
 		/* unconditional, like the creation line below: without it the window
 		 * silently stops compositing through the chrome and the log of a run
 		 * that went black says nothing at all about it */
@@ -539,7 +583,9 @@ struct wl_egl_window *atl_surface_chrome_ensure(ATLWindow *window, int fb_width,
 
 	if (!atl_surface_chrome_enabled() || !compositor || !subcompositor || !parent_surface)
 		return NULL;
-	if (!window_has_layer(window))
+	/* only creating one needs a live layer to justify it: a window that never
+	 * had a SurfaceView keeps drawing into its toplevel as before */
+	if (!chrome && !window_has_layer(window))
 		return NULL;
 	if (fb_width < 1 || fb_height < 1)
 		return NULL;
@@ -602,7 +648,7 @@ bool atl_surface_chrome_is_stale(ATLWindow *window)
 {
 	ATLSurfaceChrome *chrome = chrome_for(window);
 
-	return chrome && (chrome->stale || !atl_surface_chrome_enabled() || !window_has_layer(window));
+	return chrome_should_go(window, chrome);
 }
 
 void atl_surface_chrome_fallback(ATLWindow *window)
