@@ -118,6 +118,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/media.c',
                                           	'src/libandroid/native_window.c',
                                           	'src/libandroid/sensor.c',
+                                          	'src/libandroid/system_fonts.c',
                                           	'src/libandroid/trace.c',
                                           	'src/libandroid/window_frame.c',
                                           ],
@@ -126,7 +127,8 @@ libandroid_so = shared_library('android', [
                                           dependencies: [
                                           	dependency('glib-2.0'), dependency('jni'), dependency('egl'), dependency('gl'),
                                           	dependency('wayland-client'), dependency('wayland-egl'),
-                                          	dependency('vulkan'), dependency('openxr').partial_dependency(includes: true)
+                                          	dependency('vulkan'), dependency('openxr').partial_dependency(includes: true),
+                                          	dependency('fontconfig')
                                           ],
                                           c_args: [
                                           	'-D_LARGEFILE64_SOURCE',
