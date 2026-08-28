@@ -29,8 +29,10 @@ A tarball per arch: `atl-sdk-<arch>.tar.zst` (+ `.sha256`), containing
 
 ```
 usr/                 # the runtime tree, prefix /opt/atl-sdk/current/usr
-  bin/               #   android-translation-layer, dex2oat
+  bin/               #   android-translation-layer, -hotspot, dex2oat
   lib/               #   atlas libs, art, wolfssl, glfw, bionic libs, java/dex
+  lib/java/          #   api-impl_classes.jar (javac) + core-all_classes.jar,
+                     #   and java/dex/ for the ART vehicle (api-impl.jar = dex)
   libexec/, share/   #   bionic_translation cfg.d, atlas data
 meta/
   sdk-manifest.json  # arch + all component commits/versions
@@ -39,6 +41,11 @@ meta/
 
 Published as a **prerelease** tagged `sdk-<atlas-sha>`, so it's versioned by
 this repo's commit and downloadable without a login.
+
+Both forms of the framework are shipped because both vehicles exist: the ART
+one loads `java/dex/android_translation_layer/api-impl.jar`, and a JVM one --
+`android-translation-layer-hotspot`, which links `libjvm.so` -- needs
+`java/api-impl_classes.jar`, the same classes before d8.
 
 ## Consuming it (from a click-packaging build.sh)
 

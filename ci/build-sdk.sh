@@ -266,6 +266,14 @@ mkdir -p "${OUT}/usr"
 # atlas (already built at SDK_PREFIX)
 cp -a "${BUILD_DIR}/atlas-dest${SDK_PREFIX}/." "${OUT}/usr/"
 
+# The framework in javac form as well as the dexed one under lib/java/dex.
+# A consumer running the framework on a stock JVM -- no ART, no dex -- needs
+# class files; it cannot use classes.dex. Named like art's own javac-form jars
+# (core-all_classes.jar and friends).
+HAX_JAR="${BUILD_DIR}/atlas-build/src/api-impl/hax.jar"
+[ -f "${HAX_JAR}" ] || { echo "no ${HAX_JAR}: atlas did not build the framework jar" >&2; exit 1; }
+install -D "${HAX_JAR}" "${OUT}/usr/lib/java/api-impl_classes.jar"
+
 # staged runtime libs (drop build-only bits)
 rsync -a \
     --exclude='pkgconfig' --exclude='cmake' \

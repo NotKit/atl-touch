@@ -4,6 +4,9 @@
 # One package per line; blank lines and # comments ignored.
 
 # --- host toolchain ---
+# hax.jar is compiled by src/api-impl/build.xml when ant is here, and by
+# meson's own jar() -- one javac per source file, 966 of them -- when it is not
+ant
 autoconf
 automake
 bison
