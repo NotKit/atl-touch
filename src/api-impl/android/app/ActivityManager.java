@@ -21,6 +21,10 @@ public class ActivityManager {
 		public int uid;
 		public String processName;
 
+		// GMS' BackgroundDetector news one up itself; absent, that is a
+		// NoSuchMethodError on the GoogleApiHandler thread and the app halts.
+		public RunningAppProcessInfo() {}
+
 		private RunningAppProcessInfo(int pid, String processName) {
 			this.pid = pid;
 			this.processName = processName;
