@@ -24,9 +24,19 @@ static void on_network_changed(GNetworkMonitor *self, gboolean network_available
 	} else {
 		method = _METHOD(_CLASS(callback), "onLost", "(Landroid/net/Network;)V");
 	}
-	(*env)->CallVoidMethod(env, callback, method, NULL);
-	if ((*env)->ExceptionCheck(env))
+	// A real framework never hands these a null Network, and a Kotlin listener
+	// declares the parameter non-null -- passing NULL threw straight out of
+	// Fenix's WifiConnectionMonitor.onAvailable, 78 times in one session.
+	jclass network_class = (*env)->FindClass(env, "android/net/Network");
+	jobject network = (*env)->NewObject(env, network_class,
+	                                    (*env)->GetMethodID(env, network_class, "<init>", "()V"));
+	(*env)->CallVoidMethod(env, callback, method, network);
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, network);
+	(*env)->DeleteLocalRef(env, network_class);
 }
 
 JNIEXPORT void JNICALL Java_android_net_ConnectivityManager_registerNetworkCallback(JNIEnv *env, jobject this, jobject request, jobject callback)
