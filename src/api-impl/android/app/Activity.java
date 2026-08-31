@@ -523,6 +523,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	 * because LaunchActivity's override calls super. */
 	public void setPictureInPictureParams(PictureInPictureParams params) {}
 
+	/* Nothing ever changes the picture-in-picture UI state, so this is never
+	 * called. Present because androidx.activity's ComponentActivity declares it
+	 * as an override. */
+	public void onPictureInPictureUiStateChanged(PictureInPictureUiState state) {}
+
+	/* No assistant here, so the content an activity fills in is dropped.
+	 * Present because Fenix's HomeActivity and ExternalAppBrowserActivity
+	 * override it and call super, and the nearest superclass that declares it is
+	 * this one. */
+	public void onProvideAssistContent(android.app.assist.AssistContent content) {}
+
 	@Override
 	public void onContentChanged() {
 		Slog.i(TAG, "- onContentChanged - yay!");
