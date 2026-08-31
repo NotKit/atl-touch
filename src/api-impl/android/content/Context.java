@@ -51,6 +51,7 @@ import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserManager;
 import android.os.Vibrator;
+import android.security.keystore.AndroidKeyStoreProvider;
 import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
@@ -69,7 +70,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.security.Provider;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -139,11 +139,7 @@ public abstract class Context {
 		application_info.sourceDir = native_get_apk_path();
 		package_manager = new PackageManager();
 
-		Provider provider = new Provider("AndroidKeyStore", 1.0, "Android KeyStore provider") {};
-		provider.put("KeyStore.AndroidKeyStore", "android.security.keystore.AndroidKeyStore");
-		provider.put("KeyGenerator.AES", "android.security.keystore.KeyGenerator$AES");
-		provider.put("KeyGenerator.HmacSHA512", "android.security.keystore.KeyGenerator$HmacSHA512");
-		Security.addProvider(provider);
+		Security.addProvider(new AndroidKeyStoreProvider());
 
 		r.applyPackageQuirks(application_info.minSdkVersion);
 
