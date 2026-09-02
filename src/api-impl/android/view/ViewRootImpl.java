@@ -45,6 +45,8 @@ public class ViewRootImpl implements ViewParent {
 		final View view;
 		WindowManager.LayoutParams params;
 		final PanelCallbacks callbacks;
+		boolean attachPending = true; // AOSP attaches from the first traversal, not from addView
+		boolean attached;
 
 		Panel(View view, WindowManager.LayoutParams params, PanelCallbacks callbacks) {
 			this.view = view;
@@ -164,11 +166,13 @@ public class ViewRootImpl implements ViewParent {
 		panels.add(panel);
 		panelView.parent = this;
 		panelView.viewRootImpl = this;
-		panelView.dispatchAttachedToWindow();
+		// AOSP attaches a new window's tree from performTraversals, a frame after
+		// addView, and DialogFragment.onStart relies on that: it sets the view-tree
+		// owners *after* Dialog.show() returns, while Compose reads them in
+		// onAttachedToWindow. Attaching here would run first and throw.
+		panelLayoutPending = true;
 		// the layer below must not keep key/text input while a panel covers it
 		setFocusedView(null);
-		if (width > 0 && height > 0)
-			layoutPanel(panel);
 		WindowManagerGlobal.onPanelAdded(panelView);
 		invalidate();
 	}
@@ -183,7 +187,8 @@ public class ViewRootImpl implements ViewParent {
 			setFocusedView(null);
 		if (touchTarget == panelView)
 			touchTarget = null;
-		panelView.dispatchDetachedFromWindow();
+		if (panel.attached)
+			panelView.dispatchDetachedFromWindow();
 		panelView.parent = null;
 		panelView.viewRootImpl = null;
 		invalidate();
@@ -217,6 +222,25 @@ public class ViewRootImpl implements ViewParent {
 				return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Attach a panel's tree, dropping the panel if it throws. A panel that fails
+	 * to attach is never laid out, and an invisible zero-sized panel that is still
+	 * touch-modal swallows every gesture in the window (see dispatchTouchEvent) --
+	 * so a dialog that cannot attach has to fail as that dialog, not as the UI.
+	 */
+	private boolean attachPanel(Panel panel) {
+		try {
+			panel.view.dispatchAttachedToWindow();
+			panel.attached = true;
+			return true;
+		} catch (Throwable t) {
+			System.err.println("ATL_PANEL_ATTACH_THROW: dropping " + panel.view);
+			t.printStackTrace();
+			removePanel(panel.view);
+			return false;
+		}
 	}
 
 	/** measure the panel against the window per its LayoutParams and position it by gravity */
@@ -291,8 +315,14 @@ public class ViewRootImpl implements ViewParent {
 			view.layout(0, 0, width, height);
 		}
 		panelLayoutPending = false;
-		for (Panel panel : panels)
+		for (Panel panel : panels.toArray(new Panel[0])) {
+			if (panel.attachPending) {
+				panel.attachPending = false;
+				if (!attachPanel(panel))
+					continue;
+			}
 			layoutPanel(panel);
+		}
 		if (DUMP_HIERARCHY) {
 			if (view != null)
 				dumpHierarchy(view, "");
@@ -466,6 +496,9 @@ public class ViewRootImpl implements ViewParent {
 				View pv = panel.view;
 				if (pv.getVisibility() != View.VISIBLE)
 					continue;
+				if (panel.attachPending || pv.getRight() <= pv.getLeft()
+				    || pv.getBottom() <= pv.getTop())
+					continue;  // not attached or never laid out: not a target, not modal
 				if ((panel.params.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0)
 					continue;  // input-transparent overlay: not a target, not modal either
 				if (x >= pv.getLeft() && x < pv.getRight() && y >= pv.getTop() && y < pv.getBottom()) {
