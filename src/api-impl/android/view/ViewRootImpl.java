@@ -470,8 +470,13 @@ public class ViewRootImpl implements ViewParent {
 		if (v.getBackground() != null) // BACKGROUND provider queries the drawable's bounds
 			v.getBackground().setBounds(0, 0, v.getWidth(), v.getHeight());
 		Outline outline = new Outline();
+		outline.setAlpha(1.0f); // AOSP View.rebuildOutline; the BOUNDS providers never set it
 		provider.getOutline(v, outline);
-		if (outline.mMode != Outline.MODE_ROUND_RECT || outline.mRect.isEmpty())
+		// An outline the app cannot see casts no shadow (hwui checks the same thing):
+		// a window background of android.R.color.transparent yields alpha 0, and
+		// shadowing it drew a square frame around the real content.
+		if (outline.mMode != Outline.MODE_ROUND_RECT || outline.mRect.isEmpty()
+		    || outline.mAlpha <= 0)
 			return;
 		float density = v.getResources().getDisplayMetrics().density;
 		canvas.drawShadow(v.getLeft() + outline.mRect.left, v.getTop() + outline.mRect.top,

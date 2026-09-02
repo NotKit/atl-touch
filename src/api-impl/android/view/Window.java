@@ -89,6 +89,13 @@ public class Window {
 		TypedArray ta = context.obtainStyledAttributes(new int[] {R.attr.windowClipToOutline});
 		decorView.setClipToOutline(ta.getBoolean(0, false));
 		ta.recycle();
+		// and its windowElevation, which is what ViewRootImpl.drawPanelShadow casts
+		// the shadow from. android.R.attr has no windowElevation; the internal one does.
+		TypedArray te = context.obtainStyledAttributes(
+		    new int[] {com.android.internal.R.attr.windowElevation});
+		if (te.hasValue(0))
+			decorView.setElevation(te.getDimension(0, 0));
+		te.recycle();
 		decorView.removeAllViews();
 		decorView.addView(view);
 		if (view != null) {
