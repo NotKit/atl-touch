@@ -283,10 +283,37 @@ rsync -a \
 [ -d "${PREFIX}/share/bionic_translation" ] && \
     rsync -a "${PREFIX}/share/bionic_translation" "${OUT}/usr/share/"
 
+# Headers for the two libraries a consumer has to *compile* against: art's
+# libandroidfw and GLFW. A consumer that cross-builds atlas itself (the OpenJDK
+# port packages it that way) needs these; without them the SDK only serves
+# consumers that ship atlas as-is.
+for inc in androidfw GLFW; do
+    [ -d "${PREFIX}/include/${inc}" ] &&
+        rsync -a "${PREFIX}/include/${inc}" "${OUT}/usr/include/"
+done
+
+# skia the same way. libskia.so is already in usr/lib, but a consumer that
+# cross-builds atlas needs the headers to compile against it -- that is what
+# atlas's -Dskia-prebuilt takes, and cloning the ~8 GB skia tree just for
+# include/ is what this SDK exists to avoid. Laid out as the option expects:
+# <dir>/libskia.so beside <dir>/include, so a consumer symlinks the .so in.
+SKIA_SRC="${BUILD_DIR}/atlas-src/subprojects/skia"
+if [ -d "${SKIA_SRC}/include" ]; then
+    mkdir -p "${OUT}/usr/include/skia"
+    rsync -a "${SKIA_SRC}/include" "${OUT}/usr/include/skia/"
+    [ -d "${SKIA_SRC}/modules" ] && rsync -a "${SKIA_SRC}/modules" "${OUT}/usr/include/skia/"
+else
+    echo "no skia headers at ${SKIA_SRC}: SDK will not serve a source consumer" >&2
+fi
+
 # dex2oat so a consumer can AOT-compile against its final prefix on device/CI
 install -D "${PREFIX}/bin/dex2oat" "${OUT}/usr/bin/dex2oat"
-# dx is superseded by d8 for the boot jars and not needed at runtime
-rm -f "${OUT}/usr/lib/java/dx.jar"
+# dx: atlas's meson names it as the command of the api-impl.jar (dex) target, so
+# a consumer that configures atlas against this prefix has to be able to find it.
+[ -f "${PREFIX}/bin/dx" ] && install -D "${PREFIX}/bin/dx" "${OUT}/usr/bin/dx"
+# dx is superseded by d8 for the boot jars, but a consumer that builds atlas
+# against this prefix still resolves it through art-standalone's pkg-config, so
+# it travels with the SDK rather than being dropped.
 
 # ship the dep stamps so a consumer can drop them into its stage and skip the
 # equivalent build steps outright
