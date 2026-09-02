@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Slog;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -65,6 +66,16 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		// BottomSheetDialog (whose theme paints a transparent window) the
 		// activity's opaque windowBackground, and the panel then covered the
 		// whole window with it.
+		//
+		// A dialog with no theme of its own takes the activity's dialogTheme, as
+		// AOSP's Dialog(Context, int, boolean) does. Without that it inherited the
+		// activity's theme, where windowIsFloating is false and windowElevation is
+		// absent -- so a plain `new Dialog(activity)` got neither dim nor shadow.
+		if (themeResId == 0) {
+			TypedValue tv = new TypedValue();
+			if (context.getTheme().resolveAttribute(R.attr.dialogTheme, tv, true))
+				themeResId = tv.resourceId != 0 ? tv.resourceId : tv.data;
+		}
 		this.context = themeResId != 0 ? new ContextThemeWrapper(context, themeResId) : context;
 		window = new Window(this.context, this);
 	}
@@ -167,13 +178,22 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 				LayoutParams lp = getWindow().getAttributes();
 				if (floating) {
 					if (lp.width < 0) {
-						lp.floatingWidthMajor = a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1);
-						lp.floatingWidthMinor = a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
+						// AOSP forces a width only where the theme sets one. Defaulting
+						// the fraction to 1 made a dialog whose theme sets neither (a
+						// plain ThemeOverlay.Material.Dialog) measure full width, and
+						// its wrap-content child then sat at the decor's top left.
+						lp.floatingWidthMajor = a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 0);
+						lp.floatingWidthMinor = a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 0);
 					}
 					if (lp.gravity == 0)
 						lp.gravity = Gravity.CENTER;
+				}
+				// PhoneWindow.generateLayout dims on backgroundDimEnabled rather than on
+				// windowIsFloating, which matters: Material3's bottom-sheet themes set
+				// floating false and still want the dim.
+				if (a.getBoolean(R.styleable.Window_backgroundDimEnabled, floating)) {
 					lp.flags |= LayoutParams.FLAG_DIM_BEHIND;
-					lp.dimAmount = 0.6f;
+					lp.dimAmount = a.getFloat(R.styleable.Window_backgroundDimAmount, 0.5f);
 				}
 				a.recycle();
 
