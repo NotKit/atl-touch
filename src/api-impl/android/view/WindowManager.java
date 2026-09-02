@@ -73,6 +73,8 @@ public interface WindowManager {
 		public int layoutInDisplayCutoutMode;
 		/* ROTATION_ANIMATION_*; ATL never rotates the window, so it is stored only */
 		public int rotationAnimation = ROTATION_ANIMATION_ROTATE;
+		/* ATL does not pick a display mode; the app's preference is stored only */
+		public float preferredRefreshRate;
 		public String packageName;
 		public CharSequence title;
 
@@ -140,6 +142,7 @@ public interface WindowManager {
 			this.screenBrightness = o.screenBrightness;
 			this.windowAnimations = o.windowAnimations;
 			this.rotationAnimation = o.rotationAnimation;
+			this.preferredRefreshRate = o.preferredRefreshRate;
 			this.packageName = o.packageName;
 			this.title = o.title;
 			this.floatingWidthMajor = o.floatingWidthMajor;
