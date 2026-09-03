@@ -52,6 +52,10 @@ struct ATLWindow {
 	bool pointer_down;
 	double pointer_x, pointer_y;
 	int layout_width, layout_height;
+	/* a relayout was asked for at the size we already have. Kept apart from
+	 * layout_width/height so requesting one cannot look like a resize: only a
+	 * real size change may carry a Configuration update to the app. */
+	bool needs_layout;
 	/* persistent surface (raster or GPU): pixels outside a frame's damage rect
 	 * keep their previous contents, which partial redraws rely on */
 	void *canvas;
@@ -799,7 +803,10 @@ void atl_windows_set_ime_inset(int inset)
 		return;
 	ime_inset = inset;
 	for (ATLWindow *w = windows; w; w = w->next) {
-		w->layout_width = 0; /* force relayout with the new inset */
+		/* the inset is not part of Configuration -- AOSP's keyboardHidden says
+		 * whether a keyboard is available, not whether the IME is up -- so this
+		 * relayouts without telling the app its configuration changed */
+		w->needs_layout = true;
 		w->needs_redraw = true;
 	}
 }
@@ -1362,20 +1369,24 @@ static void atl_window_render_inner(ATLWindow *window)
 	JNIEnv *env = get_jni_env();
 	bool full = window->full_redraw || !damage_enabled();
 	jlong layout_ms = 0;
-	if (width != window->layout_width || height != window->layout_height) {
+	bool resized = width != window->layout_width || height != window->layout_height;
+	if (resized || window->needs_layout) {
 		window->layout_width = width;
 		window->layout_height = height;
+		window->needs_layout = false;
 		full = true;
-		/* Display's statics back getMetrics()/getSize(), which is where an app
-		 * gets the size it lays itself out for; leaving them at the size the
-		 * window had before the compositor resized it is how a layout ends up
-		 * wider than the surface it is drawn into. Display.setWindowSize also
-		 * carries the new size into Configuration, which the app's resource
-		 * lookups are keyed on, so do it before the layout pass below. */
-		atl_display_set_window_size(env, width, height);
-		if (window->dispatch_configuration_changed)
-			(*env)->CallVoidMethod(env, window->view_root, window->dispatch_configuration_changed);
-		atl_report_pending_exception(env);
+		if (resized) {
+			/* Display's statics back getMetrics()/getSize(), which is where an app
+			 * gets the size it lays itself out for; leaving them at the size the
+			 * window had before the compositor resized it is how a layout ends up
+			 * wider than the surface it is drawn into. Display.setWindowSize also
+			 * carries the new size into Configuration, which the app's resource
+			 * lookups are keyed on, so do it before the layout pass below. */
+			atl_display_set_window_size(env, width, height);
+			if (window->dispatch_configuration_changed)
+				(*env)->CallVoidMethod(env, window->view_root, window->dispatch_configuration_changed);
+			atl_report_pending_exception(env);
+		}
 		/* the window keeps its full size; the view root keeps the content clear
 		 * of the soft keyboard itself, per the activity's softInputMode */
 		(*env)->CallVoidMethod(env, window->view_root, window->set_ime_inset, ime_inset);
@@ -2053,7 +2064,11 @@ JNIEXPORT void JNICALL Java_android_view_ViewRootImpl_nativeInvalidate(JNIEnv *e
 static gboolean request_layout_cb(gpointer data)
 {
 	ATLWindow *window = data;
-	window->layout_width = window->layout_height = 0;
+	/* AOSP's ViewRootImpl.requestLayout only raises mLayoutRequested; it never
+	 * touches the window size, and a layout request is not a configuration
+	 * change. Zeroing the size here made it look like one, so an app calling
+	 * requestLayout() from onConfigurationChanged spun between the two. */
+	window->needs_layout = true;
 	window->needs_redraw = true;
 	return G_SOURCE_REMOVE;
 }
