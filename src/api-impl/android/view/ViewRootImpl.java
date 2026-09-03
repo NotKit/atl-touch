@@ -32,6 +32,10 @@ public class ViewRootImpl implements ViewParent {
 	private int width;
 	private int height;
 	private int imeInset; // window height covered by the soft keyboard, in px
+	/** the Configuration last handed to the app, AOSP's
+	 *  mLastConfigurationFromResources: what dispatchConfigurationChanged diffs
+	 *  against so an unchanged one is not delivered twice */
+	private final Configuration lastDispatchedConfig = new Configuration();
 
 	/** callbacks a panel owner (Dialog, PopupWindow) uses to react to modal input */
 	public interface PanelCallbacks {
@@ -102,6 +106,15 @@ public class ViewRootImpl implements ViewParent {
 		if (Context.r == null)
 			return;
 		Configuration config = Context.r.getConfiguration();
+		/* AOSP delivers the callback only when the Configuration really differs
+		 * (ViewRootImpl.updateConfiguration diffs it against the last one), and
+		 * it calls requestLayout() straight after. Re-delivering an identical
+		 * Configuration is what lets an app that lays itself out from
+		 * onConfigurationChanged -- Telegram sets the preferred refresh rate
+		 * there, and that ends in updateViewLayout -- spin on the callback. */
+		if (lastDispatchedConfig.diff(config) == 0)
+			return;
+		lastDispatchedConfig.setTo(config);
 		Window.Callback callback = window != null ? window.getCallback() : null;
 		if (callback instanceof Activity)
 			((Activity)callback).onConfigurationChanged(config);
