@@ -7,22 +7,40 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_media_AudioTrack_SUCCESS
+#define android_media_AudioTrack_SUCCESS 0L
+#undef android_media_AudioTrack_ERROR
+#define android_media_AudioTrack_ERROR -1L
 #undef android_media_AudioTrack_ERROR_BAD_VALUE
 #define android_media_AudioTrack_ERROR_BAD_VALUE -2L
+#undef android_media_AudioTrack_ERROR_INVALID_OPERATION
+#define android_media_AudioTrack_ERROR_INVALID_OPERATION -3L
 #undef android_media_AudioTrack_PLAYSTATE_STOPPED
 #define android_media_AudioTrack_PLAYSTATE_STOPPED 1L
 #undef android_media_AudioTrack_PLAYSTATE_PAUSED
 #define android_media_AudioTrack_PLAYSTATE_PAUSED 2L
 #undef android_media_AudioTrack_PLAYSTATE_PLAYING
 #define android_media_AudioTrack_PLAYSTATE_PLAYING 3L
-#undef android_media_AudioTrack_MODE_STREAM
-#define android_media_AudioTrack_MODE_STREAM 1L
-#undef android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY
-#define android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY 1L
+#undef android_media_AudioTrack_STATE_UNINITIALIZED
+#define android_media_AudioTrack_STATE_UNINITIALIZED 0L
 #undef android_media_AudioTrack_STATE_INITIALIZED
 #define android_media_AudioTrack_STATE_INITIALIZED 1L
+#undef android_media_AudioTrack_STATE_NO_STATIC_DATA
+#define android_media_AudioTrack_STATE_NO_STATIC_DATA 2L
+#undef android_media_AudioTrack_MODE_STATIC
+#define android_media_AudioTrack_MODE_STATIC 0L
+#undef android_media_AudioTrack_MODE_STREAM
+#define android_media_AudioTrack_MODE_STREAM 1L
 #undef android_media_AudioTrack_WRITE_BLOCKING
 #define android_media_AudioTrack_WRITE_BLOCKING 0L
+#undef android_media_AudioTrack_WRITE_NON_BLOCKING
+#define android_media_AudioTrack_WRITE_NON_BLOCKING 1L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_NONE
+#define android_media_AudioTrack_PERFORMANCE_MODE_NONE 0L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY
+#define android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY 1L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_POWER_SAVING
+#define android_media_AudioTrack_PERFORMANCE_MODE_POWER_SAVING 2L
 /*
  * Class:     android_media_AudioTrack
  * Method:    native_constructor

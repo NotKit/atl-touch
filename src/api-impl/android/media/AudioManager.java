@@ -13,7 +13,29 @@ public class AudioManager {
 	public static final int GET_DEVICES_OUTPUTS = 0x2;
 	public static final int GET_DEVICES_ALL = GET_DEVICES_INPUTS | GET_DEVICES_OUTPUTS;
 
+	/**
+	 * ALSA's "default" device is PulseAudio/PipeWire on the desktop and the droid
+	 * HAL on Ubuntu Touch; both run at 48 kHz, so anything else would only add a
+	 * resampler. 480 frames is the 10 ms burst webrtc asks for at that rate.
+	 */
+	static final int OUTPUT_SAMPLE_RATE = 48000;
+	static final int OUTPUT_FRAMES_PER_BUFFER = 480;
+
+	/** The stream volume scale the ALSA mixer is driven on; see nativeSetStreamVolume(). */
+	private static final int MAX_STREAM_VOLUME = 100;
+
+	private static final java.util.concurrent.atomic.AtomicInteger nextSessionId =
+	    new java.util.concurrent.atomic.AtomicInteger(1);
+
+	private int mode = MODE_NORMAL;
+
 	private native void nativeSetStreamVolume(int volume);
+	private native int nativeGetStreamVolume();
+
+	/** Session ids are unique but route nothing: there are no per-session effects. */
+	static int nextAudioSessionId() {
+		return nextSessionId.getAndIncrement();
+	}
 
 	public boolean isBluetoothA2dpOn() {
 		return false;
@@ -22,9 +44,9 @@ public class AudioManager {
 	public String getProperty(String name) {
 		switch (name) {
 			case PROPERTY_OUTPUT_FRAMES_PER_BUFFER:
-				return "256"; // FIXME arbitrary
+				return String.valueOf(OUTPUT_FRAMES_PER_BUFFER);
 			case PROPERTY_OUTPUT_SAMPLE_RATE:
-				return "44100"; // FIXME arbitrary
+				return String.valueOf(OUTPUT_SAMPLE_RATE);
 			default:
 				System.out.println("AudioManager.getProperty: >" + name + "< not handled");
 				return "";
@@ -38,12 +60,14 @@ public class AudioManager {
 		return 0;
 	}
 
+	/** There is one ALSA mixer, so every stream reports the Master level. */
 	public int getStreamVolume(int streamType) {
-		return 0; // arbitrary, shouldn't matter too much?
+		int volume = nativeGetStreamVolume();
+		return volume < 0 ? 0 : volume;
 	}
 
 	public int getStreamMaxVolume(int streamType) {
-		return 100;
+		return MAX_STREAM_VOLUME;
 	}
 
 	public int requestAudioFocus(OnAudioFocusChangeListener listener, int streamType, int durationHint) {
@@ -110,10 +134,16 @@ public class AudioManager {
 
 	public void stopBluetoothSco() {}
 
-	public void setMode(int mode) {}
+	/**
+	 * Remembered only: there is no routing to switch, but callers set a mode and
+	 * then read it back to decide what they are doing.
+	 */
+	public void setMode(int mode) {
+		this.mode = mode;
+	}
 
 	public int getMode() {
-		return /*MODE_NORMAL*/ 0;
+		return mode;
 	}
 
 	public boolean isMicrophoneMute() {
@@ -135,12 +165,15 @@ public class AudioManager {
 	}
 
 	public int generateAudioSessionId() {
-		return 0;
+		return nextAudioSessionId();
 	}
 
 	public boolean isVolumeFixed() { return false; }
 
-	public java.util.List getActiveRecordingConfigurations() { return null; }
+	/** Nothing tracks recording sessions here, so the list is empty rather than null. */
+	public java.util.List<AudioRecordingConfiguration> getActiveRecordingConfigurations() {
+		return java.util.Collections.emptyList();
+	}
 
 	public static final int AUDIO_SESSION_ID_GENERATE = 0;
 

@@ -15,6 +15,12 @@ extern "C" {
 #define android_media_AudioManager_GET_DEVICES_OUTPUTS 2L
 #undef android_media_AudioManager_GET_DEVICES_ALL
 #define android_media_AudioManager_GET_DEVICES_ALL 3L
+#undef android_media_AudioManager_OUTPUT_SAMPLE_RATE
+#define android_media_AudioManager_OUTPUT_SAMPLE_RATE 48000L
+#undef android_media_AudioManager_OUTPUT_FRAMES_PER_BUFFER
+#define android_media_AudioManager_OUTPUT_FRAMES_PER_BUFFER 480L
+#undef android_media_AudioManager_MAX_STREAM_VOLUME
+#define android_media_AudioManager_MAX_STREAM_VOLUME 100L
 #undef android_media_AudioManager_AUDIO_SESSION_ID_GENERATE
 #define android_media_AudioManager_AUDIO_SESSION_ID_GENERATE 0L
 #undef android_media_AudioManager_MODE_IN_COMMUNICATION
@@ -70,6 +76,14 @@ extern "C" {
  */
 JNIEXPORT void JNICALL Java_android_media_AudioManager_nativeSetStreamVolume
   (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     android_media_AudioManager
+ * Method:    nativeGetStreamVolume
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_android_media_AudioManager_nativeGetStreamVolume
+  (JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }

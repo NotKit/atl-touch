@@ -45,7 +45,7 @@ public class AudioFormat {
 
 	public int getChannelIndexMask() { return 0; }
 
-	public int getChannelMask() { return 0; }
+	public int getChannelMask() { return channelMask; }
 
 
 

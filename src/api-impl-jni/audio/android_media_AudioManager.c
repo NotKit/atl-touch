@@ -33,6 +33,37 @@ static void set_stream_volume(GTask *task, gpointer source_object, gpointer task
 	snd_mixer_selem_id_free(sid);
 }
 
+/* the Master playback level as a 0..100 percentage, or -1 if there is no mixer */
+JNIEXPORT jint JNICALL Java_android_media_AudioManager_nativeGetStreamVolume(JNIEnv *env, jobject clazz)
+{
+	snd_mixer_t *handle;
+	snd_mixer_selem_id_t *sid;
+	long minv, maxv, value;
+	int volume = -1;
+
+	if (snd_mixer_open(&handle, 0) < 0)
+		return -1;
+
+	if (snd_mixer_attach(handle, "default") < 0 || snd_mixer_selem_register(handle, NULL, NULL) < 0 || snd_mixer_load(handle) < 0) {
+		snd_mixer_close(handle);
+		return -1;
+	}
+
+	snd_mixer_selem_id_malloc(&sid);
+	snd_mixer_selem_id_set_index(sid, 0);
+	snd_mixer_selem_id_set_name(sid, "Master");
+
+	snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
+	if (elem && snd_mixer_selem_get_playback_volume_range(elem, &minv, &maxv) >= 0 && maxv > minv
+	    && snd_mixer_selem_get_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT, &value) >= 0)
+		volume = (value - minv) * 100 / (maxv - minv);
+
+	snd_mixer_selem_id_free(sid);
+	snd_mixer_close(handle);
+
+	return volume;
+}
+
 JNIEXPORT void JNICALL Java_android_media_AudioManager_nativeSetStreamVolume(JNIEnv *env, jobject clazz, jint volume)
 {
 	GTask *task = g_task_new(NULL, NULL, NULL, NULL);

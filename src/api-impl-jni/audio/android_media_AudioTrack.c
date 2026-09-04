@@ -49,8 +49,13 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 
 	/* Write parameters */
 	ret = snd_pcm_hw_params(pcm_handle, params);
-	if (ret < 0)
+	if (ret < 0) {
 		printf("ERROR: Can't set harware parameters. %s\n", snd_strerror(ret));
+		// leave pcm_handle at 0, so getState() says STATE_UNINITIALIZED
+		snd_pcm_close(pcm_handle);
+		_SET_INT_FIELD(this, "period_time", 25000);
+		return;
+	}
 
 	//snd_pcm_hw_params_free (hw_params);
 
@@ -93,6 +98,10 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 
 	snd_pcm_hw_params_get_period_time(params, &period_time, NULL);
 
+	snd_pcm_uframes_t actual_buffer_size;
+	if (snd_pcm_hw_params_get_buffer_size(params, &actual_buffer_size) >= 0)
+		_SET_INT_FIELD(this, "bufferSizeInFrames", actual_buffer_size);
+
 	_SET_LONG_FIELD(this, "pcm_handle", _INTPTR(pcm_handle));
 	_SET_LONG_FIELD(this, "params", _INTPTR(params));
 	_SET_INT_FIELD(this, "channels", channels_out);
@@ -104,6 +113,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize(JNIEnv *en
 	snd_pcm_t *pcm_handle;
 	snd_pcm_hw_params_t *params;
 	snd_pcm_uframes_t frames;
+	snd_pcm_uframes_t buffer_frames;
 	int ret;
 	unsigned int num_channels;
 
@@ -128,6 +138,11 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize(JNIEnv *en
 	if (ret < 0)
 		printf("Error calling snd_pcm_hw_params_get_period_size: %s\n", snd_strerror(ret));
 
+	/* two periods, not one: ALSA wakes the writer once a period, so a buffer of a
+	 * single period underruns on every wakeup. This is the AOSP quantity -- the
+	 * smallest buffer a track can be created with and still play. */
+	buffer_frames = frames * 2;
+
 	// TODO: snd_pcm_hw_params_free(params) causes segfault, is it not supposed to be called?
 	snd_pcm_close(pcm_handle);
 
@@ -135,8 +150,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize(JNIEnv *en
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 
-	printf("\n\nJava_android_media_AudioTrack_getMinBufferSize is returning: %ld\n\n\n", frames * num_channels * 2);
-	return frames * num_channels * 2; // FIXME: 2 bytes = 16 bits (s16)
+	return buffer_frames * num_channels * 2; // FIXME: 2 bytes = 16 bits (s16)
 }
 
 struct jni_callback_data {
@@ -210,15 +224,19 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1play(JNIEnv *env, j
 	/*--↑*/
 }
 
-static int write_frames(snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume)
+static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume)
 {
+	int channels = _GET_INT_FIELD(this, "channels");
+
 	if (volume != 1.f) {
-		for (int i = 0; i < frames_to_write * 2; i++)
+		for (int i = 0; i < frames_to_write * channels; i++)
 			((jshort *)(buffer))[i] *= volume;
 	}
 	snd_pcm_sframes_t frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
 	if (frames_written == -EPIPE) {
 		printf("XRUN.\n");
+		// what getUnderrunCount() reports
+		_SET_INT_FIELD(this, "underrunCount", _GET_INT_FIELD(this, "underrunCount") + 1);
 		snd_pcm_recover(pcm_handle, frames_written, 0);
 		frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
 		snd_pcm_start(pcm_handle);
@@ -237,7 +255,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIF(JNIEn
 		return frames_to_write;  // pretend we played it
 
 	jbyte *buffer = _GET_BYTE_ARRAY_ELEMENTS(audio_data);
-	snd_pcm_sframes_t frames_written = write_frames(pcm_handle, buffer + offset_in_bytes, frames_to_write, volume);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_bytes, frames_to_write, volume);
 	_RELEASE_BYTE_ARRAY_ELEMENTS(audio_data, buffer);
 
 	return frames_written;
@@ -250,7 +268,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIF(JNIEn
 		return frames_to_write;  // pretend we played it
 
 	jshort *buffer = (*env)->GetShortArrayElements(env, audio_data, NULL);
-	snd_pcm_sframes_t frames_written = write_frames(pcm_handle, buffer + offset_in_shorts, frames_to_write, volume);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_shorts, frames_to_write, volume);
 	(*env)->ReleaseShortArrayElements(env, audio_data, buffer, 0);
 
 	return frames_written;

@@ -9,13 +9,24 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 	public static final int RECORDSTATE_STOPPED = 1;
 	public static final int RECORDSTATE_RECORDING = 3;
 
+	public static final int STATE_UNINITIALIZED = 0;
+	public static final int STATE_INITIALIZED = 1;
+
+	public static final int SUCCESS = 0;
+	public static final int ERROR = -1;
 	public static final int ERROR_BAD_VALUE = -2;
+	public static final int ERROR_INVALID_OPERATION = -3;
 
 	private long pcm_handle;
-	private int channels; // set by native constructor
+	private int channels; // seeded here, overwritten by the native constructor
 	private int recordingState = RECORDSTATE_STOPPED;
+	private int audioSource;
 	private int sampleRateInHz;
-	private AudioFormat format;
+	private int channelConfig;
+	private int audioFormat;
+	private int bufferSizeInBytes;
+	private int bufferSizeInFrames;
+	private int sessionId;
 	private short[] scratch; // reused by read(ByteBuffer, int), which runs per frame
 
 	private native long native_constructor(int streamType, int sampleRateInHz, int num_channels, int audioFormat, int bufferSizeInBytes);
@@ -24,13 +35,24 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 	private native int native_read(long pcm_handle, short[] audioData, int offsetInShorts, int framesToWrite);
 	private native void native_release(long pcm_handle);
 
-	public AudioRecord(int streamType, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes) {
+	public AudioRecord(int audioSource, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes) {
+		this.audioSource = audioSource;
 		this.sampleRateInHz = sampleRateInHz;
-		this.format = new AudioFormat();
-		this.format.sampleRate = sampleRateInHz;
-		this.format.channelMask = channelConfig;
-		this.format.encoding = audioFormat;
-		pcm_handle = native_constructor(streamType, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
+		this.channelConfig = channelConfig;
+		this.audioFormat = audioFormat;
+		this.bufferSizeInBytes = bufferSizeInBytes;
+		// pre-seed what the native constructor reports back, so the accessors stay
+		// answerable (and read() stays division-safe) when no PCM could be opened
+		this.channels = channelCountForConfig(channelConfig);
+		this.bufferSizeInFrames = bufferSizeInBytes / (this.channels * 2); // 2 means PCM16
+		this.sessionId = AudioManager.nextAudioSessionId();
+
+		pcm_handle = native_constructor(audioSource, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
+	}
+
+	/** Mirrors the channel_config switch in api-impl-jni/audio/audio.c. */
+	private static int channelCountForConfig(int channelConfig) {
+		return channelConfig == AudioFormat.CHANNEL_IN_STEREO ? 2 : 1;
 	}
 
 	public static native int getMinBufferSize(int sampleRateInHz, int channelConfig, int audioFormat);
@@ -39,12 +61,37 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 		return sampleRateInHz;
 	}
 
-	public AudioFormat getFormat() {
-		return format;
+	public int getChannelCount() {
+		return channels;
 	}
 
+	public int getAudioFormat() {
+		return audioFormat;
+	}
+
+	public AudioFormat getFormat() {
+		return new AudioFormat.Builder()
+		    .setSampleRate(sampleRateInHz)
+		    .setChannelMask(channelConfig)
+		    .setEncoding(audioFormat)
+		    .build();
+	}
+
+	public int getAudioSource() {
+		return audioSource;
+	}
+
+	public int getAudioSessionId() {
+		return sessionId;
+	}
+
+	public int getBufferSizeInFrames() {
+		return bufferSizeInFrames;
+	}
+
+	/** STATE_INITIALIZED only when the native constructor really got a PCM. */
 	public int getState() {
-		return /*STATE_INITIALIZED*/ 1;
+		return pcm_handle != 0 ? STATE_INITIALIZED : STATE_UNINITIALIZED;
 	}
 
 	public int getRecordingState() {
@@ -52,6 +99,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 	}
 
 	public void startRecording() {
+		if (pcm_handle == 0) {
+			return; // stays STOPPED, which is what the caller then reports
+		}
 		native_record(pcm_handle);
 		recordingState = RECORDSTATE_RECORDING;
 	}
@@ -95,16 +145,19 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 	 * alone; native_read() takes a short[], hence the scratch array.
 	 */
 	public int read(ByteBuffer audioBuffer, int sizeInBytes) {
-		if (audioBuffer == null || sizeInBytes < 0)
+		if (audioBuffer == null || sizeInBytes < 0) {
 			return ERROR_BAD_VALUE;
+		}
 
 		int sizeInShorts = Math.min(sizeInBytes, audioBuffer.capacity()) / 2;
-		if (scratch == null || scratch.length < sizeInShorts)
+		if (scratch == null || scratch.length < sizeInShorts) {
 			scratch = new short[sizeInShorts];
+		}
 
 		int shortsRead = read(scratch, 0, sizeInShorts);
-		if (shortsRead <= 0)
+		if (shortsRead <= 0) {
 			return shortsRead;
+		}
 
 		// duplicate() so the caller's position survives; it does not inherit the
 		// byte order, and asShortBuffer() honours whatever order is set here.
@@ -124,6 +177,7 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 	public void release() {
 		native_release(pcm_handle);
 		pcm_handle = 0;
+		recordingState = RECORDSTATE_STOPPED;
 	}
 
 	@Override
@@ -163,7 +217,7 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 
 		private int audioSource;
 		private AudioFormat audioFormat;
-		private int bufferSizeInBytes = 32768;
+		private int bufferSizeInBytes;
 
 		public Builder setAudioSource(int audioSource) {
 			this.audioSource = audioSource;
@@ -175,30 +229,22 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection {
 			return this;
 		}
 
-		public Builder setBufferSizeInBytes(int bufferSizeInBytes) {
+		public Builder setBufferSizeInBytes(int bufferSizeInBytes) throws IllegalArgumentException {
+			if (bufferSizeInBytes <= 0) {
+				throw new IllegalArgumentException("Invalid buffer size " + bufferSizeInBytes);
+			}
 			this.bufferSizeInBytes = bufferSizeInBytes;
 			return this;
 		}
 
 		public AudioRecord build() {
-			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding, bufferSizeInBytes);
+			AudioFormat format = audioFormat != null ? audioFormat : new AudioFormat.Builder().build();
+			int size = bufferSizeInBytes > 0 ? bufferSizeInBytes
+			    : getMinBufferSize(format.sampleRate, format.channelMask, format.encoding);
+			return new AudioRecord(audioSource, format.sampleRate, format.channelMask, format.encoding, size);
 		}
 	}
 
-	public static final int ERROR = -1;
-	public static final int ERROR_INVALID_OPERATION = -3;
-	public static final int STATE_INITIALIZED = 1;
-	public static final int SUCCESS = 0;
-
-	public int getAudioFormat() { return 0; }
-
-	public int getAudioSessionId() { return 0; }
-
-	public int getAudioSource() { return 0; }
-
-	public int getBufferSizeInFrames() { return 0; }
-
-	public int getChannelCount() { return 0; }
-
+	/** ALSA's htimestamp is not plumbed through, so there is no capture timestamp to give. */
 	public int getTimestamp(AudioTimestamp timestamp, int timebase) { return ERROR_INVALID_OPERATION; }
 }

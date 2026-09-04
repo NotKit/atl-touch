@@ -31,8 +31,12 @@ JNIEXPORT jlong JNICALL Java_android_media_AudioRecord_native_1constructor(JNIEn
 
 	/* Write parameters */
 	ret = snd_pcm_hw_params(pcm_handle, params);
-	if (ret < 0)
+	if (ret < 0) {
 		printf("ERROR: Can't set harware parameters. %s\n", snd_strerror(ret));
+		// return no handle, so getState() says STATE_UNINITIALIZED
+		snd_pcm_close(pcm_handle);
+		return 0;
+	}
 
 	snd_pcm_uframes_t period_size;
 
@@ -51,6 +55,10 @@ JNIEXPORT jlong JNICALL Java_android_media_AudioRecord_native_1constructor(JNIEn
 	snd_pcm_sw_params(pcm_handle, sw_params);
 
 	snd_pcm_hw_params_get_channels(params, &channels_out);
+
+	snd_pcm_uframes_t actual_buffer_size;
+	if (snd_pcm_hw_params_get_buffer_size(params, &actual_buffer_size) >= 0)
+		_SET_INT_FIELD(this, "bufferSizeInFrames", actual_buffer_size);
 
 	_SET_INT_FIELD(this, "channels", channels_out);
 	return _INTPTR(pcm_handle);
@@ -85,8 +93,9 @@ JNIEXPORT jint JNICALL Java_android_media_AudioRecord_getMinBufferSize(JNIEnv *e
 
 	snd_pcm_close(pcm_handle);
 
-	printf("\n\nJava_android_media_AudioRecord_getMinBufferSize is returning: %ld\n\n\n", frames * num_channels * 2);
-	return frames * num_channels * 2; // 2 bytes = 16 bits (s16)
+	/* two periods, not one: ALSA wakes the reader once a period, so a buffer of a
+	 * single period overruns on every wakeup */
+	return frames * 2 * num_channels * 2; // 2 bytes = 16 bits (s16)
 }
 
 JNIEXPORT void JNICALL Java_android_media_AudioRecord_native_1record(JNIEnv *env, jobject this, jlong pcm_handle_ptr)
