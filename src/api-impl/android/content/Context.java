@@ -904,7 +904,10 @@ public abstract class Context {
 
 	public abstract int getThemeResId();
 
-	public android.content.ComponentName startForegroundService(android.content.Intent a0) { return null; }
+	public android.content.ComponentName startForegroundService(Intent intent) {
+		// we don't track the foreground state, so this is just a plain service start
+		return startService(intent);
+	}
 
 	public android.content.Context createWindowContext(android.view.Display a0, int a1, android.os.Bundle a2) { return null; }
 
