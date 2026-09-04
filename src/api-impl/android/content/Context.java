@@ -16,6 +16,7 @@ import android.app.UiModeManager;
 import android.app.job.JobScheduler;
 import android.atl.ATLTimeZone;
 import android.bluetooth.BluetoothManager;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
@@ -590,6 +591,17 @@ public abstract class Context {
 		}
 	}
 
+	/* the manifest launchMode of one of our own activities, standard if it is not ours */
+	private static int getActivityLaunchMode(String className) {
+		if (pkg != null) {
+			for (PackageParser.Activity activity : pkg.activities) {
+				if (className.equals(activity.className))
+					return activity.info.launchMode;
+			}
+		}
+		return ActivityInfo.LAUNCH_MULTIPLE;
+	}
+
 	public void startActivity(Intent intent) {
 		Slog.i(TAG, "startActivity(" + intent + ") called");
 		if (intent.getAction() != null && intent.getAction().equals("android.intent.action.CHOOSER")) {
@@ -697,12 +709,19 @@ public abstract class Context {
 		}
 		final String className_ = className;
 		final Intent intent_ = intent;
+		int launchMode = getActivityLaunchMode(className);
+		/* singleTop only reuses the instance that is already on top; we resume whichever
+		 * instance exists, which is the same thing for the single-window backlog here. */
+		final boolean resumeExisting = launchMode == ActivityInfo.LAUNCH_SINGLE_TASK
+		    || launchMode == ActivityInfo.LAUNCH_SINGLE_INSTANCE
+		    || launchMode == ActivityInfo.LAUNCH_SINGLE_TOP
+		    || (intent.getFlags() & (Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)) != 0;
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
 				try {
-					if ((intent_.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0 && intent_.getComponent() != null) {
-						boolean found = Activity.nativeResumeActivity(ClassLoader.getSystemClassLoader().loadClass(intent_.getComponent().getClassName()).asSubclass(Activity.class), intent_);
+					if (resumeExisting) {
+						boolean found = Activity.nativeResumeActivity(ClassLoader.getSystemClassLoader().loadClass(className_).asSubclass(Activity.class), intent_);
 						if (found)
 							return;
 					}

@@ -17,6 +17,7 @@ import org.xmlpull.v1.XmlPullParser;
 public class Intent implements Parcelable {
 	public static final int FLAG_ACTIVITY_CLEAR_TOP = 1 << 26;
 	public static final int FLAG_ACTIVITY_NEW_TASK = 1 << 28;
+	public static final int FLAG_ACTIVITY_SINGLE_TOP = 1 << 29;
 
 	public static final String ACTION_ACTIVITY_RECOGNIZER = "android.intent.action.ACTIVITY_RECOGNIZER";
 	public static final String ACTION_ADVANCED_SETTINGS_CHANGED = "android.intent.action.ADVANCED_SETTINGS";
