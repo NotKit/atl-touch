@@ -42,6 +42,12 @@ public class NotificationManager {
 			intent = notification.intent.intent;
 		}
 		nativeShowNotification(builder, id, notification.title, notification.text, notification.iconPath, notification.ongoing, intentType, intent);
+
+		/* There is no lock screen or heads-up here, so a high priority full screen intent
+		   is taken at its word: the app wants the screen now, e.g. for an incoming call. */
+		if (notification.fullScreenIntent != null && (notification.flags & Notification.FLAG_HIGH_PRIORITY) != 0) {
+			notification.fullScreenIntent.send();
+		}
 	}
 
 	public void notify(int id, Notification notification) {

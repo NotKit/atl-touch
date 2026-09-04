@@ -16,6 +16,8 @@ public class Notification implements Parcelable {
 
 	public static final AudioAttributes AUDIO_ATTRIBUTES_DEFAULT = new AudioAttributes();
 
+	public static final int FLAG_HIGH_PRIORITY = 0x00000080;
+
 	public long when;
 
 	public int audioStreamType;
@@ -23,6 +25,8 @@ public class Notification implements Parcelable {
 	public int icon;
 
 	public PendingIntent deleteIntent;
+
+	public PendingIntent fullScreenIntent;
 
 	public CharSequence tickerText;
 
@@ -133,7 +137,14 @@ public class Notification implements Parcelable {
 
 		public Builder setDeleteIntent(PendingIntent intent) { return this; }
 
-		public Builder setFullScreenIntent(PendingIntent intent, boolean highPriority) { return this; }
+		public Builder setFullScreenIntent(PendingIntent intent, boolean highPriority) {
+			notification.fullScreenIntent = intent;
+			if (highPriority)
+				notification.flags |= FLAG_HIGH_PRIORITY;
+			else
+				notification.flags &= ~FLAG_HIGH_PRIORITY;
+			return this;
+		}
 
 		public Builder setLargeIcon(Bitmap icon) { return this; }
 
