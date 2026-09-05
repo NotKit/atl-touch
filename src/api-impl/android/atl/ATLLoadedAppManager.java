@@ -86,7 +86,8 @@ public final class ATLLoadedAppManager {
 			File installed_apk_location = new File(ATLPaths.installed_apks_dir, packageName + ".apk");
 			if (!installed_apk_location.isFile()) {
 				if (ATLLoadedApp.play_services.contains(packageName)) {
-					return loadGStub(packageName).pkg;
+					ATLLoadedApp stub = loadGStub(packageName);
+					return stub == null ? null : stub.pkg;
 				}
 				return null;
 			}
@@ -148,7 +149,15 @@ public final class ATLLoadedAppManager {
 	}
 
 	private static ATLLoadedApp loadGStub(String packageName) {
-		ATLLoadedApp app = ATLGStub.loadFakePlayServices(packageName);
+		ATLLoadedApp app;
+		try {
+			app = ATLGStub.loadFakePlayServices(packageName);
+		} catch (LinkageError e) {
+			/* gstub.jar is a dex, so only ART can load it; on a JVM the caller
+			 * gets the same answer it got before there was a stub at all */
+			Slog.w(TAG, "no GMS stub for " + packageName + ": " + e);
+			return null;
+		}
 		Slog.i(TAG, "loadGStub(\"" + packageName + "\")");
 		loaded_packages.put(packageName, app.pkg);
 		loaded_apps.put(packageName, app);
