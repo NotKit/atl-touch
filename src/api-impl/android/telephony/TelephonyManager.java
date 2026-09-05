@@ -70,6 +70,24 @@ public class TelephonyManager {
 		return "";
 	}
 
+	/**
+	 * Only one subscription is modelled, so every subscription id maps back
+	 * to this manager.
+	 */
+	public TelephonyManager createForSubscriptionId(int subId) {
+		return this;
+	}
+
+	public static final String ACTION_PHONE_STATE_CHANGED = "android.intent.action.PHONE_STATE";
+
+	public static final String EXTRA_STATE = "state";
+
+	public static final String EXTRA_STATE_IDLE = "IDLE";
+
+	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
+
+	public static final String EXTRA_STATE_RINGING = "RINGING";
+
 	public static final int NETWORK_TYPE_1xRTT = 7;
 
 	public static final int NETWORK_TYPE_CDMA = 4;
