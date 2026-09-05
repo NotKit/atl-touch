@@ -61,6 +61,7 @@ public class ViewRootImpl implements ViewParent {
 
 	private final ArrayList<Panel> panels = new ArrayList<>();
 	private View touchTarget;        // view tree owning the current gesture (a panel view or the main view)
+	private Panel touchPanel;        // the panel that took the current gesture, or swallowed it; for the log
 	private boolean gestureConsumed; // gesture started outside a touch-modal panel: swallow it entirely
 	// A panel may call WindowManager.updateViewLayout() from inside its own
 	// onLayout() (Compose's PopupLayout does), which lands back in layoutPanel.
@@ -499,6 +500,39 @@ public class ViewRootImpl implements ViewParent {
 		                  AMBIENT_SHADOW_COLOR, SPOT_SHADOW_COLOR);
 	}
 
+	/**
+	 * AOSP's "outside" event: the same gesture with ACTION_OUTSIDE, in the
+	 * panel's own coordinates. A panel that dismisses itself from it is gone by
+	 * the time this returns, which is why the caller walks a copy of the stack.
+	 */
+	private void dispatchOutsideTouch(View pv, MotionEvent down) {
+		MotionEvent outside = down.copy();
+		outside.setAction(MotionEvent.ACTION_OUTSIDE);
+		outside.offsetLocation(-pv.getLeft(), -pv.getTop());
+		try {
+			pv.dispatchTouchEvent(outside);
+		} catch (Throwable t) {
+			System.err.println("exception dispatching an outside touch:");
+			t.printStackTrace();
+		}
+	}
+
+	/** where a gesture went: the only way to tell from a log why a tap did
+	 *  nothing -- a panel over the layer below took it, or swallowed it as a
+	 *  modal one, or it reached the activity's own view and was ignored there. */
+	private void logTouchDown(float x, float y) {
+		String where = gestureConsumed ? "swallowed by" : touchTarget == view ? "to main view" : "to panel";
+		String what = "";
+		if (touchPanel != null) {
+			View pv = touchPanel.view;
+			what = " " + pv + " bounds=" + pv.getLeft() + "," + pv.getTop()
+			    + "-" + pv.getRight() + "," + pv.getBottom()
+			    + " flags=0x" + Integer.toHexString(touchPanel.params.flags);
+		}
+		android.util.Slog.v("ViewRootImpl", "touch DOWN " + (int)x + "," + (int)y + " "
+		    + where + what + " (panels=" + panels.size() + ")");
+	}
+
 	/* called from native (ATLSceneWidget event controllers) */
 	protected boolean dispatchTouchEvent(MotionEvent event) {
 		if (event == null)
@@ -506,12 +540,17 @@ public class ViewRootImpl implements ViewParent {
 		int action = event.getAction();
 		if (action == MotionEvent.ACTION_DOWN) {
 			touchTarget = null;
+			touchPanel = null;
 			gestureConsumed = false;
 			float x = event.getX();
 			float y = event.getY();
-			for (int i = panels.size() - 1; i >= 0; i--) {
-				Panel panel = panels.get(i);
+			// a panel can remove itself from the ACTION_OUTSIDE below, so walk a copy
+			Panel[] stack = panels.toArray(new Panel[0]);
+			for (int i = stack.length - 1; i >= 0; i--) {
+				Panel panel = stack[i];
 				View pv = panel.view;
+				if (findPanel(pv) == null)
+					continue;  // removed while this gesture was being routed
 				if (pv.getVisibility() != View.VISIBLE)
 					continue;
 				if (panel.attachPending || pv.getRight() <= pv.getLeft()
@@ -521,18 +560,28 @@ public class ViewRootImpl implements ViewParent {
 					continue;  // input-transparent overlay: not a target, not modal either
 				if (x >= pv.getLeft() && x < pv.getRight() && y >= pv.getTop() && y < pv.getBottom()) {
 					touchTarget = pv;
+					touchPanel = panel;
 					break;
 				}
+				// AOSP hands a FLAG_WATCH_OUTSIDE_TOUCH window an ACTION_OUTSIDE for a
+				// gesture that starts outside it, modal or not. Compose's PopupLayout
+				// closes itself from that event and from an ACTION_DOWN of its own that
+				// lands outside its bounds -- neither of which it can get here, so a
+				// popup used to be closable only by tapping the popup itself.
+				if ((panel.params.flags & WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH) != 0)
+					dispatchOutsideTouch(pv, event);
 				if ((panel.params.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL) == 0) {
 					// touch-modal panel: an outside gesture belongs to nobody below it
 					if (panel.callbacks != null)
 						panel.callbacks.onPanelOutsideTouch();
 					gestureConsumed = true;
+					touchPanel = panel;
 					break;
 				}
 			}
 			if (touchTarget == null && !gestureConsumed)
 				touchTarget = view;
+			logTouchDown(x, y);
 		}
 		if (gestureConsumed) {
 			if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
