@@ -27,8 +27,6 @@ public class AudioEffect {
 	}
 
 	/* nothing here is a real effect, so there is no descriptor to describe it */
-	public Descriptor getDescriptor() { return null; }
-
 	public boolean getEnabled() { return false; }
 
 	public int setEnabled(boolean enable) { return ERROR_INVALID_OPERATION; }
