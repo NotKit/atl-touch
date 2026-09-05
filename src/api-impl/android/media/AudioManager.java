@@ -158,6 +158,14 @@ public class AudioManager {
 
 	public void dispatchMediaKeyEvent(android.view.KeyEvent a0) { }
 
+	/**
+	 * There is no media button router here, so nothing ever dispatches a
+	 * media key to the receiver -- registering one only has to not throw.
+	 */
+	public void registerMediaButtonEventReceiver(android.content.ComponentName eventReceiver) {}
+
+	public void unregisterMediaButtonEventReceiver(android.content.ComponentName eventReceiver) {}
+
 	public static final int MODE_IN_CALL = 2;
 
 	public static final int MODE_NORMAL = 0;
