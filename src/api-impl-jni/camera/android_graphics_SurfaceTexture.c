@@ -332,6 +332,18 @@ bool atl_surface_texture_await_frame_taken(struct atl_surface_texture *texture, 
 	return free_now;
 }
 
+unsigned atl_surface_texture_get_tex_name(struct atl_surface_texture *texture)
+{
+	unsigned tex_name;
+
+	if (!texture)
+		return 0;
+	g_mutex_lock(&texture->lock);
+	tex_name = texture->attached ? texture->tex_name : 0;
+	g_mutex_unlock(&texture->lock);
+	return tex_name;
+}
+
 void atl_surface_texture_get_default_size(struct atl_surface_texture *texture, int *width, int *height)
 {
 	*width = 0;

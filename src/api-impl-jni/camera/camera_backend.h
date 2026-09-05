@@ -128,9 +128,16 @@ struct atl_camera_backend {
 
 	/* Optional hardware preview-texture path: the backend renders preview
 	 * frames straight into the app's GL texture, bypassing the NV21 upload.
+	 *
+	 * attach_preview_texture() points the camera at tex_name (0 detaches) and
+	 * needs no GL context, so it can and must run before start_preview():
+	 * a HAL with no preview target produces no frames at all, not even the
+	 * software ones the caller would otherwise wait for. False means the fast
+	 * path is unusable and the caller falls back to the frame-callback path.
+	 *
 	 * update_preview_texture() runs on the app's GL thread and both binds and
-	 * updates tex_name; false means the fast path is unusable and the caller
-	 * falls back to the frame-callback path. NULL when unsupported. */
+	 * updates tex_name. NULL when unsupported. */
+	bool (*attach_preview_texture)(struct atl_camera *camera, unsigned tex_name);
 	bool (*update_preview_texture)(struct atl_camera *camera, unsigned tex_name);
 	bool (*get_preview_texture_transform)(struct atl_camera *camera, float matrix[16]);
 	void (*set_texture_callback)(struct atl_camera *camera, atl_camera_texture_cb cb, void *user);

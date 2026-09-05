@@ -45,6 +45,10 @@ bool atl_surface_texture_frame_pending(struct atl_surface_texture *texture);
  */
 bool atl_surface_texture_await_frame_taken(struct atl_surface_texture *texture, int64_t timeout_us);
 
+/* the GL texture the consumer attached, 0 while detached; a producer that
+ * fills the texture itself needs the name before the first updateTexImage */
+unsigned atl_surface_texture_get_tex_name(struct atl_surface_texture *texture);
+
 /* what setDefaultBufferSize() last asked for, 0x0 if it never ran */
 void atl_surface_texture_get_default_size(struct atl_surface_texture *texture, int *width, int *height);
 

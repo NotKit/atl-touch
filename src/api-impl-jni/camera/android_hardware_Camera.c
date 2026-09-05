@@ -211,19 +211,28 @@ JNIEXPORT void JNICALL Java_android_hardware_Camera_native_1setPreviewTexture(JN
 	camera->texture = texture;
 	g_mutex_unlock(&camera->texture_lock);
 
-	/* a backend that can render into the texture itself takes it over; the
-	 * NV21 mailbox stays as the fallback if its first update fails */
+	/*
+	 * A backend that can render into the texture itself takes it over. It has
+	 * to be told the texture name now rather than from the first
+	 * updateTexImage(): a HAL with no preview target delivers no frames, so
+	 * nothing would ever call onFrameAvailable to get that first
+	 * updateTexImage() going.
+	 */
 	if (previous)
 		atl_surface_texture_set_source(previous, NULL);
-	if (camera->backend->update_preview_texture) {
-		struct atl_surface_texture_source source = {
-			.update = texture_source_update,
-			.get_transform = texture_source_get_transform,
-			.user = camera,
-		};
-		atl_surface_texture_set_source(texture, &source); /* no-op without a texture */
+	if (camera->backend->attach_preview_texture) {
+		bool attached = camera->backend->attach_preview_texture(camera->camera,
+		                                                        atl_surface_texture_get_tex_name(texture));
+		if (attached) {
+			struct atl_surface_texture_source source = {
+				.update = texture_source_update,
+				.get_transform = texture_source_get_transform,
+				.user = camera,
+			};
+			atl_surface_texture_set_source(texture, &source);
+		}
 		if (camera->backend->set_texture_callback)
-			camera->backend->set_texture_callback(camera->camera, texture ? on_texture_frame : NULL, camera);
+			camera->backend->set_texture_callback(camera->camera, attached ? on_texture_frame : NULL, camera);
 	}
 
 	atl_surface_texture_unref(previous);

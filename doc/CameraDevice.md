@@ -64,6 +64,14 @@ Camera hybris: preview started (1280x720 @ 30000/1000 fps)
 Camera hybris: first frame (1280x720, 1382400 bytes)
 ```
 
+An app previewing into a `SurfaceTexture` gets two more lines, the second of
+which is the texture path's proof of life:
+
+```
+Camera hybris: preview texture fast path on GL texture 3
+Camera hybris: first preview texture frame
+```
+
 and, after a capture:
 
 ```
@@ -132,10 +140,18 @@ broken".
 * **AppArmor**: an unconfined click needs no camera policy group. A confined one
   would need `"policy_groups": ["camera"]`, which has never been tested with the
   hybris path.
-* **The preview-texture fast path is lazy**: it is armed on the first
-  `updateTexImage()` (that is the only call guaranteed to be on the GL thread).
-  Look for `Camera hybris: preview texture fast path on GL texture N`; without
-  it, frames still flow through the CPU upload.
+* **A camera with no preview target delivers nothing at all.**
+  `android_camera_set_preview_texture()` is the compat layer's only
+  `setPreviewTarget()` call, and without one `startPreview()` succeeds, reports
+  no error and configures no streams -- the software `on_preview_frame_cb`
+  frames stop too, not just the texture ones. So `setPreviewTexture()` arms the
+  texture straight away (look for `Camera hybris: preview texture fast path on
+  GL texture N` *before* `preview started`) rather than waiting for the first
+  `updateTexImage()`, which would never come.
+* **`setPreviewDisplay()` alone still gets no frames on this backend.** The
+  SurfaceView preview path is a pure consumer of the NV21 callback and hands the
+  HAL no target, so an app that only calls `setPreviewDisplay()` hits the case
+  above. Only the `setPreviewTexture()` route works today.
 
 ## 7. Report back
 

@@ -98,6 +98,7 @@ struct atl_camera {
 	struct atl_camera_caps caps;
 
 	uint64_t frame_count;
+	uint64_t texture_frame_count;
 	char *dump_dir;
 };
 
@@ -265,6 +266,9 @@ static void hybris_on_data_compressed_image(void *data, uint32_t size, void *con
 static void hybris_on_preview_texture_needs_update(void *context)
 {
 	struct atl_camera *camera = context;
+
+	if (++camera->texture_frame_count == 1)
+		fprintf(stderr, "Camera hybris: first preview texture frame\n");
 
 	g_mutex_lock(&camera->lock);
 	atl_camera_texture_cb cb = camera->texture_cb;
@@ -677,27 +681,44 @@ static void hybris_set_flash_mode(struct atl_camera *camera, const char *mode)
 }
 
 /*
- * The GL-thread half of the texture fast path. The first call hands the HAL the
- * app's texture name (which needs a live GL context, hence doing it here rather
- * than in setPreviewTexture); every call after that just pulls in the newest
- * frame. The HAL binds the texture itself.
+ * Point the camera at the app's GL texture. android_camera_set_preview_texture()
+ * is the compat layer's only setPreviewTarget() call, and a camera with no
+ * preview target configures no streams: startPreview() then succeeds and
+ * delivers nothing, software preview callbacks included. So this has to run
+ * before start_preview(), and it deliberately needs no GL context -- only
+ * update_preview_texture() below does.
+ */
+static bool hybris_attach_preview_texture(struct atl_camera *camera, unsigned tex_name)
+{
+	if (!hy.set_preview_texture || !hy.update_preview_texture)
+		return false;
+	if (camera->texture_id == tex_name)
+		return tex_name != 0;
+
+	/* setPreviewTexture only takes effect on a stopped preview */
+	bool was_previewing = camera->previewing;
+	if (was_previewing)
+		hybris_stop_preview(camera);
+	hy.set_preview_texture(camera->control, (int)tex_name);
+	camera->texture_id = tex_name;
+	if (tex_name)
+		fprintf(stderr, "Camera hybris: preview texture fast path on GL texture %u\n", tex_name);
+	else
+		fprintf(stderr, "Camera hybris: preview texture detached\n");
+	if (was_previewing)
+		hybris_start_preview(camera);
+	return tex_name != 0;
+}
+
+/*
+ * The GL-thread half of the texture fast path: pull in the newest frame. The
+ * HAL binds the texture itself. Attaching here too covers a consumer that moved
+ * the texture between GL contexts after setPreviewTexture().
  */
 static bool hybris_update_preview_texture(struct atl_camera *camera, unsigned tex_name)
 {
-	if (!hy.set_preview_texture || !hy.update_preview_texture || !tex_name)
+	if (!hybris_attach_preview_texture(camera, tex_name))
 		return false;
-
-	if (camera->texture_id != tex_name) {
-		/* setPreviewTexture only takes effect on a stopped preview */
-		bool was_previewing = camera->previewing;
-		if (was_previewing)
-			hybris_stop_preview(camera);
-		hy.set_preview_texture(camera->control, (int)tex_name);
-		camera->texture_id = tex_name;
-		fprintf(stderr, "Camera hybris: preview texture fast path on GL texture %u\n", tex_name);
-		if (was_previewing)
-			hybris_start_preview(camera);
-	}
 	hy.update_preview_texture(camera->control);
 	return true;
 }
@@ -739,6 +760,7 @@ static const struct atl_camera_backend hybris_backend = {
 	.set_zoom = hybris_set_zoom,
 	.set_focus_mode = hybris_set_focus_mode,
 	.set_flash_mode = hybris_set_flash_mode,
+	.attach_preview_texture = hybris_attach_preview_texture,
 	.update_preview_texture = hybris_update_preview_texture,
 	.get_preview_texture_transform = hybris_get_preview_texture_transform,
 	.set_texture_callback = hybris_set_texture_callback,
