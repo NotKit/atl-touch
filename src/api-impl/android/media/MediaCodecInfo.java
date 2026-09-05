@@ -28,7 +28,12 @@ public class MediaCodecInfo {
 
 	public static class CodecCapabilities {
 
-		public CodecProfileLevel[] profileLevels;
+		/* Empty, not null: callers iterate these without a null check, and an
+		 * exception thrown inside a JNI callback can abort the process rather
+		 * than propagate -- webrtc's codec enumeration does exactly that. There
+		 * is no profile or colour format information to give: MediaCodec here
+		 * decodes through ffmpeg and exposes no buffer formats. */
+		public CodecProfileLevel[] profileLevels = new CodecProfileLevel[0];
 
 		public boolean isFeatureSupported(String feature) {
 			System.out.println("CodecCapabilities.isFeatureSupported(" + feature + ")");
@@ -46,7 +51,7 @@ public class MediaCodecInfo {
 	
 	public android.media.MediaCodecInfo.VideoCapabilities getVideoCapabilities() { return null; }
 
-	public int[] colorFormats;
+	public int[] colorFormats = new int[0];
 
 	public static final int COLOR_FormatSurface = 2130708361;
 
