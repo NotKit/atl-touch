@@ -16,7 +16,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Slog;
-import dalvik.system.PathClassLoader;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -108,9 +107,7 @@ public final class ATLLoadedApp {
 
 	@NonNull
 	public static ATLLoadedApp loadFromPath(String mainApk, String nativePath, String classLoaderPath) throws IOException {
-		/* our own loader is the boot one (api-impl.jar sits on the boot class path), so the
-		 * apk's class loader context stays PCL[] and ART keeps accepting its oat file */
-		return load(mainApk, new PathClassLoader(classLoaderPath, nativePath, ATLLoadedApp.class.getClassLoader()));
+		return load(mainApk, ATLAppClassLoader.create(classLoaderPath, nativePath));
 	}
 
 	private static ATLLoadedApp load(String mainApk, ClassLoader classLoader) throws IOException {
