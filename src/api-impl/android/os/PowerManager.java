@@ -8,6 +8,11 @@ public final class PowerManager {
 
 		public void release() {}
 
+		/* there are no release flags to honour, so the flags are dropped */
+		public void release(int flags) {
+			release();
+		}
+
 		public boolean isHeld() {
 			return false;
 		}
@@ -28,6 +33,11 @@ public final class PowerManager {
 	}
 
 	public boolean isScreenOn() {
+		return true;
+	}
+
+	/* nothing here tracks a screen-off state, so the device is always interactive */
+	public boolean isInteractive() {
 		return true;
 	}
 

@@ -185,6 +185,10 @@ public class Window {
 
 	public void setFormat(int format) {}
 
+	public void setType(int type) {
+		params.type = type;
+	}
+
 	public void setLayout(int width, int height) {
 		params.width = width;
 		params.height = height;
