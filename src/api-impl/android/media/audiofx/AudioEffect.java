@@ -19,6 +19,9 @@ public class AudioEffect {
 		return new Descriptor[0];
 	}
 
+	/* nothing here is a real effect, so there is no descriptor to describe it */
+	public Descriptor getDescriptor() { return null; }
+
 	public boolean getEnabled() { return false; }
 
 	public int setEnabled(boolean enable) { return SUCCESS; }
