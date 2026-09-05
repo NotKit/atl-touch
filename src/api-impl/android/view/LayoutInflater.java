@@ -288,6 +288,14 @@ public class LayoutInflater {
 				try {
 					params = viewGroup.generateLayoutParams(attrs);
 				} catch (RuntimeException e) {
+					// AOSP lets this one out. Keeping the layout alive on default
+					// params is friendlier, but silence hides real gaps: a
+					// CoordinatorLayout child whose layout_behavior fails to inflate
+					// ends up with params that carry no Behavior, and the app only
+					// finds out much later -- BottomSheetDialog throws "the view is
+					// not associated with BottomSheetBehavior" from setContentView.
+					Slog.w(TAG, "generateLayoutParams for <" + name + "> in " + viewGroup
+					    + " threw; falling back to default params", e);
 					params = viewGroup.generateDefaultLayoutParams();
 				}
 				rInflate(parser, view, attrs, true);
@@ -328,7 +336,9 @@ public class LayoutInflater {
 			try {
 				params = group.generateLayoutParams(attrs);
 			} catch (RuntimeException e) {
-				// Ignore, just fail over to child attrs.
+				// Ignore, just fail over to child attrs -- as AOSP does; the
+				// <include> tag need not carry the child's layout attributes.
+				Slog.v(TAG, "generateLayoutParams from the <include> tag threw", e);
 			}
 			if (params == null) {
 				params = group.generateLayoutParams(childAttrs);
