@@ -47,16 +47,32 @@ public abstract class Service extends ContextWrapper {
 		return this_application;
 	}
 
+	/*
+	 * Stopping is asynchronous, as on Android: the caller runs on, and
+	 * onDestroy comes back on the main looper. Doing it inline would run
+	 * onDestroy underneath whatever called stopSelf.
+	 *
+	 * Leaving these as no-ops kept a service alive forever. Telegram's call
+	 * service was the case that showed it: nothing cleared its static
+	 * instance, so the "return to call" bar stayed after the call ended and
+	 * its failure handler ran once a second for as long as the app lived.
+	 */
 	public void stopSelf(int startId) {
-		System.out.println("Service.stopSelf(" + startId + ") called");
+		stopSelf();
 	}
 
 	public void stopSelf() {
-		System.out.println("Service.stopSelf() called");
+		final Service self = this;
+		new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				Context.stopRunningService(self);
+			}
+		});
 	}
 
 	public boolean stopSelfResult(int startId) {
-		System.out.println("Service.stopSelfResult(" + startId + ") called");
+		stopSelf();
 		return true;
 	}
 

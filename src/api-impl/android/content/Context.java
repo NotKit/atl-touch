@@ -810,6 +810,14 @@ public abstract class Context {
 		}
 	}
 
+	/** Stop a running service from its own stopSelf(); see Service. */
+	public static boolean stopRunningService(Service service) {
+		if (service == null || !runningServices.remove(service.getClass(), service))
+			return false;
+		service.onDestroy();
+		return true;
+	}
+
 	public boolean stopService(Intent intent) throws ClassNotFoundException {
 		Class<? extends Service> cls = ClassLoader.getSystemClassLoader().loadClass(intent.getComponent().getClassName()).asSubclass(Service.class);
 		Service service = runningServices.remove(cls);
