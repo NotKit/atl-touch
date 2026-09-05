@@ -16,11 +16,23 @@ public class ConnectivityManager {
 		return new NetworkInfo(nativeGetNetworkAvailable());
 	}
 
+	/* only one network is modelled here, so any Network describes the active one */
+	public NetworkInfo getNetworkInfo(Network network) {
+		return getActiveNetworkInfo();
+	}
+
 	public NetworkInfo getActiveNetworkInfo() {
 		return new NetworkInfo(nativeGetNetworkAvailable());
 	}
 
 	public native void registerNetworkCallback(NetworkRequest request, NetworkCallback callback);
+
+	/**
+	 * Nothing can bring up a network to match a request here, so the callback
+	 * is dropped rather than answered with the default network -- webrtc asks
+	 * this way for a cellular network and would take the answer at its word.
+	 */
+	public void requestNetwork(NetworkRequest request, NetworkCallback callback) {}
 
 	public void unregisterNetworkCallback(NetworkCallback callback) {}
 
