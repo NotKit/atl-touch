@@ -5,7 +5,19 @@ import android.net.Uri;
 
 public class NotificationChannel {
 
-	public NotificationChannel(String id, CharSequence name, int importance) {}
+	private final String id;
+	private final CharSequence name;
+	private final int importance;
+
+	public NotificationChannel(String id, CharSequence name, int importance) {
+		this.id = id;
+		this.name = name;
+		this.importance = importance;
+	}
+
+	public String getId() { return id; }
+	public CharSequence getName() { return name; }
+	public int getImportance() { return importance; }
 
 	public void setLockscreenVisibility(int a) {}
 	public void setShowBadge(boolean a) {}

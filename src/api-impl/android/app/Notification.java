@@ -183,6 +183,13 @@ public class Notification implements Parcelable {
 			return this;
 		}
 
+		public Builder addAction(int icon, CharSequence title, PendingIntent intent) {
+			return addAction(new Action.Builder(icon, title, intent).build());
+		}
+
+		/* the notification is not drawn here, so the colour is only recorded by setColor */
+		public Builder setColorized(boolean colorized) { return this; }
+
 		public Builder setStyle(Style style) {
 			notification.style = style;
 			if (style instanceof MediaStyle) {
@@ -219,6 +226,11 @@ public class Notification implements Parcelable {
 
 		public Notification build() {
 			return notification;
+		}
+
+		/* the pre-API-16 name for build() */
+		public Notification getNotification() {
+			return build();
 		}
 	}
 
