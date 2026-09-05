@@ -7,8 +7,9 @@ import android.os.Handler;
  * for view compositing, to a Bitmap. Frames come from native producers such as
  * Camera.setPreviewTexture().
  *
- * Unlike AOSP this is not a real BufferQueue: the texture is filled by a CPU
- * glTexImage2D upload into a GL_TEXTURE_2D, so the frame is only in GL once
+ * Unlike AOSP this is not a real BufferQueue: unless the producer fills the
+ * texture itself, the frame is a CPU upload that reaches the app's
+ * GL_TEXTURE_EXTERNAL_OES texture through an EGLImage, so it is only in GL once
  * updateTexImage() runs in the caller's context.
  */
 public class SurfaceTexture {

@@ -73,20 +73,6 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGenTextures__I_3II(JNIEnv *e
 	(*env)->ReleaseIntArrayElements(env, textures_ref, textures, 0);
 }
 
-/*
- * ATL has no OES external textures: SurfaceTexture uploads its frames into a
- * plain GL_TEXTURE_2D. Map the target so apps
- * written against the Android contract (bind the SurfaceTexture name as
- * GL_TEXTURE_EXTERNAL_OES) hit the texture they actually get. Sampling it from
- * a shader still needs sampler2D, not samplerExternalOES.
- */
-#define GL_TEXTURE_EXTERNAL_OES 0x8D65
-
-static GLenum texture_target(jint target)
-{
-	return target == GL_TEXTURE_EXTERNAL_OES ? GL_TEXTURE_2D : (GLenum)target;
-}
-
 static void throw_unsupported(JNIEnv *env, const char *message)
 {
 	jclass clazz = (*env)->FindClass(env, "java/lang/UnsupportedOperationException");
@@ -115,7 +101,7 @@ static jstring get_active_name(JNIEnv *env, jint program, jint index, GLenum len
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glBindTexture(JNIEnv *env, jclass, jint target, jint texture)
 {
-	glBindTexture(texture_target(target), (GLuint)texture);
+	glBindTexture((GLenum)target, (GLuint)texture);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glDeleteTextures__I_3II(JNIEnv *env, jclass, jint n, jintArray textures_ref, jint offset)
@@ -145,7 +131,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexSubImage2D(JNIEnv *env, j
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameterf(JNIEnv *env, jclass, jint target, jint pname, jfloat param)
 {
-	glTexParameterf(texture_target(target), (GLenum)pname, (GLfloat)param);
+	glTexParameterf((GLenum)target, (GLenum)pname, (GLfloat)param);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGenBuffers__I_3II(JNIEnv *env, jclass, jint n, jintArray buffers_ref, jint offset)
@@ -368,7 +354,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glPixelStorei(JNIEnv *env, jcl
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameteri(JNIEnv *env, jclass this, jint target, jint pname, jint param)
 {
-	glTexParameteri(texture_target(target), (GLenum)pname, (GLint)param);
+	glTexParameteri((GLenum)target, (GLenum)pname, (GLint)param);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetShaderiv__IILjava_nio_IntBuffer_2(JNIEnv *env, jclass this, jint shader, jint pname, jobject params_buf)
@@ -982,12 +968,12 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glDeleteTextures__ILjava_nio_I
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glCopyTexImage2D(JNIEnv *env, jclass, jint target, jint level, jint internalformat, jint x, jint y, jint width, jint height, jint border)
 {
-	glCopyTexImage2D(texture_target(target), (GLint)level, (GLenum)internalformat, (GLint)x, (GLint)y, (GLsizei)width, (GLsizei)height, (GLint)border);
+	glCopyTexImage2D((GLenum)target, (GLint)level, (GLenum)internalformat, (GLint)x, (GLint)y, (GLsizei)width, (GLsizei)height, (GLint)border);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glCopyTexSubImage2D(JNIEnv *env, jclass, jint target, jint level, jint xoffset, jint yoffset, jint x, jint y, jint width, jint height)
 {
-	glCopyTexSubImage2D(texture_target(target), (GLint)level, (GLint)xoffset, (GLint)yoffset, (GLint)x, (GLint)y, (GLsizei)width, (GLsizei)height);
+	glCopyTexSubImage2D((GLenum)target, (GLint)level, (GLint)xoffset, (GLint)yoffset, (GLint)x, (GLint)y, (GLsizei)width, (GLsizei)height);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glCompressedTexImage2D(JNIEnv *env, jclass, jint target, jint level, jint internalformat, jint width, jint height, jint border, jint imageSize, jobject data_buf)
@@ -995,7 +981,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glCompressedTexImage2D(JNIEnv 
 	jarray array_ref;
 	jbyte *array;
 	GLvoid *data = get_nio_buffer(env, data_buf, &array_ref, &array);
-	glCompressedTexImage2D(texture_target(target), (GLint)level, (GLenum)internalformat, (GLsizei)width, (GLsizei)height, (GLint)border, (GLsizei)imageSize, data);
+	glCompressedTexImage2D((GLenum)target, (GLint)level, (GLenum)internalformat, (GLsizei)width, (GLsizei)height, (GLint)border, (GLsizei)imageSize, data);
 	release_nio_buffer(env, array_ref, array);
 }
 
@@ -1004,14 +990,14 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glCompressedTexSubImage2D(JNIE
 	jarray array_ref;
 	jbyte *array;
 	GLvoid *data = get_nio_buffer(env, data_buf, &array_ref, &array);
-	glCompressedTexSubImage2D(texture_target(target), (GLint)level, (GLint)xoffset, (GLint)yoffset, (GLsizei)width, (GLsizei)height, (GLenum)format, (GLsizei)imageSize, data);
+	glCompressedTexSubImage2D((GLenum)target, (GLint)level, (GLint)xoffset, (GLint)yoffset, (GLsizei)width, (GLsizei)height, (GLenum)format, (GLsizei)imageSize, data);
 	release_nio_buffer(env, array_ref, array);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameterfv__II_3FI(JNIEnv *env, jclass, jint target, jint pname, jfloatArray params_ref, jint offset)
 {
 	jfloat *params = (*env)->GetFloatArrayElements(env, params_ref, NULL);
-	glTexParameterfv(texture_target(target), (GLenum)pname, (GLfloat *)params + offset);
+	glTexParameterfv((GLenum)target, (GLenum)pname, (GLfloat *)params + offset);
 	(*env)->ReleaseFloatArrayElements(env, params_ref, params, JNI_ABORT);
 }
 
@@ -1020,14 +1006,14 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameterfv__IILjava_nio_
 	jarray array_ref;
 	jbyte *array;
 	GLvoid *params = get_nio_buffer(env, params_buf, &array_ref, &array);
-	glTexParameterfv(texture_target(target), (GLenum)pname, (GLfloat *)params);
+	glTexParameterfv((GLenum)target, (GLenum)pname, (GLfloat *)params);
 	release_nio_buffer(env, array_ref, array);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameteriv__II_3II(JNIEnv *env, jclass, jint target, jint pname, jintArray params_ref, jint offset)
 {
 	jint *params = (*env)->GetIntArrayElements(env, params_ref, NULL);
-	glTexParameteriv(texture_target(target), (GLenum)pname, (GLint *)params + offset);
+	glTexParameteriv((GLenum)target, (GLenum)pname, (GLint *)params + offset);
 	(*env)->ReleaseIntArrayElements(env, params_ref, params, JNI_ABORT);
 }
 
@@ -1036,14 +1022,14 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glTexParameteriv__IILjava_nio_
 	jarray array_ref;
 	jbyte *array;
 	GLvoid *params = get_nio_buffer(env, params_buf, &array_ref, &array);
-	glTexParameteriv(texture_target(target), (GLenum)pname, (GLint *)params);
+	glTexParameteriv((GLenum)target, (GLenum)pname, (GLint *)params);
 	release_nio_buffer(env, array_ref, array);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetTexParameterfv__II_3FI(JNIEnv *env, jclass, jint target, jint pname, jfloatArray params_ref, jint offset)
 {
 	jfloat *params = (*env)->GetFloatArrayElements(env, params_ref, NULL);
-	glGetTexParameterfv(texture_target(target), (GLenum)pname, (GLfloat *)params + offset);
+	glGetTexParameterfv((GLenum)target, (GLenum)pname, (GLfloat *)params + offset);
 	(*env)->ReleaseFloatArrayElements(env, params_ref, params, 0);
 }
 
@@ -1052,14 +1038,14 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetTexParameterfv__IILjava_n
 	jarray array_ref;
 	jbyte *array;
 	GLvoid *params = get_nio_buffer(env, params_buf, &array_ref, &array);
-	glGetTexParameterfv(texture_target(target), (GLenum)pname, (GLfloat *)params);
+	glGetTexParameterfv((GLenum)target, (GLenum)pname, (GLfloat *)params);
 	release_nio_buffer(env, array_ref, array);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetTexParameteriv__II_3II(JNIEnv *env, jclass, jint target, jint pname, jintArray params_ref, jint offset)
 {
 	jint *params = (*env)->GetIntArrayElements(env, params_ref, NULL);
-	glGetTexParameteriv(texture_target(target), (GLenum)pname, (GLint *)params + offset);
+	glGetTexParameteriv((GLenum)target, (GLenum)pname, (GLint *)params + offset);
 	(*env)->ReleaseIntArrayElements(env, params_ref, params, 0);
 }
 
@@ -1068,7 +1054,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetTexParameteriv__IILjava_n
 	jarray array_ref;
 	jbyte *array;
 	GLvoid *params = get_nio_buffer(env, params_buf, &array_ref, &array);
-	glGetTexParameteriv(texture_target(target), (GLenum)pname, (GLint *)params);
+	glGetTexParameteriv((GLenum)target, (GLenum)pname, (GLint *)params);
 	release_nio_buffer(env, array_ref, array);
 }
 

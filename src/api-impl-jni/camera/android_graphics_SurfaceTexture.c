@@ -1,11 +1,16 @@
 /*
  * android.graphics.SurfaceTexture, see surface_texture.h.
  *
- * There is no BufferQueue and no EGLImage here: the producer converts its NV21
- * frame to RGBA into a single-frame mailbox (newest frame wins, like the other
- * camera paths), and the consumer either uploads that with glTexImage2D into a
- * GL_TEXTURE_2D or copies it into a Bitmap for the Skia scene. An app sampling
- * the texture as samplerExternalOES therefore gets a plain 2D texture.
+ * There is no BufferQueue here: the producer converts its NV21 frame to RGBA
+ * into a single-frame mailbox (newest frame wins, like the other camera
+ * paths), and the consumer either uploads that for the app's GL texture or
+ * copies it into a Bitmap for the Skia scene. The app's texture is a real
+ * GL_TEXTURE_EXTERNAL_OES one, as on Android: the upload goes into a
+ * GL_TEXTURE_2D of our own and an EGLImage of it is bound to the app's name on
+ * the external target (upload_frame_locked). A producer that fills the texture
+ * itself (the hybris camera HAL) binds it on that same target, so the app's
+ * name must never be bound on GL_TEXTURE_2D -- a name is tied to the first
+ * target it is bound on, and rebinding it elsewhere is GL_INVALID_OPERATION.
  *
  * Classes are looked up here rather than taken from handle_cache so this also
  * works without the launcher having populated the cache.
@@ -17,7 +22,10 @@
 
 #include <glib.h>
 
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
 #include "../defines.h"
 
@@ -77,6 +85,14 @@ struct atl_surface_texture {
 	uint64_t uploaded_serial;
 	int uploaded_width;
 	int uploaded_height;
+
+	/* the CPU upload path: our own GL_TEXTURE_2D holding the frame, and the
+	 * EGLImage of it that the app's external texture shows */
+	EGLDisplay upload_display;
+	EGLContext upload_context;
+	GLuint upload_tex;
+	EGLImageKHR upload_image;
+	bool warned_upload;
 
 	int default_width;
 	int default_height;
@@ -266,7 +282,10 @@ void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8
                                 int width, int height, int stride)
 {
 	g_mutex_lock(&texture->lock);
-	if (texture->released)
+	/* a producer that fills the texture itself is delivering these very
+	 * frames already: a copy here would only cost the conversion and post a
+	 * second onFrameAvailable, i.e. an updateTexImage with nothing to take */
+	if (texture->released || texture->source.update)
 		goto out;
 
 	if (!pending_buffer_locked(texture, (size_t)width * height * 4))
@@ -378,6 +397,114 @@ static void take_frame_locked(struct atl_surface_texture *texture)
 	g_cond_broadcast(&texture->frame_taken);
 }
 
+/* EGL_KHR_image_base, EGL_KHR_gl_texture_2D_image and GL_OES_EGL_image_external,
+ * all extensions, so resolved at run time */
+static PFNEGLCREATEIMAGEKHRPROC egl_create_image;
+static PFNEGLDESTROYIMAGEKHRPROC egl_destroy_image;
+static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC gl_image_target_texture;
+
+static bool ensure_image_procs(void)
+{
+	static GMutex lock;
+	bool have;
+
+	g_mutex_lock(&lock);
+	if (!gl_image_target_texture) {
+		egl_create_image = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
+		egl_destroy_image = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
+		if (egl_create_image && egl_destroy_image)
+			gl_image_target_texture = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+	}
+	have = gl_image_target_texture != NULL;
+	g_mutex_unlock(&lock);
+	return have;
+}
+
+/* Our texture belongs to the context that made it and can only be deleted
+ * from there; anywhere else it is left to go with that context. Lock held. */
+static void drop_upload_locked(struct atl_surface_texture *texture, bool context_is_current)
+{
+	if (texture->upload_image)
+		egl_destroy_image(texture->upload_display, texture->upload_image);
+	if (texture->upload_tex && context_is_current)
+		glDeleteTextures(1, &texture->upload_tex);
+	texture->upload_image = EGL_NO_IMAGE_KHR;
+	texture->upload_tex = 0;
+	texture->upload_display = EGL_NO_DISPLAY;
+	texture->upload_context = EGL_NO_CONTEXT;
+	texture->uploaded_serial = 0;
+	texture->uploaded_width = 0;
+	texture->uploaded_height = 0;
+}
+
+/*
+ * Hand the current frame to the app's texture. An external texture cannot take
+ * pixels directly, so the frame goes into a GL_TEXTURE_2D of our own and an
+ * EGLImage of that is bound to the app's name on GL_TEXTURE_EXTERNAL_OES: the
+ * same shape a HAL-filled texture has, and what a samplerExternalOES shader
+ * samples. The image aliases the texture's storage, so a glTexSubImage2D is
+ * visible through it; re-specifying the texture (new size) needs a new image.
+ * Call with the lock held and the consumer's context current.
+ */
+static bool upload_frame_locked(struct atl_surface_texture *texture)
+{
+	EGLDisplay display = eglGetCurrentDisplay();
+	EGLContext context = eglGetCurrentContext();
+	int width = texture->width;
+	int height = texture->height;
+	GLint previous = 0;
+	bool respec;
+
+	if (display == EGL_NO_DISPLAY || context == EGL_NO_CONTEXT || !ensure_image_procs())
+		return false;
+
+	/* moved to another context (detachFromGLContext/attachToGLContext) */
+	if (texture->upload_tex && texture->upload_context != context)
+		drop_upload_locked(texture, false);
+
+	respec = !texture->upload_tex || texture->uploaded_width != width || texture->uploaded_height != height;
+	if (!texture->upload_tex) {
+		glGenTextures(1, &texture->upload_tex);
+		texture->upload_display = display;
+		texture->upload_context = context;
+	}
+
+	/* leave the app's 2D binding alone: Android's updateTexImage only touches
+	 * the external target */
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous);
+	glBindTexture(GL_TEXTURE_2D, texture->upload_tex);
+	if (respec) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture->current);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	} else {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, texture->current);
+	}
+	glBindTexture(GL_TEXTURE_2D, (GLuint)previous);
+
+	if (respec) {
+		if (texture->upload_image)
+			egl_destroy_image(display, texture->upload_image);
+		texture->upload_image = egl_create_image(display, context, EGL_GL_TEXTURE_2D_KHR,
+		                                         (EGLClientBuffer)(uintptr_t)texture->upload_tex, NULL);
+		if (texture->upload_image == EGL_NO_IMAGE_KHR) {
+			fprintf(stderr, "SurfaceTexture: eglCreateImageKHR failed for a %dx%d frame: 0x%x\n",
+			        width, height, eglGetError());
+			return false;
+		}
+	}
+
+	/* bound again every frame, like Android's GLConsumer does */
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture->tex_name);
+	gl_image_target_texture(GL_TEXTURE_EXTERNAL_OES, (GLeglImageOES)texture->upload_image);
+	texture->uploaded_width = width;
+	texture->uploaded_height = height;
+	texture->uploaded_serial = texture->serial;
+	return true;
+}
+
 static void bitmap_release(struct st_bitmap *buffer, JNIEnv *env)
 {
 	if (buffer->bitmap)
@@ -448,6 +575,8 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1release(JNIE
 	texture->pending_valid = false;
 	texture->current_valid = false;
 	memset(&texture->source, 0, sizeof(texture->source));
+	if (texture->upload_tex || texture->upload_image)
+		drop_upload_locked(texture, eglGetCurrentContext() == texture->upload_context);
 	for (int i = 0; i < ST_BITMAPS; i++)
 		bitmap_release(&texture->bitmaps[i], env);
 	if (texture->self)
@@ -522,22 +651,14 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1updateTexIma
 		return; /* nothing new: AOSP keeps showing the last frame too */
 	}
 
-	glBindTexture(GL_TEXTURE_2D, texture->tex_name);
-	if (texture->uploaded_width != texture->width || texture->uploaded_height != texture->height ||
-	    texture->uploaded_serial == 0) {
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture->width, texture->height, 0,
-		             GL_RGBA, GL_UNSIGNED_BYTE, texture->current);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		texture->uploaded_width = texture->width;
-		texture->uploaded_height = texture->height;
-	} else {
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture->width, texture->height,
-		                GL_RGBA, GL_UNSIGNED_BYTE, texture->current);
+	if (!upload_frame_locked(texture)) {
+		if (!texture->warned_upload)
+			fprintf(stderr, "SurfaceTexture: cannot upload a %dx%d frame: no current EGL context, "
+			                "or no EGLImage support\n", texture->width, texture->height);
+		texture->warned_upload = true;
+		g_mutex_unlock(&texture->lock);
+		return;
 	}
-	texture->uploaded_serial = texture->serial;
 
 	GLenum error = glGetError();
 	if (error != GL_NO_ERROR)

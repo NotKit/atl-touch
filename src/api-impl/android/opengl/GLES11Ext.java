@@ -1,9 +1,9 @@
 package android.opengl;
 
 /**
- * Only the OES_EGL_image_external bits apps actually reach for. ATL has no
- * external textures: android_opengl_GLES20.c maps GL_TEXTURE_EXTERNAL_OES onto
- * GL_TEXTURE_2D, which is what SurfaceTexture uploads into.
+ * Only the OES_EGL_image_external bits apps actually reach for. The target is
+ * real: a SurfaceTexture's texture is an external texture, filled through an
+ * EGLImage (android_graphics_SurfaceTexture.c), so samplerExternalOES works.
  */
 public class GLES11Ext {
 	public static final int GL_TEXTURE_EXTERNAL_OES = 0x8D65;
