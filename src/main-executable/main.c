@@ -657,15 +657,8 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	if (!d->apk_instrumentation_class)
 		atl_window_set_title(atl_window, package_name);
 
-	const GLFWvidmode *monitor_mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-	jobject configuration = _GET_STATIC_OBJ_FIELD(handle_cache.context.class, "sys_config", "Landroid/content/res/Configuration;");
-	if (monitor_mode && monitor_mode->width >= 800 && monitor_mode->height >= 800)
-		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_LARGE*/ 0x03);
-	else
-		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02);
-	/* Resources copied sys_config when the app was loaded; push the edit into it */
-	(*env)->CallStaticVoidMethod(env, handle_cache.context.class,
-	                             _STATIC_METHOD(handle_cache.context.class, "onSystemConfigChanged", "()V"));
+	/* screenLayout comes from the window size in dp, which Display.setWindowSize()
+	 * above already pushed through Context.applyWindowSizeDp() */
 
 	// TODO: window icon (GLFW only supports this on X11; Wayland needs an app-id + .desktop file)
 

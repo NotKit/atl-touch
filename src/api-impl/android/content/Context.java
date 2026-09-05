@@ -144,9 +144,17 @@ public abstract class Context {
 	 * popups against AT_MOST(screenWidthDp * density) and got 0x0. One method,
 	 * because the boot snapshot and every later window resize have to agree. */
 	private static void applyWindowSizeDp(Configuration config, DisplayMetrics metrics) {
-		config.screenWidthDp = (int)(metrics.widthPixels / metrics.density);
-		config.screenHeightDp = (int)(metrics.heightPixels / metrics.density);
+		/* AOSP rounds (DisplayContent.computeScreenAppConfiguration), and a dp that
+		 * is one short picks a different w<N>dp resource */
+		config.screenWidthDp = (int)(metrics.widthPixels / metrics.density + 0.5f);
+		config.screenHeightDp = (int)(metrics.heightPixels / metrics.density + 0.5f);
 		config.smallestScreenWidthDp = Math.min(config.screenWidthDp, config.screenHeightDp);
+		/* the size buckets are defined in dp, so they have to be derived from the
+		 * values above; measuring the window in pixels called every phone `large` */
+		config.screenLayout = Configuration.reduceScreenLayout(
+		    Configuration.resetScreenLayout(config.screenLayout),
+		    Math.max(config.screenWidthDp, config.screenHeightDp),
+		    Math.min(config.screenWidthDp, config.screenHeightDp));
 	}
 
 	/**
