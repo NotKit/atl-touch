@@ -69,6 +69,12 @@ public class TextureView extends View {
 		return surfaceTexture != null ? surfaceTexture.getLatestFrameBitmap() : null;
 	}
 
+	/** The newest frame scaled to the requested size, or null before the first one. */
+	public Bitmap getBitmap(int width, int height) {
+		Bitmap frame = getBitmap();
+		return frame != null ? Bitmap.createScaledBitmap(frame, width, height, true) : null;
+	}
+
 	@Override
 	protected void onAttachedToWindow() {
 		super.onAttachedToWindow();

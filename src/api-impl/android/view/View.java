@@ -2246,6 +2246,10 @@ public class View implements Drawable.Callback {
 
 	public void sendAccessibilityEvent(int eventType) {}
 
+	/* nothing here builds accessibility events, so this is only ever the
+	   super call an overriding view makes */
+	public void onPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {}
+
 	public void setMinimumHeight(int minHeight) {
 		this.minHeight = minHeight;
 	}

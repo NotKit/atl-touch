@@ -23,6 +23,20 @@ public class ScaleGestureDetector {
 		return false;
 	}
 
+	/* onTouchEvent never starts a gesture, so the scale never leaves 1 and
+	   the focus point stays at the origin */
+	public float getScaleFactor() {
+		return 1.0f;
+	}
+
+	public float getFocusX() {
+		return 0.0f;
+	}
+
+	public float getFocusY() {
+		return 0.0f;
+	}
+
 	public static class SimpleOnScaleGestureListener implements OnScaleGestureListener {
 		public SimpleOnScaleGestureListener() {
 		}

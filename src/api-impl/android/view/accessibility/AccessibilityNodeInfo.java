@@ -75,6 +75,8 @@ public class AccessibilityNodeInfo {
 
 	public static AccessibilityNodeInfo obtain(android.view.View a0, int a1) { return null; }
 
+	public static AccessibilityNodeInfo obtain(android.view.View a0) { return null; }
+
 	public static AccessibilityNodeInfo obtain() { return null; }
 
 	public void setClassName(CharSequence className) {}
@@ -100,6 +102,10 @@ public class AccessibilityNodeInfo {
 	public void setScrollable(boolean scrollable) {}
 
 	public void setVisibleToUser(boolean visible) {}
+
+	public void setImportantForAccessibility(boolean important) {}
+
+	public void setParent(android.view.View parent) {}
 
 	public void setTextSelection(int start, int end) {}
 

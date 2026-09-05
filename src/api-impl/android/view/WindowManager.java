@@ -73,6 +73,8 @@ public interface WindowManager {
 		public int layoutInDisplayCutoutMode;
 		/* ROTATION_ANIMATION_*; ATL never rotates the window, so it is stored only */
 		public int rotationAnimation = ROTATION_ANIMATION_ROTATE;
+		/* SCREEN_ORIENTATION_*; ATL never rotates either, so this is stored only */
+		public int screenOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 		/* ATL does not pick a display mode; the app's preference is stored only */
 		public float preferredRefreshRate;
 		public String packageName;
@@ -142,6 +144,7 @@ public interface WindowManager {
 			this.screenBrightness = o.screenBrightness;
 			this.windowAnimations = o.windowAnimations;
 			this.rotationAnimation = o.rotationAnimation;
+			this.screenOrientation = o.screenOrientation;
 			this.preferredRefreshRate = o.preferredRefreshRate;
 			this.packageName = o.packageName;
 			this.title = o.title;
