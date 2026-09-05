@@ -62,7 +62,59 @@ public class ConnectivityManager {
 
 	public ProxyInfo getDefaultProxy() { return null; }
 
-	public android.net.LinkProperties getLinkProperties(android.net.Network a0) { return null; }
+	/**
+	 * The interface carrying the default route, and its addresses.
+	 *
+	 * Only one network is modelled here, so every Network describes that one.
+	 * Returning null instead -- which is what this did -- makes a caller treat
+	 * the network as unknown and ignore it: webrtc did exactly that, found
+	 * nothing but loopback, and no call could allocate a port.
+	 *
+	 * The route is found by asking the kernel which local address it would
+	 * send from. Connecting a UDP socket only sets that; no packet is sent.
+	 */
+	public android.net.LinkProperties getLinkProperties(android.net.Network network) {
+		java.net.NetworkInterface iface = getDefaultRouteInterface();
+		if (iface == null)
+			return null;
+
+		java.util.List<LinkAddress> addresses = new java.util.ArrayList<LinkAddress>();
+		for (java.net.InterfaceAddress address : iface.getInterfaceAddresses()) {
+			if (address.getAddress() != null)
+				addresses.add(new LinkAddress(address.getAddress(), address.getNetworkPrefixLength()));
+		}
+		try {
+			return new LinkProperties(iface.getName(), addresses);
+		} catch (Throwable t) {
+			return null;
+		}
+	}
+
+	private static java.net.NetworkInterface getDefaultRouteInterface() {
+		try (java.net.DatagramSocket socket = new java.net.DatagramSocket()) {
+			socket.connect(java.net.InetAddress.getByName("8.8.8.8"), 53);
+			java.net.NetworkInterface iface =
+			    java.net.NetworkInterface.getByInetAddress(socket.getLocalAddress());
+			if (iface != null && !iface.isLoopback())
+				return iface;
+		} catch (Throwable t) {
+			// fall through to the scan below
+		}
+		/* No route, or the address is not on an interface we can name: take the
+		 * first interface that is up, not loopback and has an address. */
+		try {
+			java.util.Enumeration<java.net.NetworkInterface> ifaces =
+			    java.net.NetworkInterface.getNetworkInterfaces();
+			while (ifaces != null && ifaces.hasMoreElements()) {
+				java.net.NetworkInterface iface = ifaces.nextElement();
+				if (iface.isUp() && !iface.isLoopback() && iface.getInetAddresses().hasMoreElements())
+					return iface;
+			}
+		} catch (Throwable t) {
+			// no interfaces to report
+		}
+		return null;
+	}
 
 	public static final int TYPE_BLUETOOTH = 7;
 
