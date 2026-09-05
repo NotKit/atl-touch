@@ -51,6 +51,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 
 	@Override
 	public void removeView(View view) {
+		Slog.v(TAG, "removeView(" + view + ") called");
 		ViewRootImpl root = view.getViewRootImpl();
 		if (root != null)
 			root.removePanel(view);
