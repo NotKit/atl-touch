@@ -219,25 +219,50 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	}
 
 	public void dismiss() {
-		// HACK: dismissing the Dialog takes some time in AOSP, as the request goes back and forth between the application
-		// and the system server. We replicate this behavior by adding 10 ms delay.
-		// This Hack is required for NewPipe RouterActivity which has a race condition. It subscribes an rxJava observable
-		// and immediately calls Dialog.dismiss(). The OnDismissListener would unsubscribes the observable again.
-		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-			@Override
-			public void run() {
-				if (!showing)
-					return;
-				showing = false;
-				if (hostRoot != null) {
-					hostRoot.removePanel(window.getDecorView());
-					hostRoot = null;
+		// AOSP's dismiss() runs dismissDialog() inline when it is already on the
+		// dialog's looper: the window goes away, onStop() runs and isShowing()
+		// answers false before dismiss() returns. Only the *listener* is a posted
+		// message. Delaying the whole thing broke callers that ask right after:
+		// androidx's DialogFragmentNavigator pops its back-stack entry from the
+		// fragment's ON_STOP, but only `if (!dialog.isShowing)`, so a dialog that
+		// still called itself showing left its destination on the stack -- and
+		// Fenix's toolbar, which refuses to act unless the current destination is
+		// the one it expects, then did nothing at all until some other navigation
+		// cleared it.
+		if (Looper.myLooper() == Looper.getMainLooper()) {
+			dismissNow();
+		} else {
+			new Handler(Looper.getMainLooper()).post(new Runnable() {
+				@Override
+				public void run() {
+					dismissNow();
 				}
-				onStop();
-				if (onDismissListener != null)
+			});
+		}
+	}
+
+	private void dismissNow() {
+		if (!showing)
+			return;
+		showing = false;
+		if (hostRoot != null) {
+			hostRoot.removePanel(window.getDecorView());
+			hostRoot = null;
+		}
+		onStop();
+		// HACK: AOSP sends the dismiss callback as a message, so it lands after the
+		// caller of dismiss() has returned. NewPipe's RouterActivity depends on
+		// that: it subscribes an rxJava observable and immediately calls dismiss(),
+		// and its OnDismissListener unsubscribes it again. The 10 ms is that
+		// message, not the dismissal.
+		if (onDismissListener != null) {
+			new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+				@Override
+				public void run() {
 					onDismissListener.onDismiss(Dialog.this);
-			}
-		}, 10);
+				}
+			}, 10);
+		}
 	}
 
 	public Window getWindow() {
