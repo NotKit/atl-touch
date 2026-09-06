@@ -852,6 +852,79 @@ public class Resources {
 		return getColor(id, null);
 	}
 
+	/**
+	 * The Typeface for a font resource. A font-family XML that names a font
+	 * provider (Play Services serves Google Camera's) cannot be fetched here,
+	 * so its <font> children are used if it has any and the default face
+	 * stands in otherwise.
+	 */
+	public android.graphics.Typeface getFont(int id) throws NotFoundException {
+		TypedValue value = new TypedValue();
+
+		getValue(id, value, true);
+		if (value.string == null)
+			throw new NotFoundException("Resource ID #0x" + Integer.toHexString(id) + " is not a font");
+
+		String file = value.string.toString();
+		android.graphics.Typeface font = file.endsWith(".xml")
+			? loadFontFamily(id, value, file) : loadFontFile(value, file);
+
+		return font != null ? font : android.graphics.Typeface.DEFAULT;
+	}
+
+	/** the first <font> child that names a font file this package carries */
+	private android.graphics.Typeface loadFontFamily(int id, TypedValue value, String file) {
+		try (XmlResourceParser parser = loadXmlResourceParser(file, id, value.assetCookie, "font")) {
+			int type;
+
+			while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
+				if (type != XmlPullParser.START_TAG || !"font".equals(parser.getName()))
+					continue;
+
+				int fontId = parser.getAttributeResourceValue(
+					"http://schemas.android.com/apk/res/android", "font", 0);
+				if (fontId == 0)
+					continue;
+
+				TypedValue fontValue = new TypedValue();
+				getValue(fontId, fontValue, true);
+				if (fontValue.string == null)
+					continue;
+
+				android.graphics.Typeface font = loadFontFile(fontValue, fontValue.string.toString());
+				if (font != null)
+					return font;
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "could not read font family " + file, e);
+		}
+		return null;
+	}
+
+	/** minikin only opens a font by path, so the packaged file is unpacked once */
+	private android.graphics.Typeface loadFontFile(TypedValue value, String file) {
+		java.io.File out = new java.io.File(android.os.Environment.getDataDirectory(),
+			"extracted_fonts/" + file.replace('/', '_'));
+
+		if (!out.isFile() || out.length() == 0) {
+			try (InputStream in = mAssets.openNonAsset(value.assetCookie, file,
+			                                           AssetManager.ACCESS_STREAMING)) {
+				out.getParentFile().mkdirs();
+				try (java.io.FileOutputStream os = new java.io.FileOutputStream(out)) {
+					byte[] buf = new byte[65536];
+					int n;
+
+					while ((n = in.read(buf)) > 0)
+						os.write(buf, 0, n);
+				}
+			} catch (IOException e) {
+				Log.w(TAG, "could not unpack font " + file, e);
+				return null;
+			}
+		}
+		return android.graphics.Typeface.createFromFile(out.getAbsolutePath());
+	}
+
 	public int getColor(int id, Theme theme) throws NotFoundException {
 		TypedValue value;
 		synchronized (mAccessLock) {
