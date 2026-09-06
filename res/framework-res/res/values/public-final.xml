@@ -3259,6 +3259,24 @@
     <public type="color" name="system_outline_variant_light" id="0x010600c0" />
     <public type="color" name="system_outline_variant_dark" id="0x010600c1" />
 
+    <!-- API 35 additions: the disabled roles and the error tonal palette -->
+    <public type="color" name="system_surface_disabled" id="0x010600c2" />
+    <public type="color" name="system_on_surface_disabled" id="0x010600c3" />
+    <public type="color" name="system_outline_disabled" id="0x010600c4" />
+    <public type="color" name="system_error_0" id="0x010600c5" />
+    <public type="color" name="system_error_10" id="0x010600c6" />
+    <public type="color" name="system_error_50" id="0x010600c7" />
+    <public type="color" name="system_error_100" id="0x010600c8" />
+    <public type="color" name="system_error_200" id="0x010600c9" />
+    <public type="color" name="system_error_300" id="0x010600ca" />
+    <public type="color" name="system_error_400" id="0x010600cb" />
+    <public type="color" name="system_error_500" id="0x010600cc" />
+    <public type="color" name="system_error_600" id="0x010600cd" />
+    <public type="color" name="system_error_700" id="0x010600ce" />
+    <public type="color" name="system_error_800" id="0x010600cf" />
+    <public type="color" name="system_error_900" id="0x010600d0" />
+    <public type="color" name="system_error_1000" id="0x010600d1" />
+
     <public type="dimen" name="system_app_widget_background_radius" id="0x01050008" />
     <public type="dimen" name="system_app_widget_inner_radius" id="0x01050009" />
 
