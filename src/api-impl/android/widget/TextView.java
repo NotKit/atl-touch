@@ -482,6 +482,22 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return paint;
 	}
 
+	public String getFontVariationSettings() {
+		return getPaint().getFontVariationSettings();
+	}
+
+	public boolean setFontVariationSettings(String settings) {
+		return getPaint().setFontVariationSettings(settings);
+	}
+
+	public String getFontFeatureSettings() {
+		return getPaint().getFontFeatureSettings();
+	}
+
+	public void setFontFeatureSettings(String settings) {
+		getPaint().setFontFeatureSettings(settings);
+	}
+
 	public void addTextChangedListener(TextWatcher watcher) {}
 	public void removeTextChangedListener(TextWatcher watcher) {}
 	public void setOnEditorActionListener(TextView.OnEditorActionListener l) {}
