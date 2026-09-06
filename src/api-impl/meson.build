@@ -936,6 +936,8 @@ srcs = [
 	'android/widget/ViewSwitcher.java',
 	'android/widget/ZoomButton.java',
 	'android/widget/ZoomButtonsController.java',
+	'android/window/BackEvent.java',
+	'android/window/OnBackAnimationCallback.java',
 	'android/window/OnBackInvokedCallback.java',
 	'android/window/OnBackInvokedDispatcher.java',
 	'android/window/SplashScreenView.java',
