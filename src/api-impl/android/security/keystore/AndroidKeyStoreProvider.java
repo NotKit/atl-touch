@@ -29,5 +29,7 @@ public class AndroidKeyStoreProvider extends Provider {
 		put("KeyStore.AndroidKeyStore", "android.security.keystore.AndroidKeyStore");
 		put("KeyGenerator.AES", "android.security.keystore.KeyGenerator$AES");
 		put("KeyGenerator.HmacSHA512", "android.security.keystore.KeyGenerator$HmacSHA512");
+		put("KeyPairGenerator.EC", "android.security.keystore.KeyPairGenerator$EC");
+		put("KeyPairGenerator.RSA", "android.security.keystore.KeyPairGenerator$RSA");
 	}
 }
