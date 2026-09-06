@@ -1,3 +1,6 @@
+#ifndef ATL_NATIVE_WINDOW_H
+#define ATL_NATIVE_WINDOW_H
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -88,3 +91,5 @@ struct atl_window_frame;
 bool atl_native_window_present(struct ANativeWindow *native_window,
                                const struct atl_window_frame *frame, const int32_t *crop,
                                int transform);
+
+#endif /* ATL_NATIVE_WINDOW_H */
