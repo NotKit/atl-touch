@@ -778,6 +778,50 @@ public class Intent implements Parcelable {
 		return extras.getChar(name, def);
 	}
 
+	public float getFloatExtra(String name, float def) {
+		return extras.getFloat(name, def);
+	}
+
+	public double getDoubleExtra(String name, double def) {
+		return extras.getDouble(name, def);
+	}
+
+	public short getShortExtra(String name, short def) {
+		return extras.getShort(name, def);
+	}
+
+	public byte getByteExtra(String name, byte def) {
+		return extras.getByte(name, def);
+	}
+
+	public float[] getFloatArrayExtra(String name) {
+		return extras.getFloatArray(name);
+	}
+
+	public double[] getDoubleArrayExtra(String name) {
+		return extras.getDoubleArray(name);
+	}
+
+	public short[] getShortArrayExtra(String name) {
+		return extras.getShortArray(name);
+	}
+
+	public char[] getCharArrayExtra(String name) {
+		return extras.getCharArray(name);
+	}
+
+	public boolean[] getBooleanArrayExtra(String name) {
+		return extras.getBooleanArray(name);
+	}
+
+	public CharSequence getCharSequenceExtra(String name) {
+		return extras.getCharSequence(name);
+	}
+
+	public CharSequence[] getCharSequenceArrayExtra(String name) {
+		return extras.getCharSequenceArray(name);
+	}
+
 	public Parcelable[] getParcelableArrayExtra(String name) {
 		return extras.getParcelableArray(name);
 	}
