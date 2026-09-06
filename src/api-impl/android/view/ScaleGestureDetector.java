@@ -11,6 +11,7 @@ public class ScaleGestureDetector {
 	}
 
 	public ScaleGestureDetector(Context context, OnScaleGestureListener listener) {}
+	public ScaleGestureDetector(Context context, OnScaleGestureListener listener, android.os.Handler handler) {}
 
 	public void setQuickScaleEnabled(boolean enabled) {}
 	public void setStylusScaleEnabled(boolean enabled) {}

@@ -3364,6 +3364,17 @@ public class View implements Drawable.Callback {
 	public void setAccessibilityTraversalBefore(int beforeId) {}
 	public void setAccessibilityTraversalAfter(int afterId) {}
 
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = Float.NaN;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE = -1;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_LOW = -2;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_NORMAL = -3;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_HIGH = -4;
+	private float requested_frame_rate = REQUESTED_FRAME_RATE_CATEGORY_DEFAULT;
+
+	// API 35: a hint to the compositor, which ATL has no use for yet
+	public void setRequestedFrameRate(float frameRate) { requested_frame_rate = frameRate; }
+	public float getRequestedFrameRate() { return requested_frame_rate; }
+
 	public void setLabelFor(int id) {}
 
 	/* --- AOSP-13 API surface: methods apps call or override-and-chain to super.
