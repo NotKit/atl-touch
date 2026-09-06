@@ -738,19 +738,23 @@ public class AnimatorInflater {
 				int valueType = a.getInt(R.styleable.PropertyValuesHolder_valueType,
 				                         VALUE_TYPE_UNDEFINED);
 
-				/*PropertyValuesHolder pvh = loadPvh(res, theme, parser, propertyName, valueType);
-				if (pvh == null) {
-					pvh = getPVH(a, valueType,
-						     R.styleable.PropertyValuesHolder_valueFrom,
-						     R.styleable.PropertyValuesHolder_valueTo, propertyName);
-				}
+				// keyframe children (loadPvh) are not supported yet; a holder with
+				// valueFrom/valueTo is, and an objectAnimator may carry nothing else
+				PropertyValuesHolder pvh = getPVH(a, valueType,
+					     R.styleable.PropertyValuesHolder_valueFrom,
+					     R.styleable.PropertyValuesHolder_valueTo, propertyName);
 				if (pvh != null) {
 					if (values == null) {
 						values = new ArrayList<PropertyValuesHolder>();
 					}
 					values.add(pvh);
-				}*/
+				}
 				a.recycle();
+				// leave the parser on this holder's end tag, past any keyframes
+				int pvhDepth = parser.getDepth();
+				while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
+				       && !(type == XmlPullParser.END_TAG && parser.getDepth() == pvhDepth)) {
+				}
 			}
 
 			parser.next();
