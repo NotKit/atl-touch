@@ -1,0 +1,85 @@
+From c5efbd99a5369fccf3950b3287e513bed456c219 Mon Sep 17 00:00:00 2001
+From: TheKit <thekit@disroot.org>
+Date: Sun, 6 Sep 2026 15:29:15 +0300
+Subject: [PATCH] compiler: emit a virtual call for an interface call to an
+ Object method
+
+Backport of AOSP's Android 11 fix; this tree is AOSP 10 (r75), where it is
+missing.
+
+An invoke-interface can resolve to a java.lang.Object method: toString,
+hashCode or equals called through an interface reference, which is what
+javac emits for `iface.toString()`. Object methods have no IMT slot, so the
+slot the hash picks holds the runtime's shared "unimplemented" method in
+every class. The conflict trampoline then resolves the real target through
+the vtable and hands it to AddMethodToConflictTable, which - because only
+the shared *conflict* method is special-cased - stores it in the shared
+unimplemented method's own table. Every later receiver of any class whose
+slot holds that method is then dispatched to the first implementation ever
+resolved.
+
+Under Google Camera one wrapper's toString ran on its delegates and finally
+on a plain Object, throwing an NPE or jumping into data. Android 11 emits a
+virtual call for these (Object's vtable indices are the same in every class)
+and CHECKs in artInvokeInterfaceTrampoline that an Object method never
+reaches it; this is the first half.
+
+Also never hang a conflict table off the shared unimplemented method. That
+half is not upstream: with the fix above nothing can reach it, but the
+failure mode it produces is silent and process-wide.
+---
+ art/compiler/optimizing/instruction_builder.cc | 16 ++++++++++++++++
+ art/runtime/class_linker.cc                    | 10 +++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/art/compiler/optimizing/instruction_builder.cc b/art/compiler/optimizing/instruction_builder.cc
+index 5e7b5752..7748f18a 100644
+--- a/art/compiler/optimizing/instruction_builder.cc
++++ b/art/compiler/optimizing/instruction_builder.cc
+@@ -929,6 +929,22 @@ bool HInstructionBuilder::BuildInvoke(const Instruction& instruction,
+     return HandleInvoke(invoke, operands, shorty, /* is_unresolved= */ true);
+   }
+ 
++  // If the resolved method is from j.l.Object, emit a virtual call instead.
++  // The IMT conflict stub only handles interface methods: Object methods have
++  // no IMT slot, so the slot the hash lands on holds the runtime's shared
++  // "unimplemented" method, and the conflict trampoline caches the first
++  // resolution in that shared method's table - after which every receiver of
++  // every class is dispatched to it.
++  //
++  // This is AOSP's own fix, added in Android 11 (which also CHECKs the
++  // invariant in artInvokeInterfaceTrampoline); this tree is AOSP 10.
++  if (invoke_type == kInterface) {
++    ScopedObjectAccess soa(Thread::Current());
++    if (resolved_method->GetDeclaringClass()->IsObjectClass()) {
++      invoke_type = kVirtual;
++    }
++  }
++
+   // Replace calls to String.<init> with StringFactory.
+   if (IsStringConstructor(resolved_method)) {
+     uint32_t string_init_entry_point = WellKnownClasses::StringInitToEntryPoint(resolved_method);
+diff --git a/art/runtime/class_linker.cc b/art/runtime/class_linker.cc
+index 62a28948..d71a6472 100644
+--- a/art/runtime/class_linker.cc
++++ b/art/runtime/class_linker.cc
+@@ -6648,7 +6648,15 @@ ArtMethod* ClassLinker::AddMethodToConflictTable(ObjPtr<mirror::Class> klass,
+   ImtConflictTable* current_table = conflict_method->GetImtConflictTable(kRuntimePointerSize);
+   Runtime* const runtime = Runtime::Current();
+   LinearAlloc* linear_alloc = GetAllocatorForClassLoader(klass->GetClassLoader());
+-  bool new_entry = conflict_method == runtime->GetImtConflictMethod() || force_new_conflict_method;
++  // The unimplemented method is shared by every class as well, so a table hung
++  // off it would be consulted by all of them. Upstream leaves this case alone
++  // because with the compiler fix above nothing can reach it: an interface
++  // method that resolves on a class always has its own IMT slot filled, and a
++  // receiver that does not implement the interface throws ICCE before we get
++  // here. Belt and braces, since the failure it produces is silent.
++  bool new_entry = conflict_method == runtime->GetImtConflictMethod() ||
++                   conflict_method == runtime->GetImtUnimplementedMethod() ||
++                   force_new_conflict_method;
+ 
+   // Create a new entry if the existing one is the shared conflict method.
+   ArtMethod* new_conflict_method = new_entry
+-- 
+2.53.0
+

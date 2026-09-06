@@ -110,7 +110,8 @@ clone() { # clone <url> <ref> <dir>
 # Stamps carry the pinned ref (and, for bionic, the patch hash) so a stale
 # cache can never mask a bump — the renamed stamp just doesn't exist.
 BIONIC_STAMP="${BIONIC_REF:0:12}-$(cat "${PATCHES}/bionic_translation-ut.patch" "${PATCHES}/bionic_translation-stdio-glibc.patch" | sha256sum | cut -c1-8)"
-ART_STAMP="${ART_REF:0:12}-$(sha256sum "${PATCHES}/art_standalone-d8.patch" | cut -c1-8)-d8${R8_VERSION}"
+ART_STAMP="${ART_REF:0:12}-$(cat "${PATCHES}/art_standalone-d8.patch" \
+    "${PATCHES}/art_standalone-imt-object-dispatch.patch" | sha256sum | cut -c1-8)-d8${R8_VERSION}"
 
 # --- 1. GLFW 3.4 (noble ships 3.3, atlas needs the libdecor init hint) ---
 
@@ -228,6 +229,10 @@ if ! stamp "art_standalone-${ART_STAMP}"; then
     clone "${ART_URL}" "${ART_REF}" art_standalone
     rsync -a --delete --exclude=.git "${SRC}/art_standalone/" "${BUILD_DIR}/art_standalone/"
     patch -d "${BUILD_DIR}/art_standalone" -p1 < "${PATCHES}/art_standalone-d8.patch"
+    # AOSP's Android 11 fix, missing from this AOSP 10 pin: an interface call
+    # to a j.l.Object method was dispatched through the IMT, and the trampoline
+    # cached the first resolution in a table shared by every class
+    patch -d "${BUILD_DIR}/art_standalone" -p1 < "${PATCHES}/art_standalone-imt-object-dispatch.patch"
     # art's envsetup.mk expects uname-style ARCH (aarch64) and reads 'arm64' as
     # 32-bit arm — override explicitly.
     make -C "${BUILD_DIR}/art_standalone" -j"${JOBS}" \

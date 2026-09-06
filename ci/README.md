@@ -20,7 +20,11 @@ The dominant CI cost of a click build is the dependency chain, not the app:
 
 Dependency pins live at the top of `build-sdk.sh` (overridable via env). The
 UT-specific patches for `vixl` and `bionic_translation` are vendored in
-`ci/patches/`. The atlas toolchain/UT patches that used to live in the packaging
+`ci/patches/`, as are two for `art_standalone`: the d8 desugaring of the boot
+jars, and AOSP's Android 11 fix for interface calls to `java.lang.Object`
+methods, which the AOSP 10 pin is missing (`tests/art/check-imt-object-dispatch.sh`
+fails without it). Every patch's hash is part of its stamp, so adding one
+forces that dependency to rebuild. The atlas toolchain/UT patches that used to live in the packaging
 repos are already upstreamed here, so atlas builds clean in the container.
 
 ## Output
