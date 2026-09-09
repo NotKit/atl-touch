@@ -497,7 +497,9 @@ public class Intent implements Parcelable {
 	public Intent(Intent o) {
 		this.action = o.action;
 		this.data = o.data;
-		this.extras = o.extras;
+		// A copy, not the same Bundle: putExtras() merges, so sharing it would
+		// let the copy write into the intent it was copied from.
+		this.extras = new Bundle(o.extras);
 		this.component = o.component;
 	}
 	public Intent(String action) {
@@ -660,14 +662,16 @@ public class Intent implements Parcelable {
 	}
 
 	public Intent putExtras(Intent src) {
-		// FIXME HACK
-		this.extras = src.getExtras();
-		return this;
+		return putExtras(src.getExtras());
 	}
 
+	// Merges, as the platform does. Replacing dropped every extra put before
+	// the call: CustomTabsIntent.Builder puts EXTRA_SESSION in its constructor
+	// and calls putExtras() again later, so no custom tab was recognised as one.
 	public Intent putExtras(Bundle extras) {
-		// FIXME HACK
-		this.extras = extras;
+		if (extras != null) {
+			this.extras.putAll(extras);
+		}
 		return this;
 	}
 
