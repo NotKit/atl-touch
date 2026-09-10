@@ -554,8 +554,8 @@ public abstract class Context {
 	}
 
 	/** Stop a running service from its own stopSelf(); see Service. */
-	public static boolean stopRunningService(Service service) {
-		return service != null && service.get_atl_loaded_app().stopRunningService(service);
+	public static boolean stopRunningService(Service service, int startId) {
+		return service != null && service.get_atl_loaded_app().stopRunningService(service, startId);
 	}
 
 	public abstract boolean stopService(Intent intent);

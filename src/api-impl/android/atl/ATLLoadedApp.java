@@ -37,7 +37,30 @@ public final class ATLLoadedApp {
 	public final PackageParser.Package pkg;
 	public final int effective_sdk_compat;
 	private final Object init_lock;
-	private final HashMap<String, Service> running_services;
+	/*
+	 * As in AOSP's ActiveServices: a service stays alive while it is started
+	 * (startService, until stopService or stopSelf) or while something is bound
+	 * to it, and is destroyed only once neither holds. Tracking just the Service
+	 * lost the "or bound" half, which is the part GeckoView leans on -- it calls
+	 * stopSelf() from inside onBind() precisely so that the service goes away
+	 * when its client unbinds, and not before.
+	 */
+	private static class ServiceRecord {
+		final Service service;
+		final HashSet<ServiceConnection> connections = new HashSet<>();
+		boolean started;
+		int last_start_id;
+
+		ServiceRecord(Service service) {
+			this.service = service;
+		}
+
+		boolean needed() {
+			return started || !connections.isEmpty();
+		}
+	}
+
+	private final HashMap<String, ServiceRecord> running_services;
 	private Application application;
 	private Resources.Theme default_theme;
 
@@ -281,21 +304,26 @@ public final class ATLLoadedApp {
 			@Override
 			public void run() {
 				try {
-					Service service = running_services.get(className);
-					if (service == null) {
+					ServiceRecord record = running_services.get(className);
+					if (record == null) {
 						Class<? extends Service> cls = ATLLoadedApp.this.loadClass(className).asSubclass(Service.class);
-						service = cls.getConstructor().newInstance();
+						Service service = cls.getConstructor().newInstance();
 						service.attachBaseContext(new ContextImpl(
 						    ATLLoadedApp.this.createDefaultResources(), ATLLoadedApp.this,
 						    pkg.applicationInfo.theme));
 						service.onCreate();
-						running_services.put(className, service);
+						record = new ServiceRecord(service);
+						running_services.put(className, record);
 					}
 
 					if (serviceConnection != null) {
-						serviceConnection.onServiceConnected(component_final, service.onBind(intent));
+						record.connections.add(serviceConnection);
+						serviceConnection.onServiceConnected(component_final, record.service.onBind(intent));
 					} else {
-						service.onStartCommand(intent, 0, 0);
+						record.started = true;
+						/* AOSP hands out start ids from 1 up, and stopSelf(id) only
+						 * stops when the id names the most recent start. */
+						record.service.onStartCommand(intent, 0, ++record.last_start_id);
 					}
 				} catch (ReflectiveOperationException e) {
 					Slog.e(TAG, "startService: failed to start service " + className, e);
@@ -306,25 +334,40 @@ public final class ATLLoadedApp {
 		return component;
 	}
 
-	/** Stop a running service from its own stopSelf(); see Service. */
-	public boolean stopRunningService(Service service) {
-		for (java.util.Map.Entry<String, Service> entry : running_services.entrySet()) {
-			if (entry.getValue() == service) {
-				running_services.remove(entry.getKey());
-				service.onDestroy();
-				return true;
-			}
+	/**
+	 * Stop a running service from its own stopSelf(); see Service. A startId of
+	 * -1 is the no-argument stopSelf(), which stops whatever the most recent
+	 * start was.
+	 */
+	public boolean stopRunningService(Service service, int startId) {
+		for (java.util.Map.Entry<String, ServiceRecord> entry : running_services.entrySet()) {
+			ServiceRecord record = entry.getValue();
+			if (record.service != service)
+				continue;
+			if (startId >= 0 && startId != record.last_start_id)
+				return false;
+			record.started = false;
+			return bringDownIfUnneeded(entry.getKey(), record);
 		}
 		return false;
 	}
 
 	public boolean stopService(Intent intent) {
 		String className = intent.getComponent().getClassName();
-		Service service = running_services.get(className);
-		if (service == null)
+		ServiceRecord record = running_services.get(className);
+		if (record == null)
 			return false;
-		service.onDestroy();
+		record.started = false;
+		return bringDownIfUnneeded(className, record);
+	}
+
+	/* AOSP's bringDownServiceIfNeededLocked: a service that is still started or
+	 * still bound is left alone. */
+	private boolean bringDownIfUnneeded(String className, ServiceRecord record) {
+		if (record.needed())
+			return false;
 		running_services.remove(className);
+		record.service.onDestroy();
 		return true;
 	}
 
