@@ -13,6 +13,16 @@
 static GList *activity_backlog = NULL;
 static jobject activity_current = NULL;
 
+/* Activity's own booleans, looked up on android.app.Activity and not on the
+ * receiver's class.  A GraalVM native image resolves GetFieldID only against
+ * the class it is handed, so an app subclass -- every real Activity -- answers
+ * NoSuchFieldError for a field the base class declares. */
+static jboolean activity_bool_field(JNIEnv *env, jobject activity, const char *name)
+{
+	return (*env)->GetBooleanField(env, activity,
+	    _FIELD_ID(handle_cache.activity.class, name, "Z"));
+}
+
 static void activity_close(JNIEnv *env, jobject activity)
 {
 	// in case some exception was left unhandled in native code, print it here so we don't confuse it with an exception thrown by onDestroy
@@ -40,7 +50,7 @@ static void activity_close(JNIEnv *env, jobject activity)
 
 static void activity_unfocus(JNIEnv *env, jobject activity)
 {
-	if (!_GET_BOOL_FIELD(activity, "paused")) {
+	if (!activity_bool_field(env, activity, "paused")) {
 		(*env)->CallVoidMethod(env, activity, handle_cache.activity.onPause);
 		atl_report_pending_exception(env);
 	}
@@ -54,22 +64,22 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
 
 static void activity_focus(JNIEnv *env, jobject activity)
 {
-	if (_GET_BOOL_FIELD(activity, "finishing"))
+	if (activity_bool_field(env, activity, "finishing"))
 		return;
 
 	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onStart);
 	atl_report_pending_exception(env);
-	if (_GET_BOOL_FIELD(activity, "finishing"))
+	if (activity_bool_field(env, activity, "finishing"))
 		return;
 
 	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onResume);
 	atl_report_pending_exception(env);
-	if (_GET_BOOL_FIELD(activity, "finishing"))
+	if (activity_bool_field(env, activity, "finishing"))
 		return;
 
 	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onPostResume);
 	atl_report_pending_exception(env);
-	if (_GET_BOOL_FIELD(activity, "finishing"))
+	if (activity_bool_field(env, activity, "finishing"))
 		return;
 
 	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onWindowFocusChanged, true);
@@ -87,7 +97,7 @@ static void activity_update_current(JNIEnv *env)
 
 		if (activity_new)
 			activity_focus(env, activity_new);
-		if (activity_new && _GET_BOOL_FIELD(activity_new, "finishing"))
+		if (activity_new && activity_bool_field(env, activity_new, "finishing"))
 			return;
 
 		activity_current = activity_new;
@@ -168,7 +178,7 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	(*env)->CallVoidMethod(env, activity_object, handle_cache.activity.onCreate, NULL);
 	atl_report_pending_exception(env);
 
-	if (_GET_BOOL_FIELD(activity_object, "finishing")) { // finish() was called before the activity was created
+	if (activity_bool_field(env, activity_object, "finishing")) { // finish() was called before the activity was created
 		return;
 	}
 
