@@ -21,6 +21,8 @@ public class Binder implements IBinder {
 		this.descriptor = descriptor;
 	}
 
+	public IInterface getOwner() { return owner; }
+
 	public static void flushPendingCommands() {}
 
 	public static long clearCallingIdentity() { return 0; }
