@@ -193,6 +193,16 @@ struct handle_cache {
 		jclass class;
 		jmethodID postFrame;
 	} surface;
+	struct {
+		jclass class;
+		jclass utils_class;
+		jmethodID constructor;
+		jmethodID setInt;
+		jmethodID getInt;
+	} file_descriptor;
+	struct {
+		jclass class;
+	} io_exception;
 };
 
 extern struct handle_cache handle_cache;

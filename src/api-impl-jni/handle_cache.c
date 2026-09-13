@@ -170,4 +170,10 @@ void set_up_handle_cache(JNIEnv *env)
 
 	handle_cache.surface.class = _REF(atl_find_class_or_exit(env, "android/view/Surface"));
 	handle_cache.surface.postFrame = _METHOD(handle_cache.surface.class, "postFrame", "(Landroid/graphics/Bitmap;)V");
+	handle_cache.file_descriptor.class = _REF(atl_find_class_or_exit(env, "java/io/FileDescriptor"));
+	handle_cache.file_descriptor.utils_class = _REF(atl_find_class_or_exit(env, "android/atl/FileDescriptorUtils"));
+	handle_cache.file_descriptor.constructor = _METHOD(handle_cache.file_descriptor.class, "<init>", "()V");
+	handle_cache.file_descriptor.setInt = _STATIC_METHOD(handle_cache.file_descriptor.utils_class, "setInt", "(Ljava/io/FileDescriptor;I)V");
+	handle_cache.file_descriptor.getInt = _STATIC_METHOD(handle_cache.file_descriptor.utils_class, "getInt", "(Ljava/io/FileDescriptor;)I");
+	handle_cache.io_exception.class = _REF(atl_find_class_or_exit(env, "java/io/IOException"));
 }
