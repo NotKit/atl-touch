@@ -23,4 +23,11 @@ public class TextKeyListener extends MetaKeyKeyListener implements KeyListener {
 			instance = new TextKeyListener();
 		return instance;
 	}
+
+	public enum Capitalize {
+		CHARACTERS,
+		WORDS,
+		SENTENCES,
+		NONE,
+	}
 }

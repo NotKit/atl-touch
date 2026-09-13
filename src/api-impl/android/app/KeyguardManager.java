@@ -54,4 +54,13 @@ public class KeyguardManager {
 	public Intent createConfirmDeviceCredentialIntent(CharSequence title, CharSequence description) {
 		return null;
 	}
+
+	public KeyguardLock newKeyguardLock(String tag) {
+		return new KeyguardLock();
+	}
+
+	public class KeyguardLock {
+		public void disableKeyguard() {}
+		public void reenableKeyguard() {}
+	}
 }
