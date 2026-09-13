@@ -1,6 +1,11 @@
 package android.os;
 
-public class ParcelFormatException extends java.lang.RuntimeException {
+public class ParcelFormatException extends RuntimeException {
+	public ParcelFormatException() {
+		super();
+	}
 
-	public ParcelFormatException(java.lang.String a0) { }
+	public ParcelFormatException(String message) {
+		super(message);
+	}
 }

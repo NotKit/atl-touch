@@ -450,8 +450,8 @@ public class Parcel {
 		try {
 			Parcelable.Creator<?> creator = (Parcelable.Creator<?>)loader.loadClass(className).getField("CREATOR").get(null);
 			return (T)creator.createFromParcel(this);
-		} catch (ReflectiveOperationException e) {
-			throw new BadParcelableException(e.toString());
+		} catch (ReflectiveOperationException | IllegalArgumentException e) {
+			throw new BadParcelableException(e);
 		}
 	}
 
