@@ -48,6 +48,23 @@ static void activity_close(JNIEnv *env, jobject activity)
 	}
 }
 
+/*
+ * onWindowFocusChanged is a change notification, not a state report: AOSP
+ * calls it when focus is gained or lost, once. Two paths here report focus
+ * (the resume sequence and the window becoming ready), and an app that starts
+ * its camera on focus restarts it on the second call - Google Camera cancels
+ * its whole readiness chain that way.
+ */
+static void activity_set_focus(JNIEnv *env, jobject activity, bool focused)
+{
+	if (activity_bool_field(env, activity, "windowFocused") == focused)
+		return;
+	(*env)->SetBooleanField(env, activity,
+	    _FIELD_ID(handle_cache.activity.class, "windowFocused", "Z"), focused);
+	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onWindowFocusChanged, focused);
+	atl_report_pending_exception(env);
+}
+
 static void activity_unfocus(JNIEnv *env, jobject activity)
 {
 	if (!activity_bool_field(env, activity, "paused")) {
@@ -58,8 +75,7 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
 	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onStop);
 	atl_report_pending_exception(env);
 
-	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onWindowFocusChanged, false);
-	atl_report_pending_exception(env);
+	activity_set_focus(env, activity, false);
 }
 
 static void activity_focus(JNIEnv *env, jobject activity)
@@ -82,8 +98,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (activity_bool_field(env, activity, "finishing"))
 		return;
 
-	(*env)->CallVoidMethod(env, activity, handle_cache.activity.onWindowFocusChanged, true);
-	atl_report_pending_exception(env);
+	activity_set_focus(env, activity, true);
 }
 
 static void activity_update_current(JNIEnv *env)
@@ -121,8 +136,7 @@ void activity_window_ready(void)
 	JNIEnv *env = get_jni_env();
 
 	for (GList *l = activity_backlog; l != NULL; l = l->next) {
-		(*env)->CallVoidMethod(env, l->data, handle_cache.activity.onWindowFocusChanged, true);
-		atl_report_pending_exception(env);
+		activity_set_focus(env, l->data, true);
 	}
 }
 
