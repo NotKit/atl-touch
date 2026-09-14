@@ -337,7 +337,7 @@ public class ViewRootImpl implements ViewParent {
 			}
 			layoutPanel(panel);
 		}
-		if (DUMP_HIERARCHY) {
+		if (DUMP_HIERARCHY && dumpDue()) {
 			if (view != null)
 				dumpHierarchy(view, "");
 			for (Panel panel : panels)
@@ -346,7 +346,36 @@ public class ViewRootImpl implements ViewParent {
 	}
 
 	private static final boolean DUMP_HIERARCHY = System.getenv("ATL_DUMP_HIERARCHY") != null;
+	/* ATL_DUMP_HIERARCHY=<seconds> dumps once, on the first layout after that
+	 * long; anything else dumps every layout */
+	private static long dumpAfterMs = -1;
+	private static final long dumpStart = android.os.SystemClock.uptimeMillis();
+	private static boolean dumpDone;
+	private static boolean dumpDue() {
+		if (dumpAfterMs == -1) {
+			try {
+				dumpAfterMs = (long)(Double.parseDouble(System.getenv("ATL_DUMP_HIERARCHY")) * 1000);
+			} catch (NumberFormatException e) {
+				dumpAfterMs = 0;
+			}
+		}
+		if (dumpAfterMs <= 0)
+			return true;
+		if (dumpDone || android.os.SystemClock.uptimeMillis() - dumpStart < dumpAfterMs)
+			return false;
+		dumpDone = true;
+		return true;
+	}
 	private static final boolean DEBUG_INVALIDATE = System.getenv("ATL_DEBUG_INVALIDATE") != null;
+
+	private static String dumpCompound(android.widget.TextView tv) {
+		StringBuilder sb = new StringBuilder();
+		android.graphics.drawable.Drawable[] ds = tv.getCompoundDrawables();
+		for (int i = 0; i < ds.length; i++)
+			if (ds[i] != null)
+				sb.append(" cd").append(i).append("=").append(ds[i].getClass().getSimpleName()).append(ds[i].getBounds());
+		return sb.toString();
+	}
 
 	private static void dumpHierarchy(View v, String indent) {
 		ViewGroup.LayoutParams lp = v.getLayoutParams();
@@ -358,6 +387,20 @@ public class ViewRootImpl implements ViewParent {
 		    + (lp != null ? " lp=" + lp.width + "x" + lp.height : "")
 		    + " vis=" + v.getVisibility()
 		    + " pad=" + v.getPaddingLeft() + "," + v.getPaddingTop() + "," + v.getPaddingRight() + "," + v.getPaddingBottom()
+		    + (v.getTranslationX() != 0 || v.getTranslationY() != 0 ? " tr=" + v.getTranslationX() + "," + v.getTranslationY() : "")
+		    + (v.getAlpha() != 1 ? " alpha=" + v.getAlpha() : "")
+		    + (v.getScaleX() != 1 || v.getScaleY() != 1 ? " scale=" + v.getScaleX() + "," + v.getScaleY() : "")
+		    + (v.getBackground() != null ? " bg=" + v.getBackground().getClass().getSimpleName() : "")
+		    + (lp instanceof ViewGroup.MarginLayoutParams
+		        ? " margin=" + ((ViewGroup.MarginLayoutParams)lp).leftMargin + "," + ((ViewGroup.MarginLayoutParams)lp).topMargin
+		            + "," + ((ViewGroup.MarginLayoutParams)lp).rightMargin + "," + ((ViewGroup.MarginLayoutParams)lp).bottomMargin
+		        : "")
+		    + (lp instanceof android.widget.FrameLayout.LayoutParams ? " gravity=" + ((android.widget.FrameLayout.LayoutParams)lp).gravity : "")
+		    + (v instanceof android.widget.ImageView && ((android.widget.ImageView)v).getDrawable() != null
+		        ? " img=" + ((android.widget.ImageView)v).getDrawable().getClass().getSimpleName()
+		            + ((android.widget.ImageView)v).getDrawable().getBounds()
+		        : "")
+		    + (v instanceof android.widget.TextView ? dumpCompound((android.widget.TextView)v) : "")
 		    + (v instanceof android.widget.TextView
 		        ? " textSize=" + ((android.widget.TextView)v).getTextSize()
 		            + " text='" + ((android.widget.TextView)v).getText() + "'"

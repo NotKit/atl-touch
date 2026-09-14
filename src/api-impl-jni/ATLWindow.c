@@ -20,11 +20,12 @@
 #include "ATLWindow.h"
 #include "graphics/ATLCanvas.h"
 
+#include "../libandroid/native_window.h"
+
 #include "generated_headers/android_view_ViewRootImpl.h"
 
 #include "viewporter-client-protocol.h"
 #include "widgets/atl_surface_layer.h"
-#include "../libandroid/native_window.h"
 
 struct ATLWindow {
 	GLFWwindow *glfw_window;
@@ -1147,6 +1148,39 @@ static bool atl_window_egl_config_alpha(EGLDisplay display, EGLConfig base, EGLC
 	return found;
 }
 
+/* every 8888 window config and its native visual, once, so a log can say
+ * what the driver offers and which one the chrome got */
+static void atl_window_log_egl_configs(EGLDisplay display, EGLConfig chosen)
+{
+	EGLConfig *configs;
+	EGLint count = 0;
+
+	if (!eglGetConfigs(display, NULL, 0, &count) || count <= 0)
+		return;
+	configs = calloc(count, sizeof(*configs));
+	if (!configs)
+		return;
+	if (eglGetConfigs(display, configs, count, &count)) {
+		for (EGLint i = 0; i < count; i++) {
+			if (atl_egl_attr(display, configs[i], EGL_RED_SIZE) != 8 ||
+			    !(atl_egl_attr(display, configs[i], EGL_SURFACE_TYPE) & EGL_WINDOW_BIT))
+				continue;
+			fprintf(stderr, "ATLWindow: EGLConfig id %d: rgba %d/%d/%d/%d depth %d stencil %d samples %d native visual 0x%x%s\n",
+			        atl_egl_attr(display, configs[i], EGL_CONFIG_ID),
+			        atl_egl_attr(display, configs[i], EGL_RED_SIZE),
+			        atl_egl_attr(display, configs[i], EGL_GREEN_SIZE),
+			        atl_egl_attr(display, configs[i], EGL_BLUE_SIZE),
+			        atl_egl_attr(display, configs[i], EGL_ALPHA_SIZE),
+			        atl_egl_attr(display, configs[i], EGL_DEPTH_SIZE),
+			        atl_egl_attr(display, configs[i], EGL_STENCIL_SIZE),
+			        atl_egl_attr(display, configs[i], EGL_SAMPLES),
+			        atl_egl_attr(display, configs[i], EGL_NATIVE_VISUAL_ID),
+			        configs[i] == chosen ? " <- chrome" : "");
+		}
+	}
+	free(configs);
+}
+
 /* the EGLSurface must go before the wl_egl_window under it does */
 static void atl_window_drop_chrome_surface(ATLWindow *window, EGLDisplay display)
 {
@@ -1234,6 +1268,8 @@ static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
 		        atl_surface_chrome_alpha_enabled() && atl_surface_opaque_region_enabled()
 		                ? "declared by ATL" : "left to GLFW",
 		        alpha < 8 ? "; a SurfaceView's hole will not be transparent" : "");
+		if (getenv("ATL_DEBUG_EGL"))
+			atl_window_log_egl_configs(display, config);
 		window->chrome_surface = surface;
 		window->chrome_egl_window = egl_window;
 		/* a fresh buffer has no history, and the toplevel underneath keeps the
@@ -1250,6 +1286,78 @@ static bool atl_window_bind_chrome(ATLWindow *window, int width, int height)
 }
 
 /*
+ * ATL_DEBUG_SCREENSHOT=<dir>[:<seconds>]: the chrome framebuffer as a PNG every
+ * <seconds> (5 by default), read back with the chrome surface still current.
+ * mirscreencast does not connect on every device, and ATL_DEBUG_PRESENT catches
+ * the app's own ANativeWindow frames - the viewfinder, not the UI; this is the
+ * UI, and it is the only way to compare a layout against another runtime's from
+ * a script. The PNG is opaque, so a SurfaceView's hole comes out black rather
+ * than showing the app's frames through it. Diagnostic only, and a full-screen
+ * readback per shot.
+ */
+extern bool atl_camera_write_png(const char *path, const uint8_t *rgba, int width, int height);
+
+static void debug_screenshot(int width, int height)
+{
+	static const char *dir;
+	static double every = 5.0;
+	static double due;
+	static int count;
+	static bool parsed;
+	uint8_t *rgba, *top_down;
+	char path[512];
+	double now;
+
+	if (!parsed) {
+		const char *s = getenv("ATL_DEBUG_SCREENSHOT");
+		parsed = true;
+		if (s && *s) {
+			const char *colon = strrchr(s, ':');
+			if (colon && colon[1]) {
+				every = strtod(colon + 1, NULL);
+				if (every <= 0)
+					every = 5.0;
+				dir = g_strndup(s, colon - s);
+			} else {
+				dir = s;
+			}
+		}
+	}
+	if (!dir || width <= 0 || height <= 0)
+		return;
+	now = g_get_monotonic_time() / 1e6;
+	if (due && now < due)
+		return;
+	due = now + every;
+
+	rgba = malloc((size_t)width * height * 4);
+	top_down = malloc((size_t)width * height * 4);
+	if (!rgba || !top_down) {
+		free(rgba);
+		free(top_down);
+		return;
+	}
+	/* Skia leaves its own framebuffer bound after a flush, so read from the
+	 * window's and put back what was there. */
+	GLint bound = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &bound);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+	glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)bound);
+	/* glReadPixels starts at the bottom row */
+	for (int y = 0; y < height; y++)
+		memcpy(top_down + (size_t)y * width * 4, rgba + (size_t)(height - 1 - y) * width * 4, (size_t)width * 4);
+	snprintf(path, sizeof(path), "%s/chrome-%06d.png", dir, count);
+	if (atl_camera_write_png(path, top_down, width, height))
+		fprintf(stderr, "ATLWindow: ATL_DEBUG_SCREENSHOT wrote %s (%dx%d)\n", path, width, height);
+	else
+		fprintf(stderr, "ATLWindow: ATL_DEBUG_SCREENSHOT could not write %s\n", path);
+	count++;
+	free(rgba);
+	free(top_down);
+}
+
+/*
  * Present a frame that was drawn into the chrome sub-surface, and give the
  * toplevel a buffer when it needs one: at the size it was just configured to,
  * and whenever a sub-surface has parent-double-buffered state (a position, or a
@@ -1263,6 +1371,7 @@ static void atl_window_present_chrome(ATLWindow *window, int width, int height)
 	EGLDisplay display = glfwGetEGLDisplay();
 	bool commit_parent;
 
+	debug_screenshot(width, height);
 	if (!eglSwapBuffers(display, window->chrome_surface))
 		fprintf(stderr, "ATLWindow: eglSwapBuffers on the chrome surface failed (0x%x)\n", eglGetError());
 	/* GLFW believes its own surface is current on this thread and swaps it
@@ -1504,6 +1613,7 @@ static void atl_window_render_inner(ATLWindow *window)
 				atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
 				                               width, height, atl_window_scale(window));
 			}
+			debug_screenshot(width, height);
 			glfwSwapBuffers(window->glfw_window);
 		}
 		if (!invalidate_fix_enabled()) {
@@ -1582,6 +1692,7 @@ static void atl_window_render_inner(ATLWindow *window)
 			atl_surface_layers_before_swap(window, glfwGetWaylandWindow(window->glfw_window),
 			                               width, height, atl_window_scale(window));
 		}
+		debug_screenshot(width, height);
 		glfwSwapBuffers(window->glfw_window);
 	}
 
@@ -1836,6 +1947,10 @@ ATLWindow *atl_window_new(int width, int height, bool visible, bool decorated)
 	bionic_egl_set_primary_display(glfwGetEGLDisplay());
 	glfwMakeContextCurrent(window->glfw_window);
 	glfwSwapInterval(0); // frame pacing comes from the render tick, don't block on vsync
+
+	/* an app asking EGL for a display gets this one, the way an Android process
+	 * has a single EGLDisplay (EGL_NO_DISPLAY on X11/GLX, where there is none) */
+	bionic_egl_set_primary_display(glfwGetEGLDisplay());
 
 	/* On Wayland a surface is not mapped until its first buffer is committed,
 	 * so hold off committing anything here: the compositor keeps showing its

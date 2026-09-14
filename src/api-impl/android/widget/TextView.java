@@ -628,7 +628,25 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return dr;
 	}
 
+	/* ATL_DEBUG_COMPOUND names every compound-drawable set and who made it: an
+	 * icon button that draws nothing is either never given a drawable or given
+	 * an empty one, and only the call itself separates the two. */
+	private static final boolean DEBUG_COMPOUND = System.getenv("ATL_DEBUG_COMPOUND") != null;
+
+	private static String describeCompound(Drawable dr) {
+		return dr == null ? "null" : dr.getClass().getSimpleName() + dr.getBounds();
+	}
+
 	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
+		if (DEBUG_COMPOUND) {
+			StackTraceElement[] st = Thread.currentThread().getStackTrace();
+			StringBuilder from = new StringBuilder();
+			for (int i = 3; i < st.length && i < 8; i++)
+				from.append(" <- ").append(st[i].getClassName()).append(".").append(st[i].getMethodName());
+			System.err.println("ATL_COMPOUND: " + getClass().getName() + " id=0x" + Integer.toHexString(getId())
+			    + " l=" + describeCompound(left) + " t=" + describeCompound(top)
+			    + " r=" + describeCompound(right) + " b=" + describeCompound(bottom) + from);
+		}
 		drawableLeft = applyCompoundTint(left);
 		drawableTop = applyCompoundTint(top);
 		drawableRight = applyCompoundTint(right);
