@@ -50,6 +50,9 @@ void atl_native_window_set_size(struct ANativeWindow *native_window, int width, 
  * have somewhere to go; safe to call more than once for the same surface */
 void atl_native_window_bind_surface(struct ANativeWindow *native_window, JNIEnv *env, jobject surface);
 void atl_native_window_detach(struct ANativeWindow *native_window);
+/* true for a window ANativeWindow_fromSurface made for a Surface with no layer
+ * (an ImageReader's, a SurfaceTexture's); the Surface owns that one outright */
+bool atl_native_window_is_layerless(struct ANativeWindow *window);
 
 /*
  * For code that is not loaded through bionic_translation (route B: Gecko built

@@ -199,6 +199,10 @@ int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
 		window->height = height;
 		if (window->egl_window)
 			wl_egl_window_resize((struct wl_egl_window *)window->egl_window, width, height, 0, 0);
+	} else if (width || height) {
+		/* half a geometry: say so rather than silently keeping the old size,
+		 * which reads downstream as the window ignoring the app */
+		return -EINVAL;
 	}
 	if (format) {
 		if (!atl_window_format_readable(format)) {
@@ -374,6 +378,51 @@ bool atl_native_window_present(struct ANativeWindow *window, const struct atl_wi
 }
 
 /*
+ * A producer window for a Surface that has no layer to build one: an
+ * ImageReader's, a SurfaceTexture's, an encoder's. There is nothing to present
+ * to a compositor here, so the window carries no Wayland objects and its frames
+ * go the CPU way, through atl_native_window_present into the Surface's sink.
+ *
+ * Google Camera's native code writes into exactly these, and asks about one
+ * surface from several threads, so the window is cached in the Surface's own
+ * field like the layer path's - one surface, one window, one geometry.
+ * Surface.release() is what frees it again.
+ */
+static struct ANativeWindow *window_without_a_layer(JNIEnv *env, jobject surface, jfieldID field)
+{
+	struct ANativeWindow *window = calloc(1, sizeof(*window));
+	jclass class;
+	jmethodID width, height;
+
+	if (!window)
+		return NULL;
+	/* one reference for the Surface, dropped by Surface.release() */
+	window->refcount = 1;
+	window->format = ATL_WINDOW_FORMAT_RGBA_8888;
+	atl_native_window_bind_surface(window, env, surface);
+
+	/* the size the surface presents at, until setBuffersGeometry overrides it */
+	class = (*env)->GetObjectClass(env, surface);
+	width = class ? (*env)->GetMethodID(env, class, "getWidth", "()I") : NULL;
+	height = class ? (*env)->GetMethodID(env, class, "getHeight", "()I") : NULL;
+	if (width && height) {
+		window->width = (*env)->CallIntMethod(env, surface, width);
+		window->height = (*env)->CallIntMethod(env, surface, height);
+	} else {
+		(*env)->ExceptionClear(env);
+	}
+
+	(*env)->SetLongField(env, surface, field, (jlong)(intptr_t)window);
+	return window;
+}
+
+/* whether this window is one of the above, i.e. the Surface owns it outright */
+bool atl_native_window_is_layerless(struct ANativeWindow *window)
+{
+	return window && !window->wayland_surface && !window->egl_window;
+}
+
+/*
  * The window behind an android.view.Surface. The SurfaceView built it when its
  * layer came up and cached it in the Surface's own field, so the several
  * fromSurface() calls an app makes about one surface are about one window -
@@ -400,6 +449,8 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	if ((*env)->MonitorEnter(env, surface) != JNI_OK)
 		return NULL;
 	window = (struct ANativeWindow *)(intptr_t)(*env)->GetLongField(env, surface, field);
+	if (!window)
+		window = window_without_a_layer(env, surface, field);
 	ANativeWindow_acquire(window);
 	/* the Surface a window was reached through is the Surface its frames belong
 	 * in, so complete the binding here rather than trusting whoever built the
@@ -410,8 +461,8 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	(*env)->MonitorExit(env, surface);
 
 	if (!window)
-		fprintf(stderr, "ANativeWindow_fromSurface: this surface has no layer behind it "
-		                "(no wl_subcompositor, or the view is not attached yet)\n");
+		fprintf(stderr, "ANativeWindow_fromSurface: no window for this surface "
+		                "(out of memory)\n");
 	return window;
 }
 

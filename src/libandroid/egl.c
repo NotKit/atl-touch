@@ -32,8 +32,32 @@ EGLBoolean bionic_eglPresentationTimeANDROID(EGLDisplay dpy, EGLSurface surface,
 	return EGL_TRUE;
 }
 
+/*
+ * EGL_ANDROID_get_native_client_buffer: an app's native code turning a camera
+ * or gralloc AHardwareBuffer into an EGLImage (Google Camera's viewfinder
+ * effects link it by name). The handle it holds is the real gralloc one - that
+ * is what AHardwareBuffer_fromHardwareBuffer hands out on a device - so this
+ * is the host EGL's own entry point, where it has one.
+ */
+EGLClientBuffer bionic_eglGetNativeClientBufferANDROID(const void *buffer)
+{
+	static EGLClientBuffer (*get_native_client_buffer)(const void *);
+	static bool tried;
+
+	if (!tried) {
+		tried = true;
+		get_native_client_buffer = (void *)eglGetProcAddress("eglGetNativeClientBufferANDROID");
+		if (!get_native_client_buffer)
+			fprintf(stderr, "EGL: this EGL has no eglGetNativeClientBufferANDROID, an app's "
+			                "EGLImage of a hardware buffer cannot be made\n");
+	}
+	return get_native_client_buffer ? get_native_client_buffer(buffer) : NULL;
+}
+
 void (*bionic_eglGetProcAddress(char const *procname))(void)
 {
+	if (__unlikely__(!strcmp(procname, "eglGetNativeClientBufferANDROID")))
+		return (void (*)(void))bionic_eglGetNativeClientBufferANDROID;
 	if (__unlikely__(!strcmp(procname, "eglPresentationTimeANDROID")))
 		return (void (*)(void))bionic_eglPresentationTimeANDROID;
 
@@ -93,7 +117,8 @@ EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLCo
 	 * the rewrite is what would come up empty. */
 	bool has_pbuffer_bit = false;
 	int attrib_list_size = 0;
-	for (EGLint *attr = attrib_list; *attr != EGL_NONE; attr += 2) {
+	/* a NULL list is legal and means "no constraints" */
+	for (EGLint *attr = attrib_list; attr && *attr != EGL_NONE; attr += 2) {
 		if (*attr == EGL_SURFACE_TYPE && (*(attr + 1) & EGL_PBUFFER_BIT) && *(attr + 1) != EGL_DONT_CARE) {
 			has_pbuffer_bit = true;
 		}
@@ -129,13 +154,50 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 }
 
 /*
- * Android exports eglCreateImageKHR (with EGLAttrib) as a direct libEGL.so symbol,
- * while Mesa exports the core EGL 1.5 function eglCreateImage as its linkable entry
- * point instead. The wrappers bridge this ABI naming difference.
+ * Android exports eglCreateImageKHR as a direct libEGL.so symbol, where Mesa
+ * only has it through eglGetProcAddress and links the core EGL 1.5
+ * eglCreateImage instead. The two do not share an attribute ABI:
+ * EGL_KHR_image_base's list is EGLint, the core one's is EGLAttrib. Forwarding
+ * the narrow list to the wide entry point makes the driver scan 8-byte entries
+ * for an EGL_NONE it never finds and read off the end of the caller's array -
+ * on Google Camera's mode switch that walked past the top of the main thread's
+ * stack.
+ *
+ * So take the driver's own KHR entry point where it has one, and widen the list
+ * only for the core call.
  */
-EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list)
+EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list)
 {
-	return eglCreateImage(dpy, ctx, target, buffer, attrib_list);
+	static EGLImage (*create_image_khr)(EGLDisplay, EGLContext, EGLenum, EGLClientBuffer, const EGLint *);
+	static bool tried;
+	/* more pairs than any EGLImage target defines, so no allocation in practice */
+	EGLAttrib inline_attribs[17];
+	EGLAttrib *wide = inline_attribs;
+	EGLImage image;
+	size_t n = 0;
+
+	if (!tried) {
+		tried = true;
+		create_image_khr = (void *)eglGetProcAddress("eglCreateImageKHR");
+	}
+	if (create_image_khr)
+		return create_image_khr(dpy, ctx, target, buffer, attrib_list);
+
+	while (attrib_list && attrib_list[n] != EGL_NONE)
+		n += 2;
+	if (n + 1 > ARRAY_SIZE(inline_attribs)) {
+		wide = malloc((n + 1) * sizeof(*wide));
+		if (!wide)
+			return EGL_NO_IMAGE;
+	}
+	for (size_t i = 0; i < n; i++)
+		wide[i] = attrib_list[i]; /* sign-extends EGL_DONT_CARE and friends */
+	wide[n] = EGL_NONE;
+
+	image = eglCreateImage(dpy, ctx, target, buffer, wide);
+	if (wide != inline_attribs)
+		free(wide);
+	return image;
 }
 
 EGLBoolean bionic_eglDestroyImageKHR(EGLDisplay dpy, EGLImage image)

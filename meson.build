@@ -115,6 +115,7 @@ subdir('third_party/minikin')
 # libandroid
 libandroid_so = shared_library('android', [
                                           	'src/libandroid/asset_manager.c',
+                                          	'src/libandroid/bionic_gaps.c',
                                           	'src/libandroid/bitmap.c',
                                           	'src/libandroid/configuration.c',
                                           	'src/libandroid/egl.c',
@@ -123,6 +124,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/media.c',
                                           	'src/libandroid/native_window.c',
                                           	'src/libandroid/sensor.c',
+                                          	'src/libandroid/surface_control.c',
                                           	'src/libandroid/system_fonts.c',
                                           	'src/libandroid/trace.c',
                                           	'src/libandroid/window_frame.c',
