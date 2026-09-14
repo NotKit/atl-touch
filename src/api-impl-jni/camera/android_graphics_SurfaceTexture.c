@@ -29,8 +29,16 @@
 
 #include "../defines.h"
 
+#include "camera_backend.h"
 #include "camera_frame.h"
+#include "camera_streams.h"
 #include "surface_texture.h"
+
+/* EGL_ANDROID_get_native_client_buffer, for a camera buffer bound as it is;
+ * the host EGL headers are the Linux ones and do not know it */
+#ifndef EGL_NATIVE_BUFFER_ANDROID
+#define EGL_NATIVE_BUFFER_ANDROID 0x3140
+#endif
 
 #include "../generated_headers/android_graphics_SurfaceTexture.h"
 
@@ -100,6 +108,22 @@ struct atl_surface_texture {
 	/* set when the producer fills the texture itself (hybris fast path) */
 	struct atl_surface_texture_source source;
 
+	/*
+	 * A camera2 stream's HAL buffers, bound to the app's texture as they are
+	 * (AOSP: GLConsumer over the stream's BufferQueue): the newest waits in
+	 * native_pending, and the one the texture shows is held as native_current
+	 * until the next is bound, so the HAL never writes into what is being
+	 * sampled. Falls back to the RGBA upload for good on a binding failure.
+	 */
+	struct atl_camera_buffer *native_pending;
+	struct atl_camera_buffer *native_current;
+	EGLImageKHR native_image;
+	EGLDisplay native_display;
+	bool native_failed;
+	bool native_bound; /* a frame has really reached the texture this way */
+	uint8_t *scratch_nv21;
+	size_t scratch_nv21_capacity;
+
 	struct st_bitmap bitmaps[ST_BITMAPS];
 	int next_bitmap;
 	int last_bitmap;
@@ -140,6 +164,7 @@ static void texture_unref(struct atl_surface_texture *texture)
 
 	free(texture->pending);
 	free(texture->current);
+	free(texture->scratch_nv21);
 	g_cond_clear(&texture->frame_taken);
 	g_mutex_clear(&texture->lock);
 	free(texture);
@@ -317,6 +342,202 @@ out:
 	g_mutex_unlock(&texture->lock);
 }
 
+/* --- camera2 stream buffers ---------------------------------------------- */
+
+static PFNEGLCREATEIMAGEKHRPROC egl_create_image;
+static PFNEGLDESTROYIMAGEKHRPROC egl_destroy_image;
+static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC gl_image_target_texture;
+static EGLClientBuffer (*egl_native_client_buffer)(const void *);
+
+static bool ensure_image_procs(void);
+
+/* only an Android EGL (hybris) has the extension; elsewhere the buffers go
+ * through the CPU, and ATL_CAMERA_ZERO_COPY=0 asks for that on purpose */
+static bool native_binding_available(void)
+{
+	static int on = -1;
+
+	if (on < 0) {
+		const char *disabled = getenv("ATL_CAMERA_ZERO_COPY");
+
+		on = 0;
+		if (disabled && !atoi(disabled)) {
+			fprintf(stderr, "SurfaceTexture: zero-copy camera buffers disabled by "
+			                "ATL_CAMERA_ZERO_COPY, frames go through the CPU\n");
+		} else if (!ensure_image_procs()) {
+			fprintf(stderr, "SurfaceTexture: this EGL has no EGL_KHR_image_base, so camera "
+			                "buffers go through the CPU\n");
+		} else {
+			egl_native_client_buffer = (void *)eglGetProcAddress("eglGetNativeClientBufferANDROID");
+			on = egl_native_client_buffer != NULL;
+			/* the path used to switch itself off here without a word, and a
+			 * preview that works at half the rate looks like nothing at all */
+			if (!on)
+				fprintf(stderr, "SurfaceTexture: this EGL has no "
+				                "EGL_ANDROID_get_native_client_buffer, so camera buffers go "
+				                "through the CPU\n");
+		}
+	}
+	return on;
+}
+
+/* a buffer's planes through the CPU into the RGBA mailbox; call with the lock
+ * held, the buffer is the caller's to release */
+static void buffer_to_pending_locked(struct atl_surface_texture *texture,
+                                     const struct atl_camera_buffer *buffer)
+{
+	struct atl_camera_yuv420 src;
+	int width = buffer->width & ~1, height = buffer->height & ~1;
+	size_t nv21_size = (size_t)width * height * 3 / 2;
+
+	if (buffer->n_planes < 3 || buffer->format != ATL_CAMERA_FORMAT_YUV_420_888 || width < 2 ||
+	    height < 2)
+		return;
+	if (texture->scratch_nv21_capacity < nv21_size) {
+		free(texture->scratch_nv21);
+		texture->scratch_nv21 = malloc(nv21_size);
+		texture->scratch_nv21_capacity = texture->scratch_nv21 ? nv21_size : 0;
+	}
+	if (!texture->scratch_nv21 || !pending_buffer_locked(texture, (size_t)width * height * 4))
+		return;
+
+	src = (struct atl_camera_yuv420){
+		.y = buffer->planes[0].data, .u = buffer->planes[1].data, .v = buffer->planes[2].data,
+		.y_stride = buffer->planes[0].row_stride, .u_stride = buffer->planes[1].row_stride,
+		.v_stride = buffer->planes[2].row_stride,
+		.u_pixel = buffer->planes[1].pixel_stride, .v_pixel = buffer->planes[2].pixel_stride,
+		.y_len = buffer->planes[0].len, .u_len = buffer->planes[1].len, .v_len = buffer->planes[2].len,
+	};
+	atl_camera_yuv420_to_nv21(texture->scratch_nv21, width, height, &src, 1);
+	atl_camera_nv21_to_rgba(texture->scratch_nv21, width, height, width, texture->pending);
+	publish_pending_locked(texture, width, height);
+	texture->pending_timestamp = buffer->timestamp;
+}
+
+void atl_surface_texture_submit_buffer(struct atl_surface_texture *texture,
+                                       struct atl_camera_buffer *buffer)
+{
+	struct atl_camera_buffer *stale = NULL;
+
+	if (!buffer)
+		return;
+	if (!texture) {
+		atl_camera_buffer_release(buffer);
+		return;
+	}
+	g_mutex_lock(&texture->lock);
+	if (texture->released) {
+		g_mutex_unlock(&texture->lock);
+		atl_camera_buffer_release(buffer);
+		return;
+	}
+	if (buffer->native && !texture->native_failed && native_binding_available()) {
+		stale = texture->native_pending; /* the GL thread is behind: newest wins */
+		if (stale)
+			texture->dropped++;
+		texture->native_pending = buffer;
+		texture->submitted++;
+		post_frame_available_locked(texture);
+		g_mutex_unlock(&texture->lock);
+		atl_camera_buffer_release(stale);
+		return;
+	}
+	buffer_to_pending_locked(texture, buffer);
+	g_mutex_unlock(&texture->lock);
+	atl_camera_buffer_release(buffer);
+}
+
+/* drop what the native path holds; call with the lock held */
+static void native_release_locked(struct atl_surface_texture *texture,
+                                  struct atl_camera_buffer **pending,
+                                  struct atl_camera_buffer **current)
+{
+	*pending = texture->native_pending;
+	*current = texture->native_current;
+	texture->native_pending = texture->native_current = NULL;
+	/* an EGLImage belongs to the display, not to a context, so it can go
+	 * from here; the texture keeps its own reference to what it was given */
+	if (texture->native_image)
+		egl_destroy_image(texture->native_display, texture->native_image);
+	texture->native_image = EGL_NO_IMAGE_KHR;
+	texture->native_display = EGL_NO_DISPLAY;
+	texture->native_bound = false;
+}
+
+/*
+ * Bind the pending HAL buffer to the app's external texture, on its GL
+ * thread. True when the texture now shows a frame this way; false drops the
+ * path for good and leaves the buffer for the CPU upload. Lock held.
+ */
+static bool bind_native_locked(struct atl_surface_texture *texture,
+                               struct atl_camera_buffer **released)
+{
+	struct atl_camera_buffer *buffer = texture->native_pending;
+	EGLDisplay display = eglGetCurrentDisplay();
+	EGLClientBuffer client;
+	EGLImageKHR image;
+	GLenum error;
+
+	*released = NULL;
+	if (!buffer)
+		return texture->native_bound; /* no new frame: the last one stays, as AOSP's does */
+	texture->native_pending = NULL;
+	if (display == EGL_NO_DISPLAY) {
+		fprintf(stderr, "SurfaceTexture: updateTexImage without a current EGL context\n");
+		goto fail;
+	}
+	client = egl_native_client_buffer(buffer->native);
+	image = client ? egl_create_image(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, client, NULL)
+	               : EGL_NO_IMAGE_KHR;
+	if (image == EGL_NO_IMAGE_KHR) {
+		fprintf(stderr, "SurfaceTexture: no EGLImage for the camera buffer (EGL error 0x%x)\n",
+		        eglGetError());
+		goto fail;
+	}
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture->tex_name);
+	gl_image_target_texture(GL_TEXTURE_EXTERNAL_OES, (GLeglImageOES)image);
+	error = glGetError();
+	if (error != GL_NO_ERROR) {
+		fprintf(stderr, "SurfaceTexture: GL error 0x%x binding the camera buffer to texture %u\n",
+		        error, texture->tex_name);
+		egl_destroy_image(display, image);
+		goto fail;
+	}
+	if (!texture->native_bound) {
+		glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		fprintf(stderr, "SurfaceTexture: camera buffers bound to GL texture %u as they are "
+		                "(%dx%d, no CPU copy)\n", texture->tex_name, buffer->width, buffer->height);
+		/* the app binds its name as GL_TEXTURE_EXTERNAL_OES, and with a real
+		 * external image behind it that is what it has to reach */
+		atl_camera_set_external_textures(true);
+	}
+
+	/* the frame before it can go back to the HAL now */
+	if (texture->native_image)
+		egl_destroy_image(texture->native_display, texture->native_image);
+	*released = texture->native_current;
+	texture->native_current = buffer;
+	texture->native_image = image;
+	texture->native_display = display;
+	texture->native_bound = true;
+	texture->width = buffer->width;
+	texture->height = buffer->height;
+	texture->timestamp = buffer->timestamp;
+	texture->serial++;
+	texture->uploaded_serial = texture->serial; /* nothing for the CPU path to redo */
+	g_cond_broadcast(&texture->frame_taken);
+	return true;
+
+fail:
+	texture->native_failed = true;
+	buffer_to_pending_locked(texture, buffer);
+	*released = buffer;
+	return false;
+}
+
 bool atl_surface_texture_frame_pending(struct atl_surface_texture *texture)
 {
 	bool pending;
@@ -399,10 +620,6 @@ static void take_frame_locked(struct atl_surface_texture *texture)
 
 /* EGL_KHR_image_base, EGL_KHR_gl_texture_2D_image and GL_OES_EGL_image_external,
  * all extensions, so resolved at run time */
-static PFNEGLCREATEIMAGEKHRPROC egl_create_image;
-static PFNEGLDESTROYIMAGEKHRPROC egl_destroy_image;
-static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC gl_image_target_texture;
-
 static bool ensure_image_procs(void)
 {
 	static GMutex lock;
@@ -575,6 +792,8 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1release(JNIE
 	texture->pending_valid = false;
 	texture->current_valid = false;
 	memset(&texture->source, 0, sizeof(texture->source));
+	struct atl_camera_buffer *native_pending, *native_current;
+	native_release_locked(texture, &native_pending, &native_current);
 	if (texture->upload_tex || texture->upload_image)
 		drop_upload_locked(texture, eglGetCurrentContext() == texture->upload_context);
 	for (int i = 0; i < ST_BITMAPS; i++)
@@ -586,6 +805,8 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1release(JNIE
 		fprintf(stderr, "SurfaceTexture: %" G_GUINT64_FORMAT " frames received, %"
 		        G_GUINT64_FORMAT " dropped\n", texture->submitted, texture->dropped);
 	g_mutex_unlock(&texture->lock);
+	atl_camera_buffer_release(native_pending);
+	atl_camera_buffer_release(native_current);
 
 	/* a producer or a queued idle call may still hold a reference */
 	texture_unref(texture);
@@ -643,6 +864,21 @@ JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_native_1updateTexIma
 		fprintf(stderr, "SurfaceTexture: the producer's texture fast path failed, "
 		                "falling back to the CPU upload\n");
 		memset(&texture->source, 0, sizeof(texture->source));
+	}
+
+	/* a camera2 stream's own buffers: bound as they are, no upload */
+	if (texture->native_pending || texture->native_bound) {
+		struct atl_camera_buffer *released;
+		bool bound = bind_native_locked(texture, &released);
+
+		if (bound) {
+			g_mutex_unlock(&texture->lock);
+			atl_camera_buffer_release(released);
+			return;
+		}
+		/* the buffer went to the CPU path below; the texture is still the
+		 * app's, whatever was bound before */
+		atl_camera_buffer_release(released);
 	}
 
 	take_frame_locked(texture);

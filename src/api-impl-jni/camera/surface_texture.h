@@ -32,6 +32,16 @@ void atl_surface_texture_submit(struct atl_surface_texture *texture, const uint8
 void atl_surface_texture_submit_rgba(struct atl_surface_texture *texture, const uint8_t *rgba,
                                      int width, int height, int stride, bool bottom_up);
 
+/*
+ * A camera2 stream's buffer, on the backend thread: the texture takes it over
+ * and releases it when the frame after it is shown, or at once when it has to
+ * go through the CPU. A buffer with a gralloc handle is bound to the app's
+ * texture as it is, with no copy, where the EGL can; the rest is converted.
+ */
+struct atl_camera_buffer;
+void atl_surface_texture_submit_buffer(struct atl_surface_texture *texture,
+                                       struct atl_camera_buffer *buffer);
+
 /* true while a submitted frame is still waiting to be taken, which is a
  * producer's cue that another one would only be dropped */
 bool atl_surface_texture_frame_pending(struct atl_surface_texture *texture);
