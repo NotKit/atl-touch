@@ -245,6 +245,20 @@ public interface SurfaceHolder {
 	public Canvas lockCanvas(Rect dirty);
 
 	/**
+	 * Just like {@link #lockCanvas()} but the returned canvas is
+	 * hardware-accelerated.
+	 *
+	 * <p>Every canvas is a Skia canvas here, so this hands back the same one
+	 * {@link #lockCanvas()} does. AOSP's default throws, which apps take as
+	 * "this holder has no hardware canvas" rather than as a framework gap.
+	 *
+	 * @return Canvas Use to draw into the surface.
+	 */
+	default Canvas lockHardwareCanvas() {
+		return lockCanvas();
+	}
+
+	/**
 	 * Finish editing pixels in the surface.  After this call, the surface's
 	 * current pixels will be shown on the screen, but its content is lost,
 	 * in particular there is no guarantee that the content of the Surface
