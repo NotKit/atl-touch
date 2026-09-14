@@ -4,7 +4,7 @@
 # conflict trampoline cached the first resolution in the runtime's shared
 # "unimplemented" IMT method, so every later receiver of any class ran the
 # first class's toString/hashCode/equals. Google Camera died of it on every
-# frame-drop log line (GCAM_HANDOVER.md, 2026-09-06).
+# frame-drop log line.
 #
 # Runs the test on the installed art_standalone dalvikvm, which both AOT
 # compiles the jar (dex2oat off PATH) and JIT compiles the hot method, so a

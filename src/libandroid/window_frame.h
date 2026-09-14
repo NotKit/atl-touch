@@ -12,8 +12,8 @@
  * transaction); the scene only knows one raster.
  *
  * Separate from native_window.c so it can be compiled on its own, which is
- * what tests/camera/window_frame_test.c does - the crop and transform
- * arithmetic is the part with corners in it.
+ * what the camera bring-up harness' window_frame_test.c does - the crop and
+ * transform arithmetic is the part with corners in it.
  */
 
 /* android.graphics.PixelFormat's, which AHardwareBuffer shares for the packed
