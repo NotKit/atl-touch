@@ -5,6 +5,8 @@ against a real HAL. Written as a checklist — expect ~15 minutes on a device
 that already runs a click with an ATL runtime (e.g. the Mercurygram one).
 
 `doc/CameraClickPackaging.md` covers what the packaging repo needs.
+`doc/Camera2Device.md` is the camera2 twin of this file: the same device,
+through the Android camera2 NDK rather than the Camera1 compat layer.
 
 ## 1. Get a camera-enabled atlas onto the device
 
@@ -87,11 +89,14 @@ Failure modes and their first line:
 | --- | --- |
 | `Camera: disabled (set ATL_UGLY_ENABLE_CAMERA=1 to enable)` | the gate is off |
 | `Camera hybris: dlopen(libcamera.so.1) failed: …` | libhybris not installed / not in the loader path |
+| `… failed: …libhybris-common.so.1: cannot allocate memory in static TLS block` | glibc's dlopen TLS surplus is smaller than libhybris' 4224-byte initial-exec segment. Affects every glibc process on the device, not just ATL — `LD_PRELOAD` the library. A Lomiri session already does; a plain ssh does not |
 | `… is not the libhybris camera compat layer (missing android_camera_*)` | the freedesktop libcamera got picked up instead — set `ATL_CAMERA_HYBRIS_LIB` to the hybris one |
 | `Camera: backend 'hybris' requested but the libhybris camera compat layer is unavailable` | the above, and the backend refused to fall back to gst (by design) |
 | `Camera hybris: failed to connect to camera N` | the compat layer reached the HAL and it said no — check the android container |
 | `Camera: using backend 'gst'` on a device | auto-selection did not find the compat layer; you are about to test videotestsrc |
 | opened, but no `first frame` | HAL is not delivering — see pitfalls below |
+| opened, preview started, no frames, `dumpsys media.camera` says `WAITING_FOR_PREVIEW_WINDOW` | the Camera1 shim in `camera_service` streams only into a preview BufferQueue, and the compat layer only builds one out of an Android-EGL GL texture: the app has to drive a `SurfaceTexture` (`setPreviewTexture` + `updateTexImage`) from its own GL context. `SurfaceView`/`TextureView` previews, which ATL composites with Skia, get nothing on such a device |
+| frames flow but every dumped PNG is black | the lens is looking at a desk. Switch the torch on (`Camera.Parameters.FLASH_MODE_TORCH`) or point the phone at something lit before blaming the pipeline |
 
 ## 4. Checking without looking at the screen
 
@@ -105,10 +110,13 @@ broken".
 | var | meaning |
 | --- | --- |
 | `ATL_UGLY_ENABLE_CAMERA=1` | **required**; without it every app sees zero cameras |
-| `ATL_CAMERA_BACKEND=hybris\|gst\|none` | default: hybris if its library loads, else gst. `hybris` never falls back |
+| `ATL_CAMERA_BACKEND=camera2ndk\|hybris\|gst\|none` | default: the first that loads — camera2ndk, then hybris, then gst. `camera2ndk` is the device's own Android camera2 stack and the only backend that serves `android.hardware.camera2` on a device; a named backend never falls back |
 | `ATL_CAMERA_HYBRIS_LIB=<soname or path>` | override `libcamera.so.1` |
 | `ATL_CAMERA_GST_SRC="<gst description>"` | gst backend source, default `videotestsrc is-live=true`. `v4l2src` on a laptop |
+| `ATL_CAMERA_GST_SRC_1="<gst description>"` | adds a second, front-facing gst camera; unset means one camera |
+| `ATL_CAMERA_ZERO_COPY=0` | turns off the camera2ndk zero-copy preview (HAL buffer → `EGLImage` → external texture) and copies every frame through NV21 instead. Only the CPU path can dump frames, so `ATL_CAMERA_DUMP_FRAMES` keeps those copies alive by itself |
 | `ATL_CAMERA_DUMP_FRAMES=<dir>` | periodic PNG frame dump (see above) |
+| `ATL_CAMERA_DUMP_METADATA=<file>` | appends each camera's camera2 characteristics to `<file>` the first time an app reads them |
 | `ATL_MEDIA_FOLDER=<dir>` | stops `ATLMediaContentProvider` popping its folder picker when an app queries MediaStore at startup |
 
 ## 6. Known Halium / device pitfalls
@@ -125,11 +133,12 @@ broken".
   camera service over binder. `systemctl status lxc@android`, and libhybris'
   `hybris/tests/test_camera` is the ATL-independent way to prove the HAL works
   at all.
-* **camera2 is a zero-camera stub on purpose.** Apps that insist on camera2 will
-  report no camera. The route for it is AImageReader + `AHardwareBuffer` →
-  `EGLImageKHR` → `GL_TEXTURE_EXTERNAL_OES`, plus the halium patch that makes
-  `CameraServiceProxyWrapper::isCameraDisabled` return false when the proxy
-  binder is null ("Camera disabled by device policy" otherwise).
+* **camera2 is a different backend, not this one.** The `hybris` backend is
+  Camera1 only and reports no camera2 cameras; `ATL_CAMERA_BACKEND=camera2ndk`
+  serves `android.hardware.camera2` out of the device's own NDK libraries.
+  `doc/Camera2Device.md` is its checklist. Some Halium ports also need the patch
+  that makes `CameraServiceProxyWrapper::isCameraDisabled` return false when the
+  proxy binder is null ("Camera disabled by device policy" otherwise).
 * **Orientation**: phone sensors are mounted at 90°/270°. The framework only
   stores `setDisplayOrientation` and forwards it; an app that does not call it
   gets a sideways preview, which is correct AOSP behaviour, not a bug.

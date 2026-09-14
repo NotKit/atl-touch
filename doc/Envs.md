@@ -14,6 +14,45 @@ The following environment variables are recognized by the main executable:
 
 ---
 
+`ATL_ANDROID_ROOT=<path>` - where a Halium device's Android system image is mounted, default `/android`.
+                           The shared Java libraries an app declares with `<uses-library>` are resolved
+                           against `<root>/<partition>/etc/permissions/*.xml` and the jars named there go
+                           on the app's class loader before any app code runs. A desktop has no such
+                           tree, so nothing resolves and every entry is logged as not provided.
+
+---
+
+`ATL_SDK_INT=<level>` - the SDK level ATL claims to the app (`Build.VERSION.SDK_INT`, `ro.build.version.sdk`).
+                        Default 9. `--sdk-int <level>` on the command line does the same thing and wins over
+                        this variable, as does `-X "-DBuild.VERSION.SDK_INT=<level>"`. Apps have no code path
+                        for a level they were never built against, so this is per app, not a global setting:
+                        Google Camera needs 36, most apps are happier at 9 or 28.
+
+---
+
+`ATL_RESOURCES_SDK_INT=<level>` - the level used to pick the app's `-vNN` resource buckets
+                                  (`Build.VERSION.RESOURCES_SDK_INT`), default the same as `ATL_SDK_INT`.
+                                  Setting it lower than `ATL_SDK_INT` gets an app's older resources with
+                                  its modern code paths; the mismatch is logged, and it can crash an app
+                                  that assumes the two agree.
+
+---
+
+`ATL_SDK_RELEASE=<version>` - the user-visible Android version (`Build.VERSION.RELEASE`, e.g. `16`).
+                              Default: the release that shipped with `ATL_SDK_INT`.
+
+---
+
+`ATL_SDK_CODENAME=<codename>` - `Build.VERSION.CODENAME`, default `REL` (a release build). Anything else
+                                means a preview platform, and apps whose manifest names a different
+                                codename will then refuse to be parsed.
+
+The four variables above, and `--sdk-int`, are carried into the desktop entry `--install` writes, so an
+app installed with a level keeps it when it is launched from its icon. A click sets them in its launcher
+script instead (`doc/CameraClickPackaging.md`).
+
+---
+
 `ATL_DISABLE_WINDOW_DECORATIONS=` - if set, window decorations will be disabled; 
                                     this is useful for saving screen space on phone screens
 
@@ -32,8 +71,12 @@ The following environment variables are recognized by the main executable:
 
 ---
 
-`ATL_CAMERA_BACKEND=<gst|hybris|none>` - camera backend; default is hybris if its library loads, else gst.
-                                         `hybris` never falls back to gst, `none` reports zero cameras.
+`ATL_CAMERA_BACKEND=<gst|camera2ndk|hybris|none>` - camera backend; default is the first whose libraries
+                                         load: camera2ndk, then hybris, then gst. `camera2ndk` (the device's
+                                         own Android camera2 stack through libhybris) is the only backend
+                                         that serves `android.hardware.camera2` on a device; `hybris` is
+                                         Camera1 only. A backend named here never falls back to another one,
+                                         `none` reports zero cameras.
 
 ---
 
@@ -46,8 +89,51 @@ The following environment variables are recognized by the main executable:
 
 ---
 
+`ATL_CAMERA_GST_SRC_1=<gstreamer description>` - if set, adds a second, front-facing gst camera with this source,
+                                                 so an app's camera-switch path has somewhere to switch to
+
+---
+
+`ATL_CAMERA_ZERO_COPY=0` - turns off the camera2ndk backend's zero-copy preview, so preview frames are
+                           copied out of the HAL's buffers into NV21 and uploaded to the app's texture by
+                           the CPU. On by default; it only exists at all where the EGL is an Android one
+                           (a device), and it is the frame rate at 1080p - see `doc/CameraDevice.md`
+
+---
+
 `ATL_CAMERA_DUMP_FRAMES=<dir>` - if set, the active camera backend writes a frame counter and every 30th
-                                 preview frame as a PNG into `<dir>`; see `doc/CameraDevice.md`
+                                 preview frame as a PNG into `<dir>`; see `doc/CameraDevice.md`.
+                                 Only the CPU path can dump, so setting this keeps the NV21 copies alive
+                                 even when the zero-copy preview is running
+
+---
+
+`ATL_CAMERA_DUMP_METADATA=<file>` - if set, each camera's camera2 characteristics are appended to `<file>`
+                                    in readable form the first time an app reads them (tag names, ids,
+                                    types and values; vendor tags show as `<vendor tag>`)
+
+---
+
+`ATL_CAMERA2_NARROW_STREAMS=1` - cuts a real HAL's characteristics down to the formats ATL's camera2 can
+                                 actually deliver: the stream-configuration, min-frame-duration and
+                                 stall-duration lists keep only PRIVATE/YUV_420_888/JPEG, the depth, HEIC
+                                 and JPEG/R lists go, and the RAW and DEPTH_OUTPUT capabilities with them.
+                                 Off by default, because it makes Google Camera *worse*: libgcam builds its
+                                 own camera list out of the RAW configurations and refuses to open a camera
+                                 without them. It is for an app that configures a stream ATL never fills.
+
+---
+
+`ATL_MEDIA_FOLDER=<dir>` - the folder `ATLMediaContentProvider` answers MediaStore queries from. Without it
+                           an app that queries MediaStore at startup gets the folder picker.
+
+---
+
+`ATL_DUMP_HIERARCHY=1` - prints every View in every window with its class, id, bounds, measured size,
+                         visibility and (for a TextView) its text. It is the substitute for a screenshot
+                         on a device where nothing can capture one; accumulate the parents' left/top for
+                         absolute coordinates. Enormous - millions of lines for one launch - so turn it on
+                         only for the run that needs it.
 
 ---
 
@@ -100,6 +186,14 @@ The following environment variables are recognized by the main executable:
 ---
 
 `ATL_VALIDATE_CERTS` - if set, the signing certificate of the APK file will be validated on startup. This adds a few extra seconds to the startup time for large APKs.
+
+---
+
+`ATL_APK_SPLITS` - a `:`-separated list of split APKs to load alongside the base APK
+                   given on the command line. The other way in is to pass a directory
+                   holding `base.apk` and the `split_<name>.apk` files, which is the
+                   layout the package installer leaves behind; see
+                   [App bundles](AppBundles.md).
 
 ---
 

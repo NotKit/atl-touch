@@ -43,6 +43,60 @@ export ATL_CAMERA_HYBRIS_LIB=/usr/lib/aarch64-linux-gnu/libcamera.so.1
 Leave `ATL_CAMERA_DUMP_FRAMES` **out** of a release click: it writes a PNG every
 30 frames for the whole session.
 
+## camera2: the same click, one different backend
+
+`android.hardware.camera2` on a device is served by the `camera2ndk` backend —
+the device's own Android camera2 stack (`libcamera2ndk.so` + `libmediandk.so`)
+loaded through libhybris. The `hybris` backend is Camera1 only and reports no
+camera2 cameras at all, so a click for an app that uses camera2 pins the other
+one:
+
+```sh
+export ATL_UGLY_ENABLE_CAMERA=1
+export ATL_CAMERA_BACKEND=camera2ndk
+```
+
+Still no new dependency and nothing bundled: both libraries are `android_dlopen`ed
+out of the Android container, exactly like `libcamera.so.1`. What the click does
+have to get right is the **Android loader's** search path, which is not
+`LD_LIBRARY_PATH`:
+
+```sh
+# libcamera2ndk.so pulls in libandroid_runtime.so, which aborts in its own
+# constructors in a host process - the empty stub next to the runtime has to
+# win.  libhybris' default namespace is isolated and permits neither
+# /vendor/lib64 nor /odm/lib64, so a vendor library an app needs is only
+# reachable if it is named here.  /system/lib64 goes first: the vendor tree
+# carries VNDK copies of libutils/libcutils/libc++ and picking them up a second
+# time breaks the process.
+export HYBRIS_LD_LIBRARY_PATH="${PKG_ROOT}/usr/lib/hybris-stubs:/system/lib64:/vendor/lib64:/odm/lib64"
+```
+
+`/vendor/lib64/egl` belongs on the end when the port keeps its EGL there.
+
+## App bundles: base plus splits
+
+An app that ships as a bundle (a base APK plus `split_*.apk`) is launched by
+naming the *directory* that holds them, or with `ATL_APK_SPLITS` as a
+`:`-separated list:
+
+```sh
+exec "${PKG_ROOT}/usr/bin/android-translation-layer" "${PKG_ROOT}/app" \
+    -l com.example.app.MainActivity "$@"
+```
+
+Order is base first, then splits, everywhere at once — classpath, `ApkAssets`,
+`splitSourceDirs` and native-library extraction — because classpath order *is*
+resource override order. The manifest is always read out of `base.apk` by name.
+`doc/AppBundles.md` is the detail; the packaging-relevant part is that a click
+ships the directory as it came out of the installer and changes nothing else.
+
+An app that needs a modern SDK level gets it in the same launcher:
+
+```sh
+export ATL_SDK_INT=36      # per app, never a global default; doc/Envs.md
+```
+
 ## atl-touch pin and the prebuilt SDK
 
 `build.sh` derives `ATL_SDK_TAG=sdk-<atl-touch short sha>` and downloads a
@@ -70,4 +124,7 @@ untested, and the reason the current click stays unconfined.
    — the hybris backend made it into the build.
 2. Launch and look for `Camera: using backend 'hybris'` in
    `journalctl --user -u "lomiri-app-launch--application-click--<pkg>_<app>_<ver>--.service"`.
-3. Full checklist: `doc/CameraDevice.md`.
+   For camera2 the line is `Camera: using backend 'camera2ndk'`, and the two
+   lines above it name the libraries it loaded.
+3. Full checklists: `doc/CameraDevice.md` (Camera1), `doc/Camera2Device.md`
+   (camera2, including the failure table and the frame/metadata dumps).
