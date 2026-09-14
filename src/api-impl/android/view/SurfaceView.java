@@ -8,6 +8,9 @@ import java.util.ArrayList;
 
 public class SurfaceView extends View {
 
+	/** ATL_DEBUG_SURFACE: the created/destroyed pair this view reports. */
+	private static final boolean DEBUG = System.getenv("ATL_DEBUG_SURFACE") != null;
+
 	final ArrayList<SurfaceHolder.Callback> mCallbacks = new ArrayList<SurfaceHolder.Callback>();
 
 	/* the wl_subsurface this view's content presents through, if the platform
@@ -52,6 +55,9 @@ public class SurfaceView extends View {
 	}
 
 	private void surfaceCreated() {
+		if (DEBUG)
+			android.util.Log.i("ATLSurfaceView", this + ": surfaceCreated to "
+			    + mCallbacks.size() + " callback(s)");
 		for (SurfaceHolder.Callback c : mCallbacks) {
 			c.surfaceCreated(mSurfaceHolder);
 		}
@@ -205,14 +211,31 @@ public class SurfaceView extends View {
 		out[1] = (int)y;
 	}
 
+	/*
+	 * surfaceDestroyed pairs with surfaceCreated and with nothing else. It used
+	 * to be sent whenever there was a layer or a bound window to tear down,
+	 * which is neither necessary nor sufficient: an app's ANativeWindow keeps
+	 * mSurface.nativeWindow set for the life of the Surface, so a second detach
+	 * sent a second surfaceDestroyed - and a view detached before the posted
+	 * surfaceCreated ran got a destroy it was never told about a creation for.
+	 * Google Camera's viewfinder holder throws IllegalStateException on that
+	 * one, which is the "Error updating preview surfaceview" that kills a mode
+	 * switch.
+	 */
 	private void destroyLayer() {
+		if (reportedCreated) {
+			reportedCreated = false;
+			/* AOSP's contract: the app tears its EGLSurface down inside this
+			 * call, so nothing is using the wl_egl_window by the time it is
+			 * destroyed */
+			if (DEBUG)
+				android.util.Log.i("ATLSurfaceView", this + ": surfaceDestroyed to "
+				    + mCallbacks.size() + " callback(s)");
+			for (SurfaceHolder.Callback c : mCallbacks)
+				c.surfaceDestroyed(mSurfaceHolder);
+		}
 		if (mLayer == 0 && mSurface.nativeWindow == 0)
 			return;
-		/* AOSP's contract: the app tears its EGLSurface down inside this call,
-		 * so nothing is using the wl_egl_window by the time it is destroyed */
-		for (SurfaceHolder.Callback c : mCallbacks)
-			c.surfaceDestroyed(mSurfaceHolder);
-		reportedCreated = false;
 		native_destroyLayer(mLayer, mSurface);
 		mLayer = 0;
 		mLayerX = mLayerY = mLayerW = mLayerH = -1;
@@ -278,11 +301,18 @@ public class SurfaceView extends View {
 			}
 		}
 
+		/*
+		 * A callback that has been removed hears nothing more. It used to hear
+		 * everything: Google Camera's viewfinder holder removes itself and then
+		 * removes the SurfaceView, and the surfaceDestroyed that arrived anyway
+		 * threw out of removeView ("Error updating preview surfaceview"), which
+		 * took the camera down on every mode switch.
+		 */
 		@Override
 		public void removeCallback(Callback callback) {
-			/*		synchronized (mCallbacks) {
-					mCallbacks.remove(callback);
-					}*/
+			synchronized (mCallbacks) {
+				mCallbacks.remove(callback);
+			}
 		}
 
 		@Override

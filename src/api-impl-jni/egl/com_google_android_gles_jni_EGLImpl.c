@@ -7,6 +7,7 @@
 #include "../../libandroid/native_window.h"
 
 #include "surface_texture_target.h"
+#include "surface_view_target.h"
 
 #include "../generated_headers/com_google_android_gles_jni_EGLImpl.h"
 
@@ -80,8 +81,12 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreateWindowSurface(JNIEnv *env, jobject this, jlong display, jlong config, jobject surface, jintArray _attrib_list)
 {
 	struct ANativeWindow *native_window = ANativeWindow_fromSurface(env, surface);
+	bool view_target = native_window && !native_window->egl_window &&
+	    atl_egl_surface_view_matches(env, surface);
 	EGLint *attrib_list = get_int_array_crit(env, _attrib_list);
-	EGLSurface ret = bionic_eglCreateWindowSurface(_PTR(display), _PTR(config), native_window, attrib_list);
+	EGLSurface ret = view_target
+	    ? atl_egl_surface_view_create(_PTR(display), _PTR(config), native_window)
+	    : bionic_eglCreateWindowSurface(_PTR(display), _PTR(config), native_window, attrib_list);
 	release_int_array_crit(env, _attrib_list, attrib_list);
 	ANativeWindow_release(native_window);
 	return _INTPTR(ret);
@@ -127,12 +132,15 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 {
 	if (atl_egl_surface_texture_swap(_PTR(display), _PTR(surface)))
 		return JNI_TRUE;
+	if (atl_egl_surface_view_swap(_PTR(surface)))
+		return JNI_TRUE;
 	return bionic_eglSwapBuffers(_PTR(display), _PTR(surface));
 }
 
 JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglDestroySurface(JNIEnv *env, jobject this, jlong display, jlong surface)
 {
 	atl_egl_surface_texture_release(_PTR(surface));
+	atl_egl_surface_view_release(_PTR(surface));
 	return bionic_eglDestroySurface(_PTR(display), _PTR(surface));
 }
 

@@ -3,6 +3,7 @@ package android.view;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.util.AttributeSet;
@@ -17,6 +18,8 @@ public class TextureView extends View {
 	private SurfaceTextureListener surfaceTextureListener;
 	private SurfaceTexture surfaceTexture;
 	private boolean available;
+	/* maps the view's own coordinates, the way AOSP's does; identity fills it */
+	private final Matrix transform = new Matrix();
 
 	public TextureView(Context context) {
 		super(context);
@@ -41,6 +44,21 @@ public class TextureView extends View {
 	}
 
 	public void setOpaque(boolean opaque) {}
+
+	public void setTransform(Matrix transform) {
+		if (transform == null)
+			this.transform.reset();
+		else
+			this.transform.set(transform);
+		invalidate();
+	}
+
+	public Matrix getTransform(Matrix out) {
+		if (out == null)
+			out = new Matrix();
+		out.set(transform);
+		return out;
+	}
 
 	public SurfaceTextureListener getSurfaceTextureListener() {
 		return surfaceTextureListener;
@@ -118,9 +136,14 @@ public class TextureView extends View {
 	@Override
 	public void onDraw(Canvas canvas) {
 		Bitmap frame = surfaceTexture != null ? surfaceTexture.getLatestFrameBitmap() : null;
-		if (frame != null)
-			canvas.drawBitmap(frame, new Rect(0, 0, frame.getWidth(), frame.getHeight()),
-			                  new Rect(0, 0, getWidth(), getHeight()), null);
+		if (frame == null)
+			return;
+
+		canvas.save();
+		canvas.concat(transform);
+		canvas.drawBitmap(frame, new Rect(0, 0, frame.getWidth(), frame.getHeight()),
+		                  new Rect(0, 0, getWidth(), getHeight()), null);
+		canvas.restore();
 	}
 
 	/*

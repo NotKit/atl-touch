@@ -17,6 +17,7 @@
  * dalvikvm, which never runs set_up_handle_cache()).
  */
 
+#include "generated_headers/android_view_Surface.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -26,6 +27,10 @@
 #include <jni.h>
 
 #include "defines.h"
+
+struct ANativeWindow;
+extern bool atl_native_window_is_layerless(struct ANativeWindow *window);
+extern void ANativeWindow_release(struct ANativeWindow *window);
 
 extern void *atl_video_frame_wrap_skbitmap(uint8_t *pixels, int width, int height);
 extern bool atl_camera_write_png(const char *path, const uint8_t *rgba, int width, int height);
@@ -178,4 +183,20 @@ int atl_surface_post_rgba(JNIEnv *env, jobject surface, uint8_t *rgba, int width
 	}
 	(*env)->DeleteLocalRef(env, bitmap);
 	return 0;
+}
+
+/*
+ * The window ANativeWindow_fromSurface made for a Surface that had no layer.
+ * Returns whether it was released, so the Surface can clear its own field; a
+ * SurfaceView's window is owned by the layer and is left alone.
+ */
+JNIEXPORT jboolean JNICALL Java_android_view_Surface_native_1releaseWindow(JNIEnv *env, jclass class,
+                                                                          jlong window)
+{
+	struct ANativeWindow *native_window = _PTR(window);
+
+	if (!atl_native_window_is_layerless(native_window))
+		return JNI_FALSE;
+	ANativeWindow_release(native_window);
+	return JNI_TRUE;
 }

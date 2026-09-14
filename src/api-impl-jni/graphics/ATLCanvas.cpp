@@ -15,6 +15,8 @@
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "include/ports/SkFontMgr_fontconfig.h"
 
+#include <EGL/egl.h>
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
 
@@ -215,6 +217,10 @@ extern "C" void atl_canvas_end_frame(void *atl_canvas)
 
 static GrGLFuncPtr atl_gl_get_proc(void *ctx, const char name[])
 {
+	/* GLFW can resolve EGL entry points under GLX, but there is no current EGL
+	 * display for Skia to query in that case. */
+	if (!strncmp(name, "egl", 3) && eglGetCurrentDisplay() == EGL_NO_DISPLAY)
+		return nullptr;
 	return (GrGLFuncPtr)((void *(*)(const char *))ctx)(name);
 }
 
