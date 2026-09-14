@@ -25,6 +25,11 @@
 extern "C" {
 #include "../generated_headers/android_graphics_Paint.h"
 #include "../generated_headers/android_graphics_PorterDuffColorFilter.h"
+/* these three give the ColorFilter natives below C linkage; without a
+ * declaration each one is mangled and JNI cannot find it */
+#include "../generated_headers/android_graphics_BlendModeColorFilter.h"
+#include "../generated_headers/android_graphics_ColorMatrixColorFilter.h"
+#include "../generated_headers/android_graphics_LightingColorFilter.h"
 }
 
 /*
@@ -742,4 +747,26 @@ JNIEXPORT jlong JNICALL Java_android_graphics_PorterDuffColorFilter_native_1Crea
 {
 	return _INTPTR(SkColorFilters::Blend((SkColor)(uint32_t)color,
 	                                     porter_duff_to_blend_mode(porterduff_mode)).release());
+}
+
+JNIEXPORT jlong JNICALL Java_android_graphics_BlendModeColorFilter_native_1CreateBlendModeFilter(JNIEnv *env, jclass, jint color, jint porterduff_mode)
+{
+	return _INTPTR(SkColorFilters::Blend((SkColor)(uint32_t)color,
+	                                     porter_duff_to_blend_mode(porterduff_mode)).release());
+}
+
+JNIEXPORT jlong JNICALL Java_android_graphics_LightingColorFilter_native_1CreateLightingFilter(JNIEnv *env, jclass, jint mul, jint add)
+{
+	return _INTPTR(SkColorFilters::Lighting((SkColor)(uint32_t)mul, (SkColor)(uint32_t)add).release());
+}
+
+/* Android's 4x5 matrix is row-major with the translation column in 0..255;
+ * skia wants that column in 0..1 */
+JNIEXPORT jlong JNICALL Java_android_graphics_ColorMatrixColorFilter_native_1CreateColorMatrixFilter(JNIEnv *env, jclass, jfloatArray array)
+{
+	float matrix[20];
+	env->GetFloatArrayRegion(array, 0, 20, matrix);
+	for (int i = 4; i < 20; i += 5)
+		matrix[i] /= 255.0f;
+	return _INTPTR(SkColorFilters::Matrix(matrix).release());
 }
