@@ -161,8 +161,15 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_native_1setApkAsset
 	int loaded = 0;
 	for (int i = 0; i < num_assets; i++) {
 		jstring path_jstr = (jstring)((*env)->GetObjectArrayElement(env, paths, i));
+		if (!path_jstr)
+			continue;
 		const char *path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
 		const struct ApkAssets *assets;
+		if (!path[0]) {
+			(*env)->ReleaseStringUTFChars(env, path_jstr, path);
+			(*env)->DeleteLocalRef(env, path_jstr);
+			continue;
+		}
 		if (path[strlen(path) - 1] == '/')
 			assets = ApkAssets_loadDir(strdup(path));
 		else
@@ -174,6 +181,7 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_native_1setApkAsset
 		else
 			fprintf(stderr, "AssetManager: cannot load assets from %s, skipping\n", path);
 		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
+		(*env)->DeleteLocalRef(env, path_jstr);
 	}
 	AssetManager_setApkAssets(asset_manager, apk_assets, loaded, true, true);
 }
