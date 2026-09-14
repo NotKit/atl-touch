@@ -40,6 +40,8 @@
 
 ATLWindow *atl_window = NULL;
 char *apk_path;
+/* the app bundle's split APKs, NULL-terminated; NULL when the app is a single APK */
+char **apk_split_paths = NULL;
 
 // standard GApplication stuff, more or less
 
@@ -140,8 +142,7 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	};
 	JavaVMOption *options;
 
-	char jdwp_option_string[sizeof(JDWP_ARG) + 5] = JDWP_ARG;          // 5 chars for port number, NULL byte is counted by sizeof
-	char sdk_int_option_string[sizeof(SDK_INT_ARG) + 2] = SDK_INT_ARG; // 2 chars for SDK_INT, NULL byte is counted by sizeof
+	char jdwp_option_string[sizeof(JDWP_ARG) + 5] = JDWP_ARG; // 5 chars for port number, NULL byte is counted by sizeof
 
 	const char *jdwp_port = getenv("JDWP_LISTEN");
 
@@ -190,10 +191,8 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 		options[option_counter++].optionString = jdwp_option_string;
 	}
 
-	if (sdk_int) {
-		strncat(sdk_int_option_string, sdk_int, 2); // 2 chars should be enough for the foreseeable future, and won't overflow our array
-		options[option_counter++].optionString = sdk_int_option_string;
-	}
+	if (sdk_int)
+		options[option_counter++].optionString = g_strdup_printf(SDK_INT_ARG "%s", sdk_int);
 
 	while (extra_jvm_options && *extra_jvm_options) {
 		options[option_counter++].optionString = *(extra_jvm_options++);
@@ -259,10 +258,12 @@ void dl_parse_library_path(const char *path, char *delim);
 #define REL_API_IMPL_NATIVES_INSTALL_PATH "android_translation_layer/natives"
 #define REL_FRAMEWORK_RES_INSTALL_PATH    "android_translation_layer/framework-res.apk"
 #define REL_TEST_RUNNER_JAR_INSTALL_PATH  "android_translation_layer/test_runner.jar"
+#define REL_LIBCORE_SHIM_JAR_INSTALL_PATH "android_translation_layer/libcore-shim.jar"
 
 #define API_IMPL_JAR_PATH_LOCAL           "./api-impl.jar"
 #define FRAMEWORK_RES_PATH_LOCAL          "./res/framework-res/framework-res.apk"
 #define TEST_RUNNER_JAR_PATH_LOCAL        "./test_runner.jar"
+#define LIBCORE_SHIM_JAR_PATH_LOCAL       "./libcore-shim.jar"
 
 struct jni_callback_data {
 	char *apk_main_activity_class;
@@ -275,6 +276,7 @@ struct jni_callback_data {
 	char **extra_jvm_options;
 	char **extra_string_keys;
 	char *sdk_int;
+	char *action;
 };
 
 static char *uri_option = NULL;
@@ -302,6 +304,84 @@ static void parse_string_extras(JNIEnv *env, char **extra_string_keys, jobject i
 
 /* Drag and drop callback to simulate ACTION_SEND intents */
 
+static gint cmp_apk_path(gconstpointer a, gconstpointer b)
+{
+	return strcmp(*(const char **)a, *(const char **)b);
+}
+
+/*
+ * An app bundle is presented as installed, never downloaded: a base APK plus
+ * its splits, given either as a directory holding base.apk and the splits, or
+ * as a base APK with ATL_APK_SPLITS naming the splits (`:`-separated).
+ * Returns the base APK and fills *splits_out with a NULL-terminated array.
+ */
+static char *collect_apk_set(const char *path, char ***splits_out)
+{
+	GPtrArray *splits = g_ptr_array_new();
+	char *base = NULL;
+
+	if (g_file_test(path, G_FILE_TEST_IS_DIR)) {
+		GDir *dir = g_dir_open(path, 0, NULL);
+		if (!dir) {
+			fprintf(stderr, "error: can't read the app bundle directory %s (%m)\n", path);
+			exit(1);
+		}
+		GPtrArray *apks = g_ptr_array_new();
+		const char *name;
+		while ((name = g_dir_read_name(dir)))
+			if (g_str_has_suffix(name, ".apk"))
+				g_ptr_array_add(apks, g_build_filename(path, name, NULL));
+		g_dir_close(dir);
+		g_ptr_array_sort(apks, cmp_apk_path);
+
+		for (guint i = 0; i < apks->len; i++) {
+			char *apk = g_ptr_array_index(apks, i);
+			char *apk_name = g_path_get_basename(apk);
+			bool is_base = !strcmp(apk_name, "base.apk");
+			g_free(apk_name);
+			if (is_base && !base)
+				base = apk;
+			else
+				g_ptr_array_add(splits, apk);
+		}
+		g_ptr_array_free(apks, TRUE);
+
+		/* without a base.apk, a lone APK is the base and several are ambiguous */
+		if (!base) {
+			if (splits->len != 1) {
+				fprintf(stderr, "error: %s holds %u APKs but no base.apk\n", path, splits->len);
+				exit(1);
+			}
+			base = g_ptr_array_index(splits, 0);
+			g_ptr_array_set_size(splits, 0);
+		}
+	} else {
+		base = strdup(path);
+	}
+
+	const char *env_splits = getenv("ATL_APK_SPLITS");
+	if (env_splits && *env_splits) {
+		char **list = g_strsplit(env_splits, ":", -1);
+		for (char **s = list; *s; s++)
+			if (**s)
+				g_ptr_array_add(splits, g_strdup(*s));
+		g_strfreev(list);
+	}
+
+	for (guint i = 0; i < splits->len; i++) {
+		const char *split = g_ptr_array_index(splits, i);
+		if (access(split, F_OK) < 0) {
+			fprintf(stderr, "error: split APK %s doesn't exist (%m)\n", split);
+			exit(1);
+		}
+		fprintf(stderr, "apk set: split %s\n", split);
+	}
+
+	g_ptr_array_add(splits, NULL);
+	*splits_out = (char **)g_ptr_array_free(splits, FALSE);
+	return base;
+}
+
 char *find_jar_or_die(char *builddir_path, char *installed_path, char *install_prefix)
 {
 	char *path;
@@ -319,6 +399,64 @@ char *find_jar_or_die(char *builddir_path, char *installed_path, char *install_p
 	}
 
 	return path;
+}
+
+static int compare_paths(gconstpointer a, gconstpointer b)
+{
+	return g_strcmp0(*(const char * const *)a, *(const char * const *)b);
+}
+
+/*
+ * ART's boot class path is a fixed list of jars next to libart.so, so the only
+ * way to give an app java.* API the runtime predates is to put a jar of our own
+ * in front of it (the first entry that defines a class wins).  core-oj stays
+ * first among ART's own, as in its default list.
+ *
+ * BOOTCLASSPATH and not the -Xbootclasspath option: the dex2oat ART spawns to
+ * compile the app inherits our environment but not our runtime options, and a
+ * boot class path the two disagree about costs the app its AOT compilation.
+ */
+static char *build_boot_class_path(const char *dex_install_dir, const char *shim_jar)
+{
+	/* canonical: the harness scripts build the same list without going through
+	 * libart.so's "../java/dex", and a boot class path that only differs
+	 * textually still costs a dalvik-cache prune */
+	char *art_dir = g_canonicalize_filename("art", dex_install_dir);
+	GDir *dir = g_dir_open(art_dir, 0, NULL);
+	if (!dir) {
+		g_free(art_dir);
+		return NULL;
+	}
+
+	GPtrArray *jars = g_ptr_array_new_with_free_func(g_free);
+	char *core_oj = NULL;
+	const char *name;
+	while ((name = g_dir_read_name(dir))) {
+		if (!g_str_has_suffix(name, ".jar"))
+			continue;
+		char *path = g_build_filename(art_dir, name, NULL);
+		if (!core_oj && g_str_has_prefix(name, "core-oj"))
+			core_oj = path;
+		else
+			g_ptr_array_add(jars, path);
+	}
+	g_dir_close(dir);
+	g_free(art_dir);
+
+	if (!core_oj) { // not the layout we know; leave ART to its own default
+		g_ptr_array_free(jars, TRUE);
+		return NULL;
+	}
+	g_ptr_array_sort(jars, compare_paths);
+
+	GString *bcp = g_string_new(shim_jar);
+	g_string_append_printf(bcp, ":%s", core_oj);
+	for (guint i = 0; i < jars->len; i++)
+		g_string_append_printf(bcp, ":%s", (char *)g_ptr_array_index(jars, i));
+
+	g_free(core_oj);
+	g_ptr_array_free(jars, TRUE);
+	return g_string_free(bcp, FALSE);
 }
 
 static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
@@ -352,17 +490,33 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	jobject activity_object;
 	jobject application_object;
 
-	char *apk_classpath = g_file_get_path(files[0]);
+	char *apk_arg = g_file_get_path(files[0]);
 	char *apk_name = g_file_get_basename(files[0]);
 
-	if (apk_classpath == NULL) {
+	if (apk_arg == NULL) {
 		fprintf(stderr, "error: the specified file path doesn't seem to be valid\n");
 		exit(1);
 	}
 
-	if (access(apk_classpath, F_OK) < 0) {
-		fprintf(stderr, "error: the specified file path (%s) doesn't seem to exist (%m)\n", apk_classpath);
+	if (access(apk_arg, F_OK) < 0) {
+		fprintf(stderr, "error: the specified file path (%s) doesn't seem to exist (%m)\n", apk_arg);
 		exit(1);
+	}
+
+	/* the base APK and its splits; base first, so splits override it everywhere */
+	char *apk_base_path = collect_apk_set(apk_arg, &apk_split_paths);
+	char *apk_classpath;
+	if (apk_split_paths[0] && (d->install || d->install_internal)) {
+		/* --install copies one file and points the desktop entry at the copy */
+		fprintf(stderr, "error: --install cannot handle an app bundle (%s), only a single APK\n", apk_arg);
+		exit(1);
+	}
+	if (apk_split_paths[0]) {
+		char *splits_joined = g_strjoinv(":", apk_split_paths);
+		apk_classpath = g_strdup_printf("%s:%s", apk_base_path, splits_joined);
+		g_free(splits_joined);
+	} else {
+		apk_classpath = g_strdup(apk_base_path);
 	}
 
 	Dl_info libart_so_dl_info;
@@ -417,6 +571,26 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	if (d->apk_instrumentation_class)
 		test_runner_jar = find_jar_or_die(TEST_RUNNER_JAR_PATH_LOCAL, REL_TEST_RUNNER_JAR_INSTALL_PATH, dex_install_dir);
 
+	/* The java.* shim goes in front of ART's own boot class path - unless the
+	 * caller already decided on one, which is what the device harness scripts
+	 * do so that their dalvikvm runs and ours agree on it. */
+	if (!getenv("BOOTCLASSPATH")) {
+		char *shim_jar = getenv("RUN_FROM_BUILDDIR")
+		                     ? g_canonicalize_filename(LIBCORE_SHIM_JAR_PATH_LOCAL, NULL)
+		                     : g_canonicalize_filename(REL_LIBCORE_SHIM_JAR_INSTALL_PATH, dex_install_dir);
+		char *bcp = access(shim_jar, F_OK) == 0 ? build_boot_class_path(dex_install_dir, shim_jar) : NULL;
+		if (bcp) {
+			setenv("BOOTCLASSPATH", bcp, 1);
+			g_free(bcp);
+		}
+		g_free(shim_jar);
+	}
+	const char *boot_class_path = getenv("BOOTCLASSPATH");
+	if (boot_class_path && strstr(boot_class_path, "libcore-shim.jar"))
+		fprintf(stderr, "atl: libcore shim on the boot class path\n");
+	else
+		fprintf(stderr, "atl: no libcore shim on the boot class path; java.* stays at the runtime's own level\n");
+
 	char *api_impl_natives_dir = g_strdup_printf("%s/%s", dex_install_dir, REL_API_IMPL_NATIVES_INSTALL_PATH);
 
 	char *art_jar_dir = g_strdup_printf("%s/art", dex_install_dir);
@@ -467,7 +641,7 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	(*env)->CallVoidMethod(env, java_runtime, loadLibrary_with_classloader, _JSTRING("translation_layer_main"), NULL);
 
 	// some apps need the apk path since they directly read their apk
-	apk_path = strdup(apk_classpath);
+	apk_path = strdup(apk_base_path);
 
 	(*env)->GetJavaVM(env, &jvm);
 	set_up_handle_cache(env);
@@ -503,15 +677,28 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 
 	prepare_main_looper(env);
 
-	/* extract native libraries from apk*/
-	if (!getenv("ATL_SKIP_NATIVES_EXTRACTION"))
+	/* extract native libraries from the base apk and every split (extractNativeLibs
+	 * is irrelevant here: nothing else puts a .so where System.loadLibrary looks) */
+	if (!getenv("ATL_SKIP_NATIVES_EXTRACTION")) {
 		extract_from_apk("lib/" NATIVE_ARCH "/", "lib/");
+		for (char **split = apk_split_paths; *split; split++)
+			extract_from_apk_at(*split, "lib/" NATIVE_ARCH "/", "lib/");
+	}
 
 	// construct Application
 	application_object = (*env)->CallStaticObjectMethod(env, handle_cache.context.class,
 	                                                    _STATIC_METHOD(handle_cache.context.class, "createApplication", "(J)Landroid/app/Application;"), _INTPTR(atl_window));
-	if ((*env)->ExceptionCheck(env))
+	/* the app class failing to load leaves every later step to NPE on an
+	 * unrelated trace, so stop here like AOSP does */
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		fprintf(stderr, "atl: Unable to instantiate application\n");
+		exit(1);
+	}
+	if (!application_object) {
+		fprintf(stderr, "atl: Unable to instantiate application (no Application object)\n");
+		exit(1);
+	}
 
 	jclass content_provider = (*env)->FindClass(env, "android/content/ContentProvider");
 	(*env)->CallStaticVoidMethod(env, content_provider, _STATIC_METHOD(content_provider, "createContentProviders", "()V"));
@@ -522,8 +709,12 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 	(*env)->CallVoidMethod(env, application_object, on_create_method);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		fprintf(stderr, "atl: Application.onCreate() threw\n");
+	} else {
+		fprintf(stderr, "atl: Application.onCreate() completed\n");
+	}
 
 	if (d->apk_instrumentation_class) {
 		if (d->apk_main_activity_class) {
@@ -549,8 +740,9 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	// construct main Activity
 	if (!d->apk_instrumentation_class && !d->install_internal) {
 		activity_object = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
-		                                                 _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
-		                                                 _JSTRING(d->apk_main_activity_class), _INTPTR(atl_window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
+		                                                 _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)Landroid/app/Activity;"),
+		                                                 _JSTRING(d->apk_main_activity_class), _INTPTR(atl_window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL,
+		                                                 (d->action && *d->action) ? _JSTRING(d->action) : NULL);
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 		if (uri_option)
@@ -630,7 +822,7 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 			printf("WARNING: RUN_FROM_BUILDDIR set and --install given: using current directory in desktop entry\n");
 			g_string_append_printf(desktop_entry, "-C %s ", g_get_current_dir());
 		}
-		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
+		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH", "ATL_SDK_INT", "ATL_RESOURCES_SDK_INT", "ATL_SDK_RELEASE", "ATL_SDK_CODENAME"};
 		for (int i = 0; i < ARRAY_SIZE(envs); i++) {
 			if (getenv(envs[i])) {
 				g_string_append_printf(desktop_entry, "%s=%s ", envs[i], getenv(envs[i]));
@@ -640,10 +832,15 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 		g_string_append_printf(desktop_entry, "--gapplication-app-id %s ", package_name);
 		if (d->apk_main_activity_class)
 			g_string_append_printf(desktop_entry, "-l %s ", d->apk_main_activity_class);
+		if (d->action)
+			g_string_append_printf(desktop_entry, "-a %s ", d->action);
 		if (d->window_width)
 			g_string_append_printf(desktop_entry, "-w %d ", d->window_width);
 		if (d->window_height)
 			g_string_append_printf(desktop_entry, "-h %d ", d->window_height);
+		/* the level is per app, so an app installed with --sdk-int keeps it */
+		if (d->sdk_int)
+			g_string_append_printf(desktop_entry, "--sdk-int %s ", d->sdk_int);
 		g_string_append_printf(desktop_entry, "%s --uri %%u\n", g_file_get_path(dest));
 		if (supported_mime_types)
 			g_string_append_printf(desktop_entry, "MimeType=%s\n", supported_mime_types);
@@ -715,6 +912,7 @@ void init_cmd_parameters(GApplication *app, struct jni_callback_data *d)
 		{ "extra-jvm-option", 'X', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_jvm_options,         "pass an additional option directly to art (e.g -X \"-verbose:jni\")",                          "\"OPTION\""    },
 		{ "extra-string-key", 'e', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_string_keys,         "pass a string extra (-e key=value)",                                                           "\"KEY=VALUE\"" },
 		{ "sdk-int",           0 , 0, G_OPTION_ARG_STRING,       &d->sdk_int,                   "shorthand for -X \"-DBuild.VERSION.SDK_INT=<version>\"",                                                           "SDK_INT" },
+		{ "action",           'a', 0, G_OPTION_ARG_STRING,       &d->action,                    "the intent action to launch the activity with (e.g android.media.action.VIDEO_CAMERA)",        "ACTION"        },
 		/* long_name | short_name | flags                     | arg                  | arg_data     | description                                                                              | arg_desc */
 		{ "uri",              'u', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, option_uri_cb, "open the given URI inside the application",                                               "URI"           },
 		{NULL}
@@ -783,6 +981,7 @@ int main(int argc, char **argv)
 	callback_data->prgname = argv[0];
 	callback_data->extra_jvm_options = NULL;
 	callback_data->extra_string_keys = NULL;
+	callback_data->action = NULL;
 	callback_data->sdk_int = NULL;
 
 	app = g_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);

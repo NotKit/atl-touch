@@ -29,6 +29,7 @@ jstring utf8_to_jstring(JNIEnv *env, const char *utf8);
 const char *attribute_set_get_string(JNIEnv *env, jobject attrs, char *attribute, char *schema);
 int attribute_set_get_int(JNIEnv *env, jobject attrs, char *attribute, char *schema, int default_value);
 void extract_from_apk(const char *path, const char *target);
+void extract_from_apk_at(const char *apk, const char *path, const char *target);
 char *get_app_data_dir();
 
 void prepare_main_looper(JNIEnv *env);

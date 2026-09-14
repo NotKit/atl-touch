@@ -69,7 +69,7 @@ public class Build {
 	/**
 	 * The manufacturer of the product/hardware.
 	 */
-	public static final String MANUFACTURER = "HTC" /* HTC picked at random; getString("ro.product.manufacturer")*/;
+	public static final String MANUFACTURER = getString("ro.product.manufacturer");
 
 	/**
 	 * The brand (e.g., carrier) the software is customized for, if any.
@@ -109,18 +109,24 @@ public class Build {
 
 	public static final String[] SUPPORTED_ABIS = getString("ro.product.cpu.abilist").split(",");
 
+	public static final String[] SUPPORTED_64_BIT_ABIS =
+	    getString("ro.product.cpu.abilist64").split(",");
+
+	public static final String[] SUPPORTED_32_BIT_ABIS =
+	    getString("ro.product.cpu.abilist32").split(",");
+
 	/**
 	 * Various version strings.
 	 */
 	public static class VERSION {
 		static {
-			String SDK_INT_str = System.getProperty("Build.VERSION.SDK_INT");
+			/* an explicit level (--sdk-int, ATL_SDK_INT; see android.atl.ATLSdkLevel)
+			 * beats everything, and is what an app that needs a modern platform
+			 * is launched with */
+			int SDK_INT_tmp = android.atl.ATLSdkLevel.SDK_INT;
 			String mainApkPath;
-			int SDK_INT_tmp = Build.VERSION_CODES.GINGERBREAD;
-			if (SDK_INT_str != null) {
-				// Always force SDK_INT to be at least 1 as 0 is used to detect early accesses.
-				SDK_INT_tmp = Integer.parseInt(SDK_INT_str);
-			} else if ((mainApkPath = System.getProperty("atl.app.class.path")) != null) {
+			if (!android.atl.ATLSdkLevel.EXPLICIT
+			    && (mainApkPath = System.getProperty("atl.app.class.path")) != null) {
 				// We need to set the SDK int to at least the minSdk as the
 				// Android Gradle plugin strips the SDK_INT check below anyway.
 				// And applications may also expect the SDK_INT to be at least
@@ -137,11 +143,17 @@ public class Build {
 				}
 			}
 
-			/* !!! forcing a RESOURCES_SDK_INT value different from SDK_INT can cause issues, including crashes */
-			String RESOURCES_SDK_INT_str = System.getProperty("Build.VERSION.RESOURCES_SDK_INT");
-
 			SDK_INT = SDK_INT_tmp;
-			RESOURCES_SDK_INT = (RESOURCES_SDK_INT_str != null) ? Math.max(Integer.parseInt(RESOURCES_SDK_INT_str), 1) : SDK_INT_tmp;
+			SDK_INT_FULL = SDK_INT_tmp * 100000;
+			/* !!! forcing a RESOURCES_SDK_INT value different from SDK_INT can cause issues, including crashes */
+			RESOURCES_SDK_INT = android.atl.ATLSdkLevel.EXPLICIT
+			    ? android.atl.ATLSdkLevel.RESOURCES_SDK_INT : SDK_INT_tmp;
+			/* the version string has to describe the level actually claimed:
+			 * with no override that is the app's own minSdk, not this class's
+			 * default, and apps do parse RELEASE */
+			RELEASE = android.atl.ATLSdkLevel.EXPLICIT ? android.atl.ATLSdkLevel.RELEASE
+			                                          : android.atl.ATLSdkLevel.releaseForSdk(SDK_INT_tmp);
+			CODENAME = android.atl.ATLSdkLevel.CODENAME;
 		}
 
 		/**
@@ -154,13 +166,19 @@ public class Build {
 		/**
 		 * The user-visible version string.  E.g., "1.0" or "3.4b5".
 		 */
-		public static final String RELEASE = getString("ro.build.version.release");
+		public static final String RELEASE;
 
 		/**
 		 * The user-visible SDK version of the framework; its possible
 		 * values are defined in {@link Build.VERSION_CODES}.
 		 */
 		public static final int SDK_INT;
+
+		/**
+		 * API 36's major.minor SDK level in one int: the major level times
+		 * 100000 plus the minor one, which is always 0 for ATL.
+		 */
+		public static final int SDK_INT_FULL;
 
 		/**
 		 * The user-visible SDK version of the framework in its raw String
@@ -175,7 +193,7 @@ public class Build {
 		 * The current development codename, or the string "REL" if this is
 		 * a release build.
 		 */
-		public static final String CODENAME = getString("ro.build.version.codename");
+		public static final String CODENAME;
 
 		/**
 		 * The SDK version to use when accessing resources.
@@ -188,10 +206,29 @@ public class Build {
 		public static final String SECURITY_PATCH = getString("ro.build.version.security_patch");
 
 		/**
-		 * The developer preview revision of a prerelease SDK. This value will always
-		 * be <code>0</code> on production platform builds/devices.
+		 * The developer preview revision of a prerelease SDK; 0 on a release build.
 		 */
 		public static final int PREVIEW_SDK_INT = SystemProperties.getInt("ro.build.version.preview_sdk", 0);
+
+		/**
+		 * The base OS build the product is based on; empty when unknown.
+		 */
+		public static final String BASE_OS = "";
+
+		/**
+		 * The version string, or the codename on a prerelease build.
+		 */
+		public static final String RELEASE_OR_CODENAME = "REL".equals(CODENAME) ? RELEASE : CODENAME;
+
+		/** same, but never a bare codename; what apps show to the user */
+		public static final String RELEASE_OR_PREVIEW_DISPLAY = RELEASE_OR_CODENAME;
+
+		/**
+		 * The media performance class this device claims, or 0 for none. ATL
+		 * does not claim one: apps then fall back to their own measurements
+		 * instead of assuming a Pixel-class device.
+		 */
+		public static final int MEDIA_PERFORMANCE_CLASS = 0;
 	}
 
 	/**

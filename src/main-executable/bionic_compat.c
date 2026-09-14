@@ -58,7 +58,9 @@ _Thread_local uintptr_t TLS[] = {
 	/* internal on glibc, seems to be unused on musl */
 	/* (tp + 1) =    0xXXXXXXXXXXXXXXXX */ // TLS_SLOT_THREAD_ID
 	/* PT_TLS of main executable gets copied here (so this array!) */
-	/* (tp + 2) = */ 0x5555555555555555,   // TLS_SLOT_APP
+	/* Keep this one zero: libhybris' static tlsdesc resolver reads (tp + 2) and
+	 * dereferences whatever it finds, so filler here faults it. */
+	/* (tp + 2) = */ 0,                    // TLS_SLOT_APP
 	/* (tp + 3) = */ 0x5555555555555555,   // TLS_SLOT_OPENGL
 	/* (tp + 4) = */ 0x5555555555555555,   // TLS_SLOT_OPENGL_API
 	/* (tp + 5) = */ 0x5555555555555555,   // TLS_SLOT_STACK_GUARD

@@ -205,6 +205,12 @@ public final class ContextImpl extends Context {
 				return new SearchManager();
 			case "storage":
 				return new StorageManager();
+			case "device_policy":
+				return new android.app.admin.DevicePolicyManager();
+			case "download":
+				return new DownloadManager();
+			case "blob_store":
+				return new android.app.blob.BlobStoreManager(this);
 			default:
 				Slog.e(TAG, "!!!!!!! getSystemService: case >" + name + "< is not implemented yet");
 				return null;

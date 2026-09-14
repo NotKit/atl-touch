@@ -14,6 +14,7 @@ import android.app.SharedPreferencesImpl;
 import android.app.StatusBarManager;
 import android.app.UiModeManager;
 import android.app.job.JobScheduler;
+import android.atl.ATLSharedLibraries;
 import android.atl.ATLLoadedApp;
 import android.atl.ATLTimeZone;
 import android.bluetooth.BluetoothManager;
@@ -121,7 +122,19 @@ public abstract class Context {
 		ApplicationInfo application_info = primary_application.pkg.applicationInfo;
 		application_info.dataDir = Environment.getExternalStorageDirectory().getAbsolutePath();
 		application_info.nativeLibraryDir = (new File(Environment.getExternalStorageDirectory(), "lib")).getAbsolutePath();
+		/* the jars the app's <uses-library> entries resolved to, where an app
+		 * expects to read them back */
+		application_info.sharedLibraryFiles = primary_application.pkg.usesLibraryFiles;
 		application_info.sourceDir = native_get_apk_path();
+		application_info.publicSourceDir = application_info.sourceDir;
+		String[] splits = native_get_split_apk_paths();
+		if (splits.length > 0) {
+			application_info.splitSourceDirs = splits;
+			application_info.splitPublicSourceDirs = splits;
+			application_info.splitNames = splitNames(splits);
+			primary_application.pkg.splitNames = application_info.splitNames;
+			Slog.i(TAG, "app bundle: " + splits.length + " splits: " + String.join(", ", application_info.splitNames));
+		}
 		package_manager = new PackageManager();
 
 		Security.addProvider(new AndroidKeyStoreProvider());
@@ -136,6 +149,25 @@ public abstract class Context {
 				}
 			}
 		}
+	}
+
+
+
+	/**
+	 * The split name of an installed split is its file name: the package installer
+	 * writes base.apk and split_&lt;name&gt;.apk, which is the layout we are handed.
+	 */
+	private static String[] splitNames(String[] splits) {
+		String[] names = new String[splits.length];
+		for (int i = 0; i < splits.length; i++) {
+			String name = new File(splits[i]).getName();
+			if (name.endsWith(".apk"))
+				name = name.substring(0, name.length() - ".apk".length());
+			if (name.startsWith("split_"))
+				name = name.substring("split_".length());
+			names[i] = name;
+		}
+		return names;
 	}
 
 	/* screenWidthDp and friends describe the app's window in dp. The window size
@@ -191,6 +223,8 @@ public abstract class Context {
 	}
 
 	private static native String native_get_apk_path();
+	/* the splits this app was launched with, read by android.atl.ATLLoadedApp too */
+	public static native String[] native_get_split_apk_paths();
 	protected static native void native_updateConfig(Configuration config);
 	protected static native void nativeOpenFile(int fd);
 	protected static native void nativeComposeEmail(String text, int fd);
@@ -244,6 +278,26 @@ public abstract class Context {
 
 	public Looper getMainLooper() {
 		return Looper.getMainLooper();
+	}
+
+	/** an Executor that runs on the main thread, which is what apps use it for */
+	public java.util.concurrent.Executor getMainExecutor() {
+		final android.os.Handler handler = new android.os.Handler(getMainLooper());
+
+		return new java.util.concurrent.Executor() {
+			@Override
+			public void execute(Runnable command) {
+				handler.post(command);
+			}
+		};
+	}
+
+	/** this process, as the identity a permission check would be made against */
+	public AttributionSource getAttributionSource() {
+		return new AttributionSource.Builder(android.os.Process.myUid())
+		    .setPackageName(getPackageName())
+		    .setAttributionTag(getAttributionTag())
+		    .build();
 	}
 
 	public String getPackageName() {
@@ -683,17 +737,6 @@ public abstract class Context {
 
 	public boolean bindIsolatedService(android.content.Intent a0, int a1, java.lang.String a2, java.util.concurrent.Executor a3, android.content.ServiceConnection a4) { return false; }
 
-	/* Not null: callers hand this straight to APIs that dereference it -
-	 * androidx.biometric NPEs on it before a Fragment can even start. */
-	public java.util.concurrent.Executor getMainExecutor() {
-		final android.os.Handler handler = new android.os.Handler(getMainLooper());
-		return new java.util.concurrent.Executor() {
-			@Override
-			public void execute(Runnable command) {
-				handler.post(command);
-			}
-		};
-	}
 
 	public static final int BIND_AUTO_CREATE = 1;
 

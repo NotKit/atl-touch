@@ -22,10 +22,26 @@
 #include "../generated_headers/android_content_Context.h"
 
 extern char *apk_path;
+extern char **apk_split_paths;
 
 JNIEXPORT jstring JNICALL Java_android_content_Context_native_1get_1apk_1path(JNIEnv *env, jclass this)
 {
 	return _JSTRING(apk_path);
+}
+
+JNIEXPORT jobjectArray JNICALL Java_android_content_Context_native_1get_1split_1apk_1paths(JNIEnv *env, jclass this)
+{
+	int n = 0;
+	while (apk_split_paths && apk_split_paths[n])
+		n++;
+
+	jobjectArray paths = (*env)->NewObjectArray(env, n, (*env)->FindClass(env, "java/lang/String"), NULL);
+	for (int i = 0; i < n; i++) {
+		jstring path = _JSTRING(apk_split_paths[i]);
+		(*env)->SetObjectArrayElement(env, paths, i, path);
+		(*env)->DeleteLocalRef(env, path);
+	}
+	return paths;
 }
 
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8

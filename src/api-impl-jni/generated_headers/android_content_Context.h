@@ -35,6 +35,14 @@ JNIEXPORT jstring JNICALL Java_android_content_Context_native_1get_1apk_1path
 
 /*
  * Class:     android_content_Context
+ * Method:    native_get_split_apk_paths
+ * Signature: ()[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL Java_android_content_Context_native_1get_1split_1apk_1paths
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_content_Context
  * Method:    native_updateConfig
  * Signature: (Landroid/content/res/Configuration;)V
  */

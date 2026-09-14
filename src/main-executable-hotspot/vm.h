@@ -34,6 +34,7 @@ struct launcher_options {
 	char *vm_library; /* image backend: the native-image .so to create the VM from */
 	char *vm_check;   /* run CLASS.main(String[]) right after the VM is up, then exit */
 	char *uri;        /* handed to createMainActivity, as the ART launcher's -u is */
+	char *action;     /* the intent action to launch with, as the ART launcher's -a is */
 };
 
 /* defined by main.c; the backends need it for -Datl.data.dir */

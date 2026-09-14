@@ -140,8 +140,7 @@ public final class ATLLoadedApp {
 		String[] outError = new String[1];
 		PackageParser.Package pkg;
 		try {
-			pkg = packageParser.parsePackage(resources,
-			                                 assetManager.openXmlResourceParser(1, "AndroidManifest.xml"), 0, outError);
+			pkg = packageParser.parsePackage(resources, openManifest(assetManager, mainApk), 0, outError);
 		} catch (XmlPullParserException e) {
 			throw new IOException(outError[0], e);
 		}
@@ -149,12 +148,35 @@ public final class ATLLoadedApp {
 			throw new IOException(outError[0]);
 		}
 		packageParser.collectCertificates(pkg, 0);
+		/* before any app code: an app resolves its <uses-library> jars with plain
+		 * Class.forName, from a class initializer as often as not. A library
+		 * that will not load is the app's problem, not a reason not to start. */
+		try {
+			ATLSharedLibraries.install(classLoader, pkg.usesLibraryFiles);
+		} catch (Exception e) {
+			Slog.w(TAG, "could not install the app's shared libraries", e);
+		}
 		resources.applyPackageQuirks(pkg.applicationInfo.minSdkVersion);
 		// Support for MicroG and other custom GMS implementations.
 		if (play_services.contains(pkg.packageName)) {
 			ATLSigHelper.addGMSSignatures(pkg);
 		}
 		return new ATLLoadedApp(resources, classLoader, pkg);
+	}
+
+	/*
+	 * On an app bundle the manifest has to come out of base.apk. The shared
+	 * AssetManager cannot be asked for it: openXmlAssetNative ignores the cookie
+	 * and the native asset manager scans its paths back to front, so the last
+	 * split's manifest wins - and a split manifest has no <application
+	 * android:name>, no activities and no providers.
+	 */
+	private static android.content.res.XmlResourceParser openManifest(AssetManager assetManager,
+	                                                                  String mainApk)
+	    throws IOException, XmlPullParserException {
+		if (mainApk != null && !mainApk.isEmpty() && Context.native_get_split_apk_paths().length > 0)
+			return AssetManager.forSingleApk(mainApk).openXmlResourceParser(0, "AndroidManifest.xml");
+		return assetManager.openXmlResourceParser(1, "AndroidManifest.xml");
 	}
 
 	/*

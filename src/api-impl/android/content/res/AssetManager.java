@@ -215,6 +215,19 @@ public final class AssetManager {
 	}
 
 	/**
+	 * An asset manager holding exactly one APK, for reading a file out of a
+	 * *specific* APK of an app bundle: openXmlAssetNative ignores the cookie and
+	 * the native asset manager scans its paths back to front, so on the shared
+	 * instance the last split always wins.
+	 * {@hide}
+	 */
+	public static AssetManager forSingleApk(String apk_path) {
+		AssetManager am = new AssetManager(true);
+		am.addAssetPath(apk_path);
+		return am;
+	}
+
+	/**
 	 * Return a global shared asset manager that provides access to only
 	 * system assets (no application assets).
 	 * {@hide}
@@ -763,6 +776,16 @@ public final class AssetManager {
 			}
 		}
 		return true;
+	}
+
+	private static void extractEntry(JarFile apk, JarEntry entry, String target, long apk_mtime) throws IOException {
+		Path file = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), target);
+		if (Files.exists(file) && Files.getLastModifiedTime(file).toMillis() >= apk_mtime)
+			return;
+		Files.createDirectories(file.getParent());
+		try (InputStream inputStream = apk.getInputStream(entry)) {
+			Files.copy(inputStream, file, StandardCopyOption.REPLACE_EXISTING);
+		}
 	}
 
 	/**

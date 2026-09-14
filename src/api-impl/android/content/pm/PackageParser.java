@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import android.atl.ATLSharedLibraries;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -35,6 +36,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Slog;
 import android.util.TypedValue;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.XmlUtils;
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -305,6 +307,7 @@ public class PackageParser {
 		}
 		PackageInfo pi = new PackageInfo();
 		pi.packageName = p.packageName;
+		pi.splitNames = p.splitNames;
 		pi.versionCode = p.mVersionCode;
 		pi.versionName = p.mVersionName;
 		pi.sharedUserId = p.mSharedUserId;
@@ -2162,7 +2165,38 @@ public class PackageParser {
 							owner.usesOptionalLibraries.add(lname.intern());
 						}
 					}
+					String jar = ATLSharedLibraries.resolve(lname);
+					if (jar != null) {
+						owner.usesLibraryFiles = ArrayUtils.appendElement(String.class, owner.usesLibraryFiles, jar);
+						Slog.i(TAG, "uses-library " + lname + (req ? " (required)" : " (optional)") +
+						                " is provided by " + jar);
+					} else {
+						/* ATL has no shared Java libraries of its own, so an entry the
+						 * device does not declare either is one the app will not find.
+						 * Log it and carry on: a real installer would refuse the install
+						 * over a required one, and refusing to launch is worse than
+						 * letting the app find out. */
+						Slog.w(TAG, "uses-library " + lname + (req ? " (required)" : " (optional)") +
+						                " is not provided by ATL");
+					}
 				}
+
+				XmlUtils.skipCurrentTag(parser);
+
+			} else if (tagName.equals("uses-native-library")) {
+				sa = res.obtainAttributes(attrs,
+				                          com.android.internal.R.styleable.AndroidManifestUsesLibrary);
+				String lname = sa.getNonResourceString(
+				    com.android.internal.R.styleable.AndroidManifestUsesLibrary_name);
+				boolean req = sa.getBoolean(
+				    com.android.internal.R.styleable.AndroidManifestUsesLibrary_required,
+				    true);
+				sa.recycle();
+
+				/* vendor .so files the app dlopens; nothing to do at parse time,
+				 * the bionic linker resolves them (or does not) at load time */
+				if (lname != null)
+					Slog.i(TAG, "uses-native-library " + lname + (req ? " (required)" : " (optional)"));
 
 				XmlUtils.skipCurrentTag(parser);
 
@@ -3265,6 +3299,9 @@ public class PackageParser {
 	public final static class Package {
 
 		public String packageName;
+
+		/** the installed splits, in splitSourceDirs order; null for a single APK */
+		public String[] splitNames;
 
 		// For now we only support one application per package.
 		public final ApplicationInfo applicationInfo = new ApplicationInfo();

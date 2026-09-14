@@ -496,6 +496,9 @@ public class ApplicationInfo extends PackageItemInfo {
 
 	public String[] splitSourceDirs;
 
+	/** the split names, in the same order as {@link #splitSourceDirs} */
+	public String[] splitNames;
+
 	public void dump(Printer pw, String prefix) {
 		super.dumpFront(pw, prefix);
 		if (className != null) {
@@ -592,6 +595,9 @@ public class ApplicationInfo extends PackageItemInfo {
 		largestWidthLimitDp = orig.largestWidthLimitDp;
 		sourceDir = orig.sourceDir;
 		publicSourceDir = orig.publicSourceDir;
+		splitSourceDirs = orig.splitSourceDirs;
+		splitPublicSourceDirs = orig.splitPublicSourceDirs;
+		splitNames = orig.splitNames;
 		nativeLibraryDir = orig.nativeLibraryDir;
 		resourceDirs = orig.resourceDirs;
 		seinfo = orig.seinfo;

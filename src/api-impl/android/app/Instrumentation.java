@@ -1,6 +1,7 @@
 package android.app;
 
 import android.atl.ATLLoadedApp;
+import android.atl.ATLSharedLibraries;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -12,15 +13,8 @@ import android.os.Looper;
 import android.os.MessageQueue;
 import android.util.Slog;
 import android.view.KeyEvent;
-import dalvik.system.DexClassLoader;
-/* for hacky classloader patching */
-import dalvik.system.DexFile;
 import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,7 +42,8 @@ public class Instrumentation {
 
 			ATLLoadedApp.getPrimaryApplication().default_resources.getAssets().addAssetPath(target_path);
 
-			patchClassLoader(ATLLoadedApp.getPrimaryApplication().class_loader, new File(target_path));
+			ATLSharedLibraries.appendToClassPath(ATLLoadedApp.getPrimaryApplication().class_loader,
+			    new File(target_path));
 
 			Class<? extends Instrumentation> cls = ATLLoadedApp.getPrimaryApplication()
 			                                           .loadClass(className)
@@ -320,65 +315,4 @@ public class Instrumentation {
 		}
 	}
 
-	/* -- a hacky method to patch in a classpath entry (there should be a better way *in theory*, but other approaches didn't work) -- */
-	private static Object getFieldObject(Class cls, Object obj, String field_name) {
-		try {
-			Field field = cls.getDeclaredField(field_name);
-			field.setAccessible(true);
-			Object ret = field.get(obj);
-			field.setAccessible(false);
-			return ret;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return null;
-	}
-
-	private static void setFieldObject(Class cls, Object obj, String field_name, Object value) {
-		try {
-			Field field = cls.getDeclaredField(field_name);
-			field.setAccessible(true);
-			field.set(obj, value);
-			field.setAccessible(false);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	private static Object createObject(Class cls, Class[] type_array, Object[] value_array) {
-		try {
-			Constructor ctor = cls.getDeclaredConstructor(type_array);
-			ctor.setAccessible(true);
-			Object ret = ctor.newInstance(value_array);
-			ctor.setAccessible(false);
-			return ret;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return null;
-	}
-
-	private static void patchClassLoader(ClassLoader cl, File apk_path) throws IOException {
-		// get cl.pathList
-		Object pathList = getFieldObject(DexClassLoader.class.getSuperclass(), cl, "pathList");
-		// get pathList.dexElements
-		Object[] dexElements = (Object[])getFieldObject(pathList.getClass(), pathList, "dexElements");
-		// Element type
-		Class<?> Element_class = dexElements.getClass().getComponentType();
-		// Create an array to replace the original array
-		Object[] DexElements_new = (Object[])Array.newInstance(Element_class, dexElements.length + 1);
-		// use this constructor: ElementDexFile.class(DexFile dexFile, File file)
-		Class[] type_array = {DexFile.class, File.class};
-		Object[] value_array = {DexFile.loadDex(apk_path.getCanonicalPath(), null, 0), apk_path};
-		Object new_element = createObject(Element_class, type_array, value_array);
-		Object[] new_element_wrapper_array = new Object[] {new_element};
-		// Copy the original elements
-		System.arraycopy(dexElements, 0, DexElements_new, 0, dexElements.length);
-		// The element of the plugin is copied in
-		System.arraycopy(new_element_wrapper_array, 0, DexElements_new, dexElements.length, new_element_wrapper_array.length);
-		// replace
-		setFieldObject(pathList.getClass(), pathList, "dexElements", DexElements_new);
-	}
 }

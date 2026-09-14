@@ -999,6 +999,41 @@ public class PackageManager {
 
 	/**
 	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: at least one camera reports the camera2 FULL
+	 * hardware level (or better).
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_CAMERA_LEVEL_FULL = "android.hardware.camera.level.full";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: at least one camera has the camera2
+	 * MANUAL_SENSOR capability.
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_CAMERA_CAPABILITY_MANUAL_SENSOR =
+	    "android.hardware.camera.capability.manual_sensor";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: at least one camera has the camera2
+	 * MANUAL_POST_PROCESSING capability.
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_CAMERA_CAPABILITY_MANUAL_POST_PROCESSING =
+	    "android.hardware.camera.capability.manual_post_processing";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: at least one camera has the camera2 RAW
+	 * capability.
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_CAMERA_CAPABILITY_RAW =
+	    "android.hardware.camera.capability.raw";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
 	 * {@link #hasSystemFeature}: The device is capable of communicating with
 	 * consumer IR devices.
 	 */
@@ -1339,6 +1374,24 @@ public class PackageManager {
 
 	@SdkConstant(SdkConstantType.FEATURE)
 	public static final String FEATURE_WATCH = "android.hardware.type.watch";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: this is a Google build. Not an AOSP feature
+	 * name, but Google's own apps require it.
+	 */
+	public static final String FEATURE_GOOGLE_EXPERIENCE = "com.google.android.feature.GOOGLE_EXPERIENCE";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: this is a Pixel, of the 2019 generation.
+	 * Google Camera refuses to start without one of these ("Cannot start the
+	 * Google Camera App on an unsupported device"); ATL claims the oldest it
+	 * accepts and nothing newer, so the app keeps to the paths a 2019 Pixel
+	 * has rather than asking for this year's ML hardware.
+	 */
+	public static final String FEATURE_PIXEL_EXPERIENCE = "com.google.android.feature.PIXEL_EXPERIENCE";
+	public static final String FEATURE_PIXEL_2019_EXPERIENCE = "com.google.android.feature.PIXEL_2019_EXPERIENCE";
 
 	/**
 	 * Action to external storage service to clean out removed apps.
@@ -2247,8 +2300,53 @@ public class PackageManager {
 	 * @return An array of FeatureInfo classes describing the features
 	 * that are available on the system, or null if there are none(!!).
 	 */
+	/* every feature hasSystemFeature() can answer yes to; getSystemAvailableFeatures()
+	 * asks it about each of them, so the two answers cannot drift apart */
+	private static final String[] KNOWN_FEATURES = {
+	    FEATURE_TOUCHSCREEN,
+	    FEATURE_TOUCHSCREEN_MULTITOUCH,
+	    FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT,
+	    FEATURE_FAKETOUCH,
+	    FEATURE_FAKETOUCH_MULTITOUCH_DISTINCT,
+	    FEATURE_SCREEN_PORTRAIT,
+	    FEATURE_SCREEN_LANDSCAPE,
+	    FEATURE_MICROPHONE,
+	    FEATURE_AUTOMOTIVE,
+	    FEATURE_LEANBACK,
+	    FEATURE_TELEVISION,
+	    FEATURE_WATCH,
+	    FEATURE_CAMERA,
+	    FEATURE_CAMERA_ANY,
+	    FEATURE_CAMERA_FRONT,
+	    FEATURE_CAMERA_FLASH,
+	    FEATURE_CAMERA_AUTOFOCUS,
+	    FEATURE_CAMERA_LEVEL_FULL,
+	    FEATURE_CAMERA_CAPABILITY_MANUAL_SENSOR,
+	    FEATURE_CAMERA_CAPABILITY_MANUAL_POST_PROCESSING,
+	    FEATURE_CAMERA_CAPABILITY_RAW,
+	    FEATURE_GOOGLE_EXPERIENCE,
+	    FEATURE_PIXEL_EXPERIENCE,
+	    FEATURE_PIXEL_2019_EXPERIENCE,
+	};
+
+	/* answering costs a camera enumeration per camera feature, and AOSP's own
+	 * list is built once at boot, so compute it once here too */
+	private static FeatureInfo[] availableFeatures;
+
 	public FeatureInfo[] getSystemAvailableFeatures() {
-		return new FeatureInfo[0];
+		if (availableFeatures != null)
+			return availableFeatures;
+
+		java.util.ArrayList<FeatureInfo> features = new java.util.ArrayList<>();
+		for (String name : KNOWN_FEATURES) {
+			if (!hasSystemFeature(name))
+				continue;
+			FeatureInfo info = new FeatureInfo();
+			info.name = name;
+			features.add(info);
+		}
+		availableFeatures = features.toArray(new FeatureInfo[0]);
+		return availableFeatures;
 	}
 
 	/**
@@ -2260,8 +2358,26 @@ public class PackageManager {
 	 */
 	public boolean hasSystemFeature(String name) {
 		switch (name) {
-			case "android.hardware.touchscreen.multitouch.distinct":
+			case FEATURE_TOUCHSCREEN:
+			case FEATURE_TOUCHSCREEN_MULTITOUCH:
+			case FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT:
+			/* faketouch is what a pointer emulating a touchscreen gives you, and
+			 * every ATL host has one: the mouse. Apps that require it (GCam)
+			 * would otherwise refuse to run on a desktop. */
+			case FEATURE_FAKETOUCH:
+			case FEATURE_FAKETOUCH_MULTITOUCH_DISTINCT:
+			case FEATURE_SCREEN_PORTRAIT:
+			case FEATURE_SCREEN_LANDSCAPE:
 				return true;
+			/* Google apps gate whole feature sets on this; ATL is not a Google
+			 * build, but claiming otherwise is the only way in and costs nothing
+			 * that GMS does not already cost us */
+			case FEATURE_GOOGLE_EXPERIENCE:
+			case FEATURE_PIXEL_EXPERIENCE:
+			case FEATURE_PIXEL_2019_EXPERIENCE:
+				return true;
+			case FEATURE_MICROPHONE:
+				return System.getenv("ATL_UGLY_ENABLE_MICROPHONE") != null;
 			case FEATURE_AUTOMOTIVE:
 				return System.getenv("ATL_IS_AUTOMOTIVE") != null;
 			case FEATURE_LEANBACK:
@@ -2272,6 +2388,12 @@ public class PackageManager {
 			case FEATURE_CAMERA:
 			case FEATURE_CAMERA_ANY:
 			case FEATURE_CAMERA_FRONT:
+			case FEATURE_CAMERA_FLASH:
+			case FEATURE_CAMERA_AUTOFOCUS:
+			case FEATURE_CAMERA_LEVEL_FULL:
+			case FEATURE_CAMERA_CAPABILITY_MANUAL_SENSOR:
+			case FEATURE_CAMERA_CAPABILITY_MANUAL_POST_PROCESSING:
+			case FEATURE_CAMERA_CAPABILITY_RAW:
 				return hasCameraFeature(name);
 			default:
 				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
@@ -2282,8 +2404,15 @@ public class PackageManager {
 	/* the camera backend decides: no backend (or no ATL_UGLY_ENABLE_CAMERA)
 	 * means no cameras and none of these features */
 	static boolean hasCameraFeature(String name) {
-		int count = android.hardware.Camera.getNumberOfCameras();
+		int count;
 
+		if (name.startsWith("android.hardware.camera.level.")
+		    || name.startsWith("android.hardware.camera.capability.")
+		    || FEATURE_CAMERA_FLASH.equals(name)
+		    || FEATURE_CAMERA_AUTOFOCUS.equals(name))
+			return hasCamera2Feature(name);
+
+		count = android.hardware.Camera.getNumberOfCameras();
 		if (!FEATURE_CAMERA_FRONT.equals(name))
 			return count > 0;
 
@@ -2292,6 +2421,73 @@ public class PackageManager {
 			android.hardware.Camera.getCameraInfo(i, info);
 			if (info.facing == android.hardware.Camera.CameraInfo.CAMERA_FACING_FRONT)
 				return true;
+		}
+		return false;
+	}
+
+	/* the level.*, capability.*, flash and autofocus features are answers about
+	 * the hardware, so they come from the characteristics, not the Camera1 count */
+	private static boolean hasCamera2Feature(String name) {
+		android.hardware.camera2.CameraManager manager =
+		    new android.hardware.camera2.CameraManager();
+
+		try {
+			for (String id : manager.getCameraIdList()) {
+				android.hardware.camera2.CameraCharacteristics characteristics =
+				    manager.getCameraCharacteristics(id);
+
+				if (FEATURE_CAMERA_LEVEL_FULL.equals(name)) {
+					Integer level = characteristics.get(android.hardware.camera2
+					    .CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+					if (level == null)
+						continue;
+					/* LEGACY < LIMITED < FULL < LEVEL_3, and the constants are
+					 * not ordered, so name the two that qualify */
+					if (level == android.hardware.camera2.CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_FULL
+					    || level == android.hardware.camera2.CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_3)
+						return true;
+					continue;
+				}
+
+				if (FEATURE_CAMERA_FLASH.equals(name)) {
+					Boolean flash = characteristics.get(android.hardware.camera2
+					    .CameraCharacteristics.FLASH_INFO_AVAILABLE);
+					if (Boolean.TRUE.equals(flash))
+						return true;
+					continue;
+				}
+
+				if (FEATURE_CAMERA_AUTOFOCUS.equals(name)) {
+					int[] af_modes = characteristics.get(android.hardware.camera2
+					    .CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
+					if (af_modes == null)
+						continue;
+					for (int mode : af_modes)
+						if (mode != android.hardware.camera2.CameraMetadata.CONTROL_AF_MODE_OFF)
+							return true;
+					continue;
+				}
+
+				int wanted;
+				if (FEATURE_CAMERA_CAPABILITY_MANUAL_SENSOR.equals(name))
+					wanted = android.hardware.camera2.CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR;
+				else if (FEATURE_CAMERA_CAPABILITY_MANUAL_POST_PROCESSING.equals(name))
+					wanted = android.hardware.camera2.CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING;
+				else if (FEATURE_CAMERA_CAPABILITY_RAW.equals(name))
+					wanted = android.hardware.camera2.CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_RAW;
+				else
+					return false;
+
+				int[] capabilities = characteristics.get(android.hardware.camera2
+				    .CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+				if (capabilities == null)
+					continue;
+				for (int capability : capabilities)
+					if (capability == wanted)
+						return true;
+			}
+		} catch (android.hardware.camera2.CameraAccessException e) {
+			return false; /* no camera2 backend */
 		}
 		return false;
 	}

@@ -239,6 +239,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/os/android_atl_GVariantBuilderParcel.c',
                                                                   	'src/api-impl-jni/os/android_atl_GVariantIterParcel.c',
                                                                   	'src/api-impl-jni/os/android_os_Process.c',
+                                                                  	'src/api-impl-jni/os/android_os_SystemProperties.c',
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
                                                                   	'src/api-impl-jni/text/android_graphics_text_LineBreaker.cpp',
                                                                   	'src/api-impl-jni/text/android_graphics_text_MeasuredText.cpp',
@@ -390,6 +391,17 @@ custom_target('api-impl.jar', build_by_default: true, input: [hax_jar], output: 
               # not --incremental: dx merges into an existing output instead of replacing it,
               # so every in-place rebuild kept the classes of every build before it
               command: ['dx', '--dex', '--output='+join_paths(builddir_base, 'api-impl.jar'), hax_jar.full_path()])
+
+# libcore-shim.jar: java.* classes that go in front of ART's boot class path,
+# for API the runtime's own core-oj predates.  api-impl.jar cannot shadow java.*
+# - the app class loader delegates to the boot one first.
+libcore_shim_srcs = files('src/libcore/java/util/concurrent/Future.java')
+custom_target('libcore-shim.jar', build_by_default: true, output: ['libcore-shim.jar'],
+              install: true,
+              install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
+              depend_files: libcore_shim_srcs,
+              command: [python3_prog, files('src/libcore/build-libcore-shim.py'),
+                        '@OUTPUT@', bootclasspath_dir / 'core-all_classes.jar'] + libcore_shim_srcs)
 
 # gstub.jar
 subdir('src/gstub')

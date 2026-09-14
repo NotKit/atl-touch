@@ -54,6 +54,7 @@ void remove_ongoing_notifications(void); // app/android_app_NotificationManager.
 /* referenced by libtranslation_layer_main.so, which expects the launcher to own them */
 ATLWindow *atl_window = NULL;
 char *apk_path = NULL;
+char **apk_split_paths = NULL;
 
 /* the equivalent of /data/data/com.example.app/ */
 static char *app_data_dir = NULL;
@@ -464,9 +465,10 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 	fprintf(stderr, "boot: Application.onCreate returned\n");
 
 	jobject activity_object = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
-	                                                         static_method(env, handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
+	                                                         static_method(env, handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)Landroid/app/Activity;"),
 	                                                         _JSTRING(d->main_activity_class), _INTPTR(atl_window),
-	                                                         (d->uri && *d->uri) ? _JSTRING(d->uri) : NULL);
+	                                                         (d->uri && *d->uri) ? _JSTRING(d->uri) : NULL,
+	                                                         (d->action && *d->action) ? _JSTRING(d->action) : NULL);
 	fatal_exception_check(env, "Activity.createMainActivity");
 
 	jstring package_name_jstr = (*env)->CallObjectMethod(env, application_object, handle_cache.context.get_package_name);
@@ -504,7 +506,7 @@ static void activate(GApplication *app, struct launcher_options *d)
 		return;
 	}
 
-	fprintf(stderr, "error: usage: ./android-translation-layer-hotspot [app.apk] --api-impl-jar JAR --natives-dir DIR [-l ACTIVITY] [-u URI]\n"
+	fprintf(stderr, "error: usage: ./android-translation-layer-hotspot [app.apk] --api-impl-jar JAR --natives-dir DIR [-l ACTIVITY] [-u URI] [-a ACTION]\n"
 	                "you can specify --help to see the list of options\n");
 	exit(1);
 }
@@ -529,6 +531,7 @@ static void init_cmd_parameters(GApplication *app, struct launcher_options *d)
 		{ "vm-library",       0,  0, G_OPTION_ARG_FILENAME,   &d->vm_library,          "the native-image shared library to create the VM from; $ATL_IMAGE_LIB",               "SO"            },
 		{ "vm-check",         0,  0, G_OPTION_ARG_STRING,     &d->vm_check,            "run CLASS.main(String[]) as soon as the VM exists and exit, before any framework setup", "CLASS"       },
 		{ "uri",             'u', 0, G_OPTION_ARG_STRING,     &d->uri,                 "open the given URI inside the application",                                          "URI"           },
+		{ "action",          'a', 0, G_OPTION_ARG_STRING,     &d->action,              "the intent action to launch the activity with",                                      "ACTION"        },
 		{NULL}
 		/* clang-format on */
 	};

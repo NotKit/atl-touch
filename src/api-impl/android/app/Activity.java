@@ -54,6 +54,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	private Activity resultActivity;
 	private int resultRequestCode;
 	private boolean paused = false;
+	/* what onWindowFocusChanged was last told, so it stays a change
+	 * notification: the native side has two paths that both report focus */
+	private boolean windowFocused = false;
 	private CharSequence title = null;
 	List<Fragment> fragments = new ArrayList<>();
 	boolean destroyed = false;
@@ -69,10 +72,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	 * Helper function to be called from native code to construct main activity
 	 *
 	 * @param className  class name of activity or null
+	 * @param action     the intent action to launch with, or null
 	 * @return  instance of main activity class
 	 * @throws Exception
 	 */
-	private static Activity createMainActivity(String className, long native_window, String uriString) throws ReflectiveOperationException {
+	private static Activity createMainActivity(String className, long native_window, String uriString, String action) throws ReflectiveOperationException {
 		Uri uri = uriString != null ? Uri.parse(uriString) : null;
 		if (className == null) {
 			for (PackageParser.Activity activity : ATLLoadedApp.getPrimaryApplication().pkg.activities) {
@@ -81,8 +85,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 				boolean done = false;
 				for (PackageParser.IntentInfo intent : activity.intents) {
 					Slog.i(TAG, intent.toString());
-					if ((uri == null && intent.hasCategory("android.intent.category.LAUNCHER") && intent.hasAction("android.intent.action.MAIN")) ||        // NOLINT
-					    (uri != null && intent.hasDataScheme(uri.getScheme())                  && intent.hasCategory("android.intent.category.DEFAULT"))) { // NOLINT
+					if ((action != null && intent.hasAction(action)) ||                                                                                    // NOLINT
+					    (action == null && uri == null && intent.hasCategory("android.intent.category.LAUNCHER") && intent.hasAction("android.intent.action.MAIN")) || // NOLINT
+					    (action == null && uri != null && intent.hasDataScheme(uri.getScheme())                  && intent.hasCategory("android.intent.category.DEFAULT"))) { // NOLINT
 						className = activity.info.targetActivity != null ? activity.info.targetActivity : activity.className;
 						done = true;
 						break;
@@ -95,13 +100,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			className = className.replace('/', '.');
 		}
 		if (className == null) {
-			if (uri != null)
+			if (action != null)
+				System.err.println("Failed to find Activity for action: " + action);
+			else if (uri != null)
 				System.err.println("Failed to find Activity to launch URI: " + uri);
 			else
 				System.err.println("Failed to find main Activity");
 			System.exit(1);
 		}
-		return internalCreateActivity(className, native_window, uri != null ? new Intent("android.intent.action.VIEW", uri) : new Intent());
+		/* an explicit action wins: an app picks its entry mode off getAction() */
+		Intent intent;
+		if (action != null)
+			intent = uri != null ? new Intent(action, uri) : new Intent(action);
+		else if (uri != null)
+			intent = new Intent("android.intent.action.VIEW", uri);
+		else
+			intent = new Intent();
+		return internalCreateActivity(className, native_window, intent);
 	}
 
 	public Activity() {
@@ -483,6 +498,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public boolean isChangingConfigurations() { return false; }
 
+	/* nothing launches an ATL activity by voice, and there is no task stack */
+	public boolean isVoiceInteraction() { return false; }
+
+	public boolean isVoiceInteractionRoot() { return false; }
+
+	public void finishAndRemoveTask() { finish(); }
+
+	public void setVrModeEnabled(boolean enabled, android.content.ComponentName component) {}
+
 	public boolean isInPictureInPictureMode() { return false; }
 
 	/* No picture-in-picture mode here, so the params are dropped. Present
@@ -635,23 +659,19 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	public boolean hasWindowFocus() {
-		return true; // FIXME?
+		return windowFocused;
 	}
 
 	public boolean isDestroyed() {
 		return destroyed;
 	}
 
+	public void overridePendingTransition(int enterAnim, int exitAnim) {}
+
 	public void finishAffinity() {
 		finish();
 	}
 
-	/* No task stack here, so there is no task to remove: finishing is all of it. */
-	public void finishAndRemoveTask() {
-		finish();
-	}
-
-	public void overridePendingTransition(int enterAnim, int exitAnim) {}
 
 	public native boolean isTaskRoot();
 
@@ -801,6 +821,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	public void setDisablePreviewScreenshots(boolean disable) {}
+
+	/* SDK 33's replacement for setDisablePreviewScreenshots(); there is no
+	 * recents screen to keep a screenshot out of */
+	public void setRecentsScreenshotEnabled(boolean enabled) {}
 	public final View requireViewById(int id) {
 		View view = findViewById(id);
 		if (view == null)
