@@ -1,5 +1,8 @@
 package android.hardware.camera2;
 
+import android.hardware.camera2.impl.CameraMetadataNative;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -8,7 +11,7 @@ import java.util.List;
  *
  * The metadata enum constants, straight from the NDK tag header. Subclasses
  * (CameraCharacteristics, CaptureRequest, CaptureResult) inherit them and
- * override getKeys().
+ * override getKeys() and getAtlBag().
  */
 public abstract class CameraMetadata<TKey> {
 	protected CameraMetadata() {
@@ -16,6 +19,52 @@ public abstract class CameraMetadata<TKey> {
 
 	public List<TKey> getKeys() {
 		return Collections.emptyList();
+	}
+
+	/** the bag these keys come from; null only for a subclass that has none. */
+	CameraMetadataNative getAtlBag() {
+		return null;
+	}
+
+	/**
+	 * AOSP's package-private key enumerator. Camera apps call it by reflection
+	 * to reach the vendor keys, so the signature has to match theirs exactly.
+	 *
+	 * Every subclass here already lists just the keys its own bag holds, and
+	 * ATL has no synthetic keys, so only the tag filter is left to apply. A
+	 * subclass with no bag cannot resolve tags and keeps the whole list.
+	 */
+	static <TKey> ArrayList<TKey> getKeys(Class<?> type, Class<TKey> keyClass,
+	    CameraMetadata<TKey> instance, int[] filterTags, boolean includeSynthetic) {
+		ArrayList<TKey> keys = new ArrayList<TKey>(instance.getKeys());
+		CameraMetadataNative bag = instance.getAtlBag();
+
+		if (filterTags == null || bag == null)
+			return keys;
+
+		ArrayList<TKey> filtered = new ArrayList<TKey>();
+		for (TKey key : keys) {
+			int tag = bag.getTag(nameOf(key));
+
+			for (int want : filterTags) {
+				if (want == tag) {
+					filtered.add(key);
+					break;
+				}
+			}
+		}
+		return filtered;
+	}
+
+	/** the three Key classes share no supertype, only a getName(). */
+	private static String nameOf(Object key) {
+		if (key instanceof CameraCharacteristics.Key)
+			return ((CameraCharacteristics.Key<?>)key).getName();
+		if (key instanceof CaptureRequest.Key)
+			return ((CaptureRequest.Key<?>)key).getName();
+		if (key instanceof CaptureResult.Key)
+			return ((CaptureResult.Key<?>)key).getName();
+		return "";
 	}
 
 	public static final int AUTOMOTIVE_LENS_FACING_EXTERIOR_FRONT = 1;

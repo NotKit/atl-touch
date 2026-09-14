@@ -88,6 +88,11 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 		return metadata;
 	}
 
+	@Override
+	CameraMetadataNative getAtlBag() {
+		return metadata;
+	}
+
 	@SuppressWarnings("unchecked")
 	public <T> T get(Key<T> key) {
 		return (T)metadata.get(key.getName(), key.getType());
