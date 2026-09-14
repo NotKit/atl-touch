@@ -6,6 +6,11 @@ fs = import('fs')
 incdir_dep = declare_dependency(include_directories: '.')
 add_project_dependencies(incdir_dep, language: 'c')
 
+# the vendored Android NDK headers include each other as <camera/...>,
+# <media/...>, <android/...>; nothing else in the tree uses those prefixes
+android_ndk_headers_dep = declare_dependency(include_directories: 'third_party/android-headers')
+add_project_dependencies(android_ndk_headers_dep, language: 'c')
+
 cc = meson.get_compiler('c')
 python3_prog = import('python').find_installation('python3')
 dir_base = meson.current_source_dir()
@@ -220,6 +225,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/ATLWindow.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/input/input_method.c',
+                                                                  	'src/api-impl-jni/surface_post.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
                                                                   	'src/api-impl-jni/widgets/atl_surface_layer.c',
                                                                   	'src/api-impl-jni/widgets/android_webkit_WebView.cpp',
