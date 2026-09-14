@@ -6,7 +6,47 @@ import java.util.Map;
 
 public class MediaFormat {
 
+	public static final String KEY_MIME = "mime";
+	public static final String KEY_WIDTH = "width";
+	public static final String KEY_HEIGHT = "height";
+	public static final String KEY_BIT_RATE = "bitrate";
+	public static final String KEY_FRAME_RATE = "frame-rate";
+	public static final String KEY_I_FRAME_INTERVAL = "i-frame-interval";
+	public static final String KEY_COLOR_FORMAT = "color-format";
+	public static final String KEY_MAX_INPUT_SIZE = "max-input-size";
+	public static final String KEY_DURATION = "durationUs";
+	public static final String KEY_CHANNEL_COUNT = "channel-count";
+	public static final String KEY_SAMPLE_RATE = "sample-rate";
+
+	public static final String MIMETYPE_VIDEO_AVC = "video/avc";
+	public static final String MIMETYPE_VIDEO_HEVC = "video/hevc";
+	public static final String MIMETYPE_AUDIO_AAC = "audio/mp4a-latm";
+
 	private Map<String, Object> map = new HashMap<>();
+
+	public MediaFormat() {}
+
+	public MediaFormat(MediaFormat other) {
+		map.putAll(other.map);
+	}
+
+	public static MediaFormat createVideoFormat(String mime, int width, int height) {
+		MediaFormat format = new MediaFormat();
+
+		format.setString(KEY_MIME, mime);
+		format.setInteger(KEY_WIDTH, width);
+		format.setInteger(KEY_HEIGHT, height);
+		return format;
+	}
+
+	public static MediaFormat createAudioFormat(String mime, int sampleRate, int channelCount) {
+		MediaFormat format = new MediaFormat();
+
+		format.setString(KEY_MIME, mime);
+		format.setInteger(KEY_SAMPLE_RATE, sampleRate);
+		format.setInteger(KEY_CHANNEL_COUNT, channelCount);
+		return format;
+	}
 
 	public void setString(String key, String value) {
 		map.put(key, value);
@@ -32,6 +72,16 @@ public class MediaFormat {
 		return (int)map.get(name);
 	}
 
+	public int getInteger(String name, int defaultValue) {
+		Object value = map.get(name);
+
+		return value instanceof Integer ? (Integer)value : defaultValue;
+	}
+
+	public float getFloat(String name) {
+		return (float)map.get(name);
+	}
+
 	public boolean containsKey(String name) {
 		return map.containsKey(name);
 	}
@@ -48,33 +98,13 @@ public class MediaFormat {
 		return (long)map.get(name);
 	}
 
-	// Gecko's AndroidDecoderModule calls these before it can create any decoder,
-	// and a missing method or a null format is a MOZ_CRASH in GetStaticMethodID.
-	public static android.media.MediaFormat createAudioFormat(java.lang.String mime, int sampleRate, int channelCount) {
-		MediaFormat format = new MediaFormat();
-		format.setString(KEY_MIME, mime);
-		format.setInteger(KEY_SAMPLE_RATE, sampleRate);
-		format.setInteger(KEY_CHANNEL_COUNT, channelCount);
-		return format;
-	}
-
-	public static android.media.MediaFormat createVideoFormat(java.lang.String mime, int width, int height) {
-		MediaFormat format = new MediaFormat();
-		format.setString(KEY_MIME, mime);
-		format.setInteger(KEY_WIDTH, width);
-		format.setInteger(KEY_HEIGHT, height);
-		return format;
-	}
 
 	public static final int VIDEO_ENCODING_STATISTICS_LEVEL_1 = 1;
 
 	public static final java.lang.String KEY_BITRATE_MODE = "bitrate-mode";
 
-	public static final java.lang.String KEY_BIT_RATE = "bitrate";
 
-	public static final java.lang.String KEY_CHANNEL_COUNT = "channel-count";
 
-	public static final java.lang.String KEY_COLOR_FORMAT = "color-format";
 
 	public static final java.lang.String KEY_COLOR_RANGE = "color-range";
 
@@ -88,19 +118,14 @@ public class MediaFormat {
 
 	public static final java.lang.String KEY_CROP_TOP = "crop-top";
 
-	public static final java.lang.String KEY_FRAME_RATE = "frame-rate";
 
-	public static final java.lang.String KEY_HEIGHT = "height";
 
-	public static final java.lang.String KEY_I_FRAME_INTERVAL = "i-frame-interval";
 
 	public static final java.lang.String KEY_MAX_HEIGHT = "max-height";
 
 	public static final java.lang.String KEY_MAX_WIDTH = "max-width";
 
-	public static final java.lang.String KEY_MIME = "mime";
 
-	public static final java.lang.String KEY_SAMPLE_RATE = "sample-rate";
 
 	public static final java.lang.String KEY_SLICE_HEIGHT = "slice-height";
 
@@ -110,5 +135,4 @@ public class MediaFormat {
 
 	public static final java.lang.String KEY_VIDEO_QP_AVERAGE = "video-qp-average";
 
-	public static final java.lang.String KEY_WIDTH = "width";
 }

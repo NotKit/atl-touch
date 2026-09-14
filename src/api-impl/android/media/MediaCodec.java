@@ -10,7 +10,16 @@ import java.util.Queue;
 
 public class MediaCodec {
 
+	public static final int BUFFER_FLAG_KEY_FRAME = 0x1;
+	public static final int BUFFER_FLAG_SYNC_FRAME = 0x1;
+	public static final int BUFFER_FLAG_CODEC_CONFIG = 0x2;
 	public static final int BUFFER_FLAG_END_OF_STREAM = 0x4;
+
+	public static final int CONFIGURE_FLAG_ENCODE = 0x1;
+
+	public static final int INFO_TRY_AGAIN_LATER = -1;
+	public static final int INFO_OUTPUT_FORMAT_CHANGED = -2;
+	public static final int INFO_OUTPUT_BUFFERS_CHANGED = -3;
 
 	private String codecName;
 	private ByteBuffer[] inputBuffers;
@@ -24,21 +33,52 @@ public class MediaCodec {
 	private Queue<Integer> queuedInputBuffers;
 	private Queue<Integer> freeInputBuffers;
 
+	/* encoder mode (createEncoderByType + createInputSurface): the frames come
+	 * from a Surface, so there is no input buffer loop, and the output is the
+	 * encoded access units the native encoder hands over */
+	private final boolean encoder;
+	private long native_encoder;
+	private Surface inputSurface;
+	private int pendingOutputIndex = -1;
+	private final BufferInfo pendingInfo = new BufferInfo();
+
 	private MediaCodec(String codecName) throws IOException {
 		this.codecName = codecName;
+		this.encoder = false;
 		native_codec = native_constructor(codecName);
 		if (native_codec == 0) {
 			throw new IOException("Unable to create MediaCodec: " + codecName);
 		}
 	}
 
+	private MediaCodec(String codecName, boolean encoder) {
+		this.codecName = codecName;
+		this.encoder = encoder;
+	}
+
 	public static MediaCodec createByCodecName(String codecName) throws IOException {
 		return new MediaCodec(codecName);
+	}
+
+	/** ATL encodes H.264 and nothing else; the encoder itself is built by configure(). */
+	public static MediaCodec createEncoderByType(String type) throws IOException {
+		if (!"video/avc".equals(type))
+			throw new IOException("no encoder for " + type);
+		return new MediaCodec("h264-encoder", true);
+	}
+
+	public String getName() {
+		return codecName;
 	}
 
 	public void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags) {
 		System.out.println("MediaCodec.configure(" + format + ", " + surface + ", " + crypto + ", " + flags + "): codecName=" + codecName);
 		this.mediaFormat = format;
+
+		if (encoder) {
+			configureEncoder(format);
+			return;
+		}
 
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
@@ -70,8 +110,52 @@ public class MediaCodec {
 		}
 	}
 
+	/* the encoder half: one native encoder, its Surface, and the access units
+	 * it produces read straight into the output buffers */
+	private void configureEncoder(MediaFormat format) {
+		int width = format.getInteger(MediaFormat.KEY_WIDTH);
+		int height = format.getInteger(MediaFormat.KEY_HEIGHT);
+		int bitRate = format.getInteger(MediaFormat.KEY_BIT_RATE, 0);
+		int frameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE, 30);
+
+		native_encoder = native_encoder_create(width, height, frameRate, bitRate);
+		if (native_encoder == 0)
+			throw new IllegalStateException("cannot encode " + width + "x" + height + " H.264");
+
+		/* one access unit fits in an uncompressed frame, whatever the bitrate */
+		int bufferSize = Math.max(width * height * 3 / 2, 65536);
+		outputBuffers = new ByteBuffer[2];
+		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		for (int i = 0; i < outputBuffers.length; i++) {
+			outputBuffers[i] = ByteBuffer.allocate(bufferSize).order(ByteOrder.LITTLE_ENDIAN);
+			freeOutputBuffers.add(i);
+		}
+	}
+
+	/** The encoder's input: a Surface a camera2 session (or anything else) fills. */
+	public Surface createInputSurface() {
+		if (!encoder || native_encoder == 0)
+			throw new IllegalStateException("createInputSurface() needs a configured encoder");
+		if (inputSurface == null) {
+			inputSurface = new Surface();
+			native_encoder_inputSurface(native_encoder, inputSurface);
+		}
+		return inputSurface;
+	}
+
+	public void signalEndOfInputStream() {
+		if (!encoder || native_encoder == 0)
+			throw new IllegalStateException("signalEndOfInputStream() needs a configured encoder");
+		native_encoder_signalEndOfInputStream(native_encoder);
+	}
+
 	public void start() {
 		System.out.println("MediaCodec.start(): codecName=" + codecName);
+		if (encoder) {
+			if (native_encoder == 0 || !native_encoder_start(native_encoder))
+				throw new IllegalStateException("the encoder refused to start");
+			return;
+		}
 		native_start(native_codec);
 	}
 
@@ -92,6 +176,8 @@ public class MediaCodec {
 	}
 
 	public int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
+		if (encoder)
+			return dequeueEncodedBuffer(info, timeoutUs);
 		if (!outputFormatSet) {
 			outputFormatSet = true;
 			return /*INFO_OUTPUT_FORMAT_CHANGED*/ -2;
@@ -111,7 +197,48 @@ public class MediaCodec {
 		return ret;
 	}
 
+	/*
+	 * The first access unit is what says what the stream is, so it is held
+	 * back until the app has been told the output format — the order AOSP
+	 * reports and every muxing loop is written against.
+	 */
+	private int dequeueEncodedBuffer(BufferInfo info, long timeoutUs) {
+		if (native_encoder == 0)
+			return INFO_TRY_AGAIN_LATER;
+
+		if (pendingOutputIndex < 0) {
+			Integer index = freeOutputBuffers.poll();
+
+			if (index == null)
+				return INFO_TRY_AGAIN_LATER;
+			outputBuffers[index].clear();
+			if (native_encoder_dequeue(native_encoder, outputBuffers[index], pendingInfo, timeoutUs) != 0) {
+				freeOutputBuffers.add(index);
+				return INFO_TRY_AGAIN_LATER;
+			}
+			pendingOutputIndex = index;
+		}
+		if (!outputFormatSet) {
+			outputFormatSet = true;
+			return INFO_OUTPUT_FORMAT_CHANGED;
+		}
+
+		int index = pendingOutputIndex;
+		pendingOutputIndex = -1;
+		info.offset = pendingInfo.offset;
+		info.size = pendingInfo.size;
+		info.flags = pendingInfo.flags;
+		info.presentationTimeUs = pendingInfo.presentationTimeUs;
+		outputBuffers[index].position(0);
+		outputBuffers[index].limit(info.offset + info.size);
+		return index;
+	}
+
 	public void releaseOutputBuffer(int index, boolean render) {
+		if (encoder) {
+			freeOutputBuffers.add(index);
+			return;
+		}
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], render);
 		freeOutputBuffers.add(index);
 	}
@@ -123,8 +250,21 @@ public class MediaCodec {
 
 	public MediaFormat getOutputFormat(int index) { return null; }
 
+	/** For an encoder this carries csd-0, the SPS/PPS of the stream so far. */
 	public MediaFormat getOutputFormat() {
-		return mediaFormat;
+		if (!encoder || native_encoder == 0)
+			return mediaFormat;
+
+		MediaFormat format = MediaFormat.createVideoFormat("video/avc",
+		    mediaFormat.getInteger(MediaFormat.KEY_WIDTH),
+		    mediaFormat.getInteger(MediaFormat.KEY_HEIGHT));
+		byte[] csd = native_encoder_csd(native_encoder);
+
+		format.setInteger(MediaFormat.KEY_FRAME_RATE,
+		    mediaFormat.getInteger(MediaFormat.KEY_FRAME_RATE, 30));
+		if (csd != null)
+			format.setByteBuffer("csd-0", ByteBuffer.wrap(csd));
+		return format;
 	}
 
 	public void flush() {}
@@ -171,10 +311,21 @@ public class MediaCodec {
 		System.out.println("MediaCodec.setVideoScalingMode(" + mode + "): codecName=" + codecName);
 	}
 
-	public void stop() {}
+	public void stop() {
+		if (encoder && native_encoder != 0)
+			native_encoder_finish(native_encoder);
+	}
 
 	public void release() {
 		System.out.println("MediaCodec.release(): codecName=" + codecName);
+		if (native_encoder != 0) {
+			native_encoder_release(native_encoder);
+			native_encoder = 0;
+			if (inputSurface != null) {
+				inputSurface.release();
+				inputSurface = null;
+			}
+		}
 		if (native_codec != 0) {
 			if (outputBuffers != null) {
 				for (int i = 0; i < outputBuffers.length; i++) {
@@ -209,6 +360,16 @@ public class MediaCodec {
 	public static final class CryptoException extends RuntimeException {
 		public int getErrorCode() { return 0; }
 	}
+	private static native long native_encoder_create(int width, int height, int fps, int bitRate);
+	private static native void native_encoder_inputSurface(long encoder, Surface surface);
+	private static native boolean native_encoder_start(long encoder);
+	/* 0 with the info filled in, or -1 when nothing is encoded yet */
+	private static native int native_encoder_dequeue(long encoder, ByteBuffer buffer, BufferInfo info,
+	    long timeoutUs);
+	private static native byte[] native_encoder_csd(long encoder);
+	private static native void native_encoder_signalEndOfInputStream(long encoder);
+	private static native void native_encoder_finish(long encoder);
+	private static native void native_encoder_release(long encoder);
 
 	public static final class CryptoInfo {
 		public static final class Pattern {
@@ -284,19 +445,12 @@ public class MediaCodec {
 
 	public android.media.MediaFormat getInputFormat() { return null; }
 
-	public android.view.Surface createInputSurface() { return null; }
 
-	public static final int BUFFER_FLAG_CODEC_CONFIG = 2;
 
-	public static final int BUFFER_FLAG_KEY_FRAME = 1;
 
-	public static final int BUFFER_FLAG_SYNC_FRAME = 1;
 
-	public static final int CONFIGURE_FLAG_ENCODE = 1;
 
-	public static final int INFO_OUTPUT_BUFFERS_CHANGED = -3;
 
-	public static final int INFO_OUTPUT_FORMAT_CHANGED = -2;
 
 	public static final java.lang.String PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
 

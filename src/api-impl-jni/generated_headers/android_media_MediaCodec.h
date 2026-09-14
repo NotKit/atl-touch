@@ -7,20 +7,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#undef android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM
-#define android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM 4L
-#undef android_media_MediaCodec_BUFFER_FLAG_CODEC_CONFIG
-#define android_media_MediaCodec_BUFFER_FLAG_CODEC_CONFIG 2L
 #undef android_media_MediaCodec_BUFFER_FLAG_KEY_FRAME
 #define android_media_MediaCodec_BUFFER_FLAG_KEY_FRAME 1L
 #undef android_media_MediaCodec_BUFFER_FLAG_SYNC_FRAME
 #define android_media_MediaCodec_BUFFER_FLAG_SYNC_FRAME 1L
+#undef android_media_MediaCodec_BUFFER_FLAG_CODEC_CONFIG
+#define android_media_MediaCodec_BUFFER_FLAG_CODEC_CONFIG 2L
+#undef android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM
+#define android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM 4L
 #undef android_media_MediaCodec_CONFIGURE_FLAG_ENCODE
 #define android_media_MediaCodec_CONFIGURE_FLAG_ENCODE 1L
-#undef android_media_MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED
-#define android_media_MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED -3L
+#undef android_media_MediaCodec_INFO_TRY_AGAIN_LATER
+#define android_media_MediaCodec_INFO_TRY_AGAIN_LATER -1L
 #undef android_media_MediaCodec_INFO_OUTPUT_FORMAT_CHANGED
 #define android_media_MediaCodec_INFO_OUTPUT_FORMAT_CHANGED -2L
+#undef android_media_MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED
+#define android_media_MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED -3L
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_constructor
@@ -84,6 +86,70 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
  */
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1release
   (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_create
+ * Signature: (IIII)J
+ */
+JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1encoder_1create
+  (JNIEnv *, jclass, jint, jint, jint, jint);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_inputSurface
+ * Signature: (JLandroid/view/Surface;)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1encoder_1inputSurface
+  (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_start
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_media_MediaCodec_native_1encoder_1start
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_dequeue
+ * Signature: (JLjava/nio/ByteBuffer;Landroid/media/MediaCodec/BufferInfo;J)I
+ */
+JNIEXPORT jint JNICALL Java_android_media_MediaCodec_native_1encoder_1dequeue
+  (JNIEnv *, jclass, jlong, jobject, jobject, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_csd
+ * Signature: (J)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_android_media_MediaCodec_native_1encoder_1csd
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_signalEndOfInputStream
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1encoder_1signalEndOfInputStream
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_finish
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1encoder_1finish
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_encoder_release
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1encoder_1release
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

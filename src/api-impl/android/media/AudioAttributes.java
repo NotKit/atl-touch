@@ -27,6 +27,11 @@ public class AudioAttributes {
 			return this;
 		}
 
+		/* No haptic channels here, so muting them is already true. */
+		public Builder setHapticChannelsMuted(boolean muted) {
+			return this;
+		}
+
 		public AudioAttributes build() {
 			return new AudioAttributes();
 		}

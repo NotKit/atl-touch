@@ -6,6 +6,18 @@ public class AudioFormat {
 	int channelMask;
 	int encoding;
 
+	public int getSampleRate() {
+		return sampleRate;
+	}
+
+	public int getChannelCount() {
+		return Math.max(1, Integer.bitCount(channelMask));
+	}
+
+	public int getEncoding() {
+		return encoding;
+	}
+
 	public static class Builder {
 
 		private AudioFormat audioFormat = new AudioFormat();
@@ -30,15 +42,12 @@ public class AudioFormat {
 		}
 	}
 
-	public int getChannelCount() { return 0; }
 
 	public int getChannelIndexMask() { return 0; }
 
 	public int getChannelMask() { return 0; }
 
-	public int getEncoding() { return 0; }
 
-	public int getSampleRate() { return 0; }
 
 	public static final int CHANNEL_INVALID = 0;
 
