@@ -1,0 +1,206 @@
+Implement TLS descriptors (R_AARCH64_TLSDESC) in the shim linker
+
+1031 is R_AARCH64_TLSDESC, but linker.h defines it as R_AARCH64_TLS_DTPREL32
+when the system elf.h does not (glibc has not called it that for years), and
+the relocation loop then "handles" every TLS descriptor by tracing it and
+moving on.  The descriptor's resolver stays NULL, and the library dies on its
+first thread-local access - a jump to address 0 from inside its own
+constructors, with nothing in the log.
+
+Google Camera's libgcastartup.so has 59 of them.
+
+The resolver has to answer per thread ("this module's block, plus the
+variable's offset, minus the thread pointer"), and it runs under an ABI that
+lets it clobber only x0, so the entry point is a trampoline that saves the
+caller-saved registers around the C half.  aarch64 only; every other
+architecture keeps the old do-nothing behaviour.
+
+Cross-module descriptors (a TLS symbol defined in another object) are not
+handled: the module id is always the relocated object's own, which is the same
+simplification the DTPMOD case already makes.
+
+--- a/linker/linker.c
++++ b/linker/linker.c
+@@ -2012,9 +2012,19 @@
+ 			TRACE_TYPE(RELO, "RELO TLS_TPREL64 *** %p <- %p - %p\n",
+ 				   (void *)reloc, (void *)(sym_addr + get_addend(rel)), (void *)rel->r_offset);
+ 			break;
+-		case R_AARCH64_TLS_DTPREL32:
+-			TRACE_TYPE(RELO, "RELO TLS_DTPREL32 *** %p <- %p - %p\n",
+-				   (void *)reloc, (void *)(sym_addr + get_addend(rel)), (void *)rel->r_offset);
++		case R_AARCH64_TLSDESC:
++			/* A TLS descriptor is a pair of words: a resolver and its
++			 * argument.  The code calls the resolver and adds what it
++			 * returns to the thread pointer, so the answer has to be
++			 * computed per thread - see __tls_desc_relocate(). */
++			TRACE_TYPE(RELO, "RELO TLSDESC %p <- module %zu offset %p %s\n",
++				   (void *)reloc, si->tls_slot_id,
++				   (void *)(sym_addr + get_addend(rel)), sym_name);
++			if (__tls_desc_relocate((void **)reloc, si->tls_slot_id,
++						sym_addr + get_addend(rel)) != 0) {
++				DL_ERR("%s: out of memory relocating a TLS descriptor", si->name);
++				return -1;
++			}
+ 			break;
+ #elif defined(__x86_64__)
+ 		case R_X86_64_32:
+--- a/linker/linker.h
++++ b/linker/linker.h
+@@ -47,9 +47,13 @@
+ #define PAGE_SIZE 4096
+ #define PAGE_MASK 4095
+ 
+-#ifndef R_AARCH64_TLS_DTPREL32
+-#define R_AARCH64_TLS_DTPREL32 1031
+-#pragma message "The R_AARCH64_TLS_DTPREL32 was not set :("
++/* 1031 is R_AARCH64_TLSDESC.  It used to be defined here as
++ * R_AARCH64_TLS_DTPREL32, which is not a dynamic relocation at all, and the
++ * relocation loop then "handled" every TLS descriptor by tracing it and moving
++ * on - leaving the descriptor's resolver NULL, so the library crashed on its
++ * first thread-local access. */
++#ifndef R_AARCH64_TLSDESC
++#define R_AARCH64_TLSDESC 1031
+ #endif
+ 
+ #ifndef R_AARCH64_TLS_TPREL64
+--- a/linker/linker_tls.c
++++ b/linker/linker_tls.c
+@@ -149,3 +149,127 @@
+ 
+ 	return (uintptr_t)module_base + idx->offset;
+ }
++
++/*
++ * TLS descriptors (R_AARCH64_TLSDESC and its equivalents).
++ *
++ * A descriptor is two words in the GOT: a resolver function and one argument.
++ * The compiled code loads both, calls the resolver, and adds the value it
++ * returns to the thread pointer. The answer is therefore per thread, and for a
++ * module loaded at runtime it has to allocate that module's block first - so
++ * the resolver is the dynamic one, and it answers
++ * "block + offset - thread pointer".
++ *
++ * The resolver runs under its own ABI: the caller expects every register except
++ * x0 to survive the call, which no compiler-generated function guarantees. The
++ * entry point is therefore a trampoline that saves the caller-saved registers
++ * (including the SIMD ones - the C half reaches memcpy) around the C half.
++ */
++
++struct tlsdesc_arg {
++	size_t module;
++	size_t offset;
++};
++
++/* the C half; the trampoline hands it the descriptor's argument */
++ptrdiff_t __tls_desc_resolve(struct tlsdesc_arg *arg);
++
++ptrdiff_t __tls_desc_resolve(struct tlsdesc_arg *arg)
++{
++	char *block = __tls_get_module(arg->module);
++	uintptr_t tp;
++
++	if (!block)
++		return 0;
++#if defined(__aarch64__)
++	__asm__ volatile("mrs %0, tpidr_el0" : "=r"(tp));
++#else
++	tp = 0;
++#endif
++	return (ptrdiff_t)((uintptr_t)block + arg->offset - tp);
++}
++
++#if defined(__aarch64__)
++__asm__(
++    ".text\n"
++    ".balign 16\n"
++    ".globl __tls_desc_resolver\n"
++    ".hidden __tls_desc_resolver\n"
++    ".type __tls_desc_resolver, %function\n"
++    "__tls_desc_resolver:\n"
++    "	sub	sp, sp, #544\n"
++    "	stp	x29, x30, [sp]\n"
++    "	mov	x29, sp\n"
++    "	stp	x1, x2, [sp, #16]\n"
++    "	stp	x3, x4, [sp, #32]\n"
++    "	stp	x5, x6, [sp, #48]\n"
++    "	stp	x7, x8, [sp, #64]\n"
++    "	stp	x9, x10, [sp, #80]\n"
++    "	stp	x11, x12, [sp, #96]\n"
++    "	stp	x13, x14, [sp, #112]\n"
++    "	stp	x15, x16, [sp, #128]\n"
++    "	stp	x17, x18, [sp, #144]\n"
++    "	stp	q0, q1, [sp, #160]\n"
++    "	stp	q2, q3, [sp, #192]\n"
++    "	stp	q4, q5, [sp, #224]\n"
++    "	stp	q6, q7, [sp, #256]\n"
++    "	stp	q16, q17, [sp, #288]\n"
++    "	stp	q18, q19, [sp, #320]\n"
++    "	stp	q20, q21, [sp, #352]\n"
++    "	stp	q22, q23, [sp, #384]\n"
++    "	stp	q24, q25, [sp, #416]\n"
++    "	stp	q26, q27, [sp, #448]\n"
++    "	stp	q28, q29, [sp, #480]\n"
++    "	stp	q30, q31, [sp, #512]\n"
++    "	ldr	x0, [x0, #8]\n"
++    "	bl	__tls_desc_resolve\n"
++    "	ldp	q30, q31, [sp, #512]\n"
++    "	ldp	q28, q29, [sp, #480]\n"
++    "	ldp	q26, q27, [sp, #448]\n"
++    "	ldp	q24, q25, [sp, #416]\n"
++    "	ldp	q22, q23, [sp, #384]\n"
++    "	ldp	q20, q21, [sp, #352]\n"
++    "	ldp	q18, q19, [sp, #320]\n"
++    "	ldp	q16, q17, [sp, #288]\n"
++    "	ldp	q6, q7, [sp, #256]\n"
++    "	ldp	q4, q5, [sp, #224]\n"
++    "	ldp	q2, q3, [sp, #192]\n"
++    "	ldp	q0, q1, [sp, #160]\n"
++    "	ldp	x17, x18, [sp, #144]\n"
++    "	ldp	x15, x16, [sp, #128]\n"
++    "	ldp	x13, x14, [sp, #112]\n"
++    "	ldp	x11, x12, [sp, #96]\n"
++    "	ldp	x9, x10, [sp, #80]\n"
++    "	ldp	x7, x8, [sp, #64]\n"
++    "	ldp	x5, x6, [sp, #48]\n"
++    "	ldp	x3, x4, [sp, #32]\n"
++    "	ldp	x1, x2, [sp, #16]\n"
++    "	ldp	x29, x30, [sp]\n"
++    "	add	sp, sp, #544\n"
++    "	ret\n"
++    ".size __tls_desc_resolver, .-__tls_desc_resolver\n");
++
++extern void __tls_desc_resolver(void);
++#endif
++
++int __tls_desc_relocate(void **descriptor, size_t module, size_t offset)
++{
++#if defined(__aarch64__)
++	struct tlsdesc_arg *arg = malloc(sizeof(*arg));
++
++	if (!arg)
++		return -1;
++	arg->module = module;
++	arg->offset = offset;
++	descriptor[0] = (void *)__tls_desc_resolver;
++	descriptor[1] = arg;
++	return 0;
++#else
++	/* every other architecture keeps the old behaviour: the descriptor is
++	 * left alone, which is wrong but is what it has always done */
++	(void)descriptor;
++	(void)module;
++	(void)offset;
++	return 0;
++#endif
++}
+--- a/linker/linker_tls.h
++++ b/linker/linker_tls.h
+@@ -5,4 +5,8 @@
+ 
+ size_t __tls_register_module(void *template_base, size_t template_size, size_t size, int align);
+ 
++/* Fill in a TLS descriptor (an R_AARCH64_TLSDESC relocation target): a resolver
++ * function plus its argument.  Returns 0 on success. */
++int __tls_desc_relocate(void **descriptor, size_t module, size_t offset);
++
+ #endif

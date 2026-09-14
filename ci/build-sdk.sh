@@ -109,7 +109,7 @@ clone() { # clone <url> <ref> <dir>
 
 # Stamps carry the pinned ref (and, for bionic, the patch hash) so a stale
 # cache can never mask a bump — the renamed stamp just doesn't exist.
-BIONIC_STAMP="${BIONIC_REF:0:12}-$(cat "${PATCHES}/bionic_translation-ut.patch" "${PATCHES}/bionic_translation-stdio-glibc.patch" | sha256sum | cut -c1-8)"
+BIONIC_STAMP="${BIONIC_REF:0:12}-$(cat "${PATCHES}/bionic_translation-ut.patch" "${PATCHES}/bionic_translation-stdio-glibc.patch" "${PATCHES}/bionic_translation-tlsdesc.patch" | sha256sum | cut -c1-8)"
 ART_STAMP="${ART_REF:0:12}-$(cat "${PATCHES}/art_standalone-d8.patch" \
     "${PATCHES}/art_standalone-imt-object-dispatch.patch" | sha256sum | cut -c1-8)-d8${R8_VERSION}"
 
@@ -201,6 +201,7 @@ if ! stamp "bionic_translation-${BIONIC_STAMP}"; then
     rsync -a --delete --exclude=.git "${SRC}/bionic_translation/" "${BUILD_DIR}/bionic_translation/"
     patch -d "${BUILD_DIR}/bionic_translation" -p1 < "${PATCHES}/bionic_translation-ut.patch"
     patch -d "${BUILD_DIR}/bionic_translation" -p1 < "${PATCHES}/bionic_translation-stdio-glibc.patch"
+    patch -d "${BUILD_DIR}/bionic_translation" -p1 < "${PATCHES}/bionic_translation-tlsdesc.patch"
     meson setup "${BUILD_DIR}/bionic_translation/build" "${BUILD_DIR}/bionic_translation" \
         --prefix="${PREFIX}" --libdir=lib --buildtype=release
     ninja -C "${BUILD_DIR}/bionic_translation/build" -j"${JOBS}" install
