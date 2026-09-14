@@ -142,6 +142,9 @@ libandroid_so = shared_library('android', [
                                           	'-Wl,-z,lazy',  # outdated Nvidia driver version 340 lacks EGL symbols
                                           ])
 
+# libcamera2ndk/libbinder_ndk/libnativewindow for an app's own native code
+subdir('src/hybris-ndk')
+
 wayland_protos_dep = dependency('wayland-protocols', version: '>=1.12')
 
 # wayland protocols for osk
