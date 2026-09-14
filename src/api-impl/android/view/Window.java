@@ -179,6 +179,14 @@ public class Window {
 
 	public void setStatusBarColor(int color) {}
 
+	/* the host compositor owns colour mode, shared-element overlays and the
+	 * performance hint, so these are recorded nowhere */
+	public void setColorMode(int colorMode) {}
+
+	public void setSharedElementsUseOverlay(boolean sharedElementsUseOverlay) {}
+
+	public void setSustainedPerformanceMode(boolean enable) {}
+
 	public void setNavigationBarColor(int color) {}
 
 	public void setNavigationBarDividerColor(int color) {}
@@ -270,7 +278,15 @@ public class Window {
 
 	public void setStatusBarContrastEnforced(boolean enforced) {}
 
-	public void setNavigationBarContrastEnforced(boolean enforced) {}
+	public void setNavigationBarContrastEnforced(boolean enforced) {
+		navigationBarContrastEnforced = enforced;
+	}
+
+	public boolean isNavigationBarContrastEnforced() {
+		return navigationBarContrastEnforced;
+	}
+
+	private boolean navigationBarContrastEnforced;
 
 	public native void native_set_view_root(long native_window, ViewRootImpl view_root);
 	private native void set_title(long native_window, String title);

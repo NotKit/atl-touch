@@ -833,6 +833,13 @@ public class Process {
 
 	public static final native boolean is64Bit();
 
+	/** whether a uid belongs to an installed app rather than the system */
+	public static final boolean isApplicationUid(int uid) {
+		int appId = uid % 100000;
+
+		return appId >= FIRST_APPLICATION_UID && appId <= LAST_APPLICATION_UID;
+	}
+
 	public static long getStartUptimeMillis() {
 		return 1000;
 	};

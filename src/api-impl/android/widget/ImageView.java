@@ -53,18 +53,23 @@ public class ImageView extends View {
 	}
 
 	public void setImageResource(final int resid) {
+		android.content.res.Resources res = getResources();
+		Bitmap decoded;
+
 		if (resid == 0) {
 			// Resource id 0 is how an app clears the image, not a lookup failure.
 			setImageDrawable(null);
 			return;
 		}
-		if (this.getResources().getString(resid).endsWith(".xml")) {
+		if (res.getString(resid).endsWith(".xml")) {
 			setImageDrawable(getContext().getDrawable(resid));
 			return;
 		}
-		bitmap = BitmapFactory.decodeResource(this.getResources(), resid);
-		requestLayout();
-		invalidate();
+		/* AOSP always ends up with a Drawable here, and apps read it back and
+		 * tint it (Google Camera's EV-compensation buttons do) */
+		decoded = BitmapFactory.decodeResource(res, resid);
+		setImageDrawable(decoded == null ? null
+		    : new android.graphics.drawable.BitmapDrawable(res, decoded));
 	}
 	public void setAdjustViewBounds(boolean adjustViewBounds) {}
 

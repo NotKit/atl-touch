@@ -69,6 +69,55 @@ public final class Display {
 		return new float[] { getRefreshRate() };
 	}
 
+	/** ATL's display has exactly one mode: the window it draws into */
+	public Mode getMode() {
+		return new Mode(1, getWidth(), getHeight(), getRefreshRate());
+	}
+
+	public Mode[] getSupportedModes() {
+		return new Mode[] { getMode() };
+	}
+
+	/** a host window has square corners */
+	public RoundedCorner getRoundedCorner(int position) {
+		return null;
+	}
+
+	public static final class Mode {
+		private final int modeId;
+		private final int width;
+		private final int height;
+		private final float refreshRate;
+
+		Mode(int modeId, int width, int height, float refreshRate) {
+			this.modeId = modeId;
+			this.width = width;
+			this.height = height;
+			this.refreshRate = refreshRate;
+		}
+
+		public int getModeId() {
+			return modeId;
+		}
+
+		public int getPhysicalWidth() {
+			return width;
+		}
+
+		public int getPhysicalHeight() {
+			return height;
+		}
+
+		public float getRefreshRate() {
+			return refreshRate;
+		}
+
+		@Override
+		public String toString() {
+			return "Display.Mode(" + width + "x" + height + "@" + refreshRate + ")";
+		}
+	}
+
 	public long getAppVsyncOffsetNanos() {
 		return 0; // what else would we return here?
 	}
@@ -91,6 +140,11 @@ public final class Display {
 
 	public void getRectSize(Rect rect) {
 		rect.set(0, 0, getWidth(), getHeight());
+	}
+
+	/** the host window is the built-in panel as far as an app is concerned */
+	public android.hardware.display.DeviceProductInfo getDeviceProductInfo() {
+		return new android.hardware.display.DeviceProductInfo();
 	}
 
 	public DisplayCutout getCutout() {

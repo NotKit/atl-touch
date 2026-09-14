@@ -567,6 +567,29 @@ public class Resources {
 	}
 
 	/**
+	 * A raw float resource (API 29). A dimension answers too, in its own
+	 * units, which is what AOSP's TypedValue.getFloat() does with one.
+	 */
+	public float getFloat(int id) throws NotFoundException {
+		synchronized (mAccessLock) {
+			TypedValue value = mTmpValue;
+			if (value == null) {
+				mTmpValue = value = new TypedValue();
+			}
+			getValue(id, value, true);
+			if (value.type == TypedValue.TYPE_FLOAT)
+				return value.getFloat();
+			if (value.type == TypedValue.TYPE_DIMENSION)
+				return TypedValue.complexToDimension(value.data, mMetrics);
+			if (value.type >= TypedValue.TYPE_FIRST_INT && value.type <= TypedValue.TYPE_LAST_INT)
+				return value.data;
+			throw new NotFoundException(
+			    "Resource ID #0x" + Integer.toHexString(id) + " type #0x"
+			    + Integer.toHexString(value.type) + " is not a float");
+		}
+	}
+
+	/**
 	 * Retrieve a dimensional for a particular resource ID.  Unit
 	 * conversions are based on the current {@link DisplayMetrics} associated
 	 * with the resources.
@@ -925,7 +948,21 @@ public class Resources {
 		return android.graphics.Typeface.createFromFile(out.getAbsolutePath());
 	}
 
+	private static final boolean DEBUG_COLORS = System.getenv("ATL_DEBUG_COLORS") != null;
+
 	public int getColor(int id, Theme theme) throws NotFoundException {
+		if (DEBUG_COLORS && (id >>> 24) == 0x01) {
+			int color = getColorInternal(id, theme);
+			StackTraceElement[] st = Thread.currentThread().getStackTrace();
+			String from = st.length > 3 ? st[3].getClassName() + "." + st[3].getMethodName() : "?";
+			System.err.println("ATL_COLOR: 0x" + Integer.toHexString(id) + " " + getResourceEntryName(id)
+			    + " = #" + Integer.toHexString(color) + " from " + from);
+			return color;
+		}
+		return getColorInternal(id, theme);
+	}
+
+	private int getColorInternal(int id, Theme theme) throws NotFoundException {
 		TypedValue value;
 		synchronized (mAccessLock) {
 			value = mTmpValue;

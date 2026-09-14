@@ -154,6 +154,11 @@ public class WindowInsets {
 		return getInsets(Type.TAPPABLE_ELEMENT);
 	}
 
+	/* ATL's window has no rounded corners; androidx asks anyway. */
+	public RoundedCorner getRoundedCorner(int position) {
+		return null;
+	}
+
 	public DisplayCutout getDisplayCutout() {
 		return displayCutout;
 	}

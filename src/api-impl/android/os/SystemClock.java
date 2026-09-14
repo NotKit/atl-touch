@@ -141,6 +141,13 @@ public final class SystemClock {
 	native public static long uptimeMillis();
 
 	/**
+	 * Returns nanoseconds since boot, not counting time spent in deep sleep.
+	 *
+	 * @return nanoseconds of non-sleep uptime since boot.
+	 */
+	public static native long uptimeNanos();
+
+	/**
 	 * Returns milliseconds since boot, including time spent in sleep.
 	 *
 	 * @return elapsed milliseconds since boot.

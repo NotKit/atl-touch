@@ -113,6 +113,9 @@ public class StaticLayout extends Layout {
             b.mHyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NONE;
             b.mJustificationMode = Layout.JUSTIFICATION_MODE_NONE;
             b.mLineBreakConfig = LineBreakConfig.NONE;
+            b.mUseBoundsForWidth = false;
+            b.mShiftDrawingOffsetForStartOverhang = false;
+            b.mMinimumFontMetrics = null;
             return b;
         }
 
@@ -420,6 +423,27 @@ public class StaticLayout extends Layout {
             return this;
         }
 
+        /** API 35: layout width from glyph bounds instead of advances. Stored only. */
+        @NonNull
+        public Builder setUseBoundsForWidth(boolean useBoundsForWidth) {
+            mUseBoundsForWidth = useBoundsForWidth;
+            return this;
+        }
+
+        /** API 35, companion of setUseBoundsForWidth. Stored only. */
+        @NonNull
+        public Builder setShiftDrawingOffsetForStartOverhang(boolean shift) {
+            mShiftDrawingOffsetForStartOverhang = shift;
+            return this;
+        }
+
+        /** API 35: a floor for every line's ascent/descent. Stored only. */
+        @NonNull
+        public Builder setMinimumFontMetrics(@Nullable Paint.FontMetrics minimumFontMetrics) {
+            mMinimumFontMetrics = minimumFontMetrics;
+            return this;
+        }
+
         /**
          * Build the {@link StaticLayout} after options have been set.
          *
@@ -457,6 +481,9 @@ public class StaticLayout extends Layout {
         private int mJustificationMode;
         private boolean mAddLastLineLineSpacing;
         private LineBreakConfig mLineBreakConfig = LineBreakConfig.NONE;
+        private boolean mUseBoundsForWidth;
+        private boolean mShiftDrawingOffsetForStartOverhang;
+        @Nullable private Paint.FontMetrics mMinimumFontMetrics;
 
         private final Paint.FontMetricsInt mFontMetricsInt = new Paint.FontMetricsInt();
 

@@ -326,6 +326,7 @@ public final class Sensor {
 	private int mMinDelay;
 	private int mFifoReservedEventCount;
 	private int mFifoMaxEventCount;
+	private String mStringType;
 
 	Sensor(int type) {
 		mType = type;
@@ -350,6 +351,52 @@ public final class Sensor {
 	 */
 	public int getType() {
 		return mType;
+	}
+
+	/** AOSP's reverse-domain names, indexed by type; "" for a type with none. */
+	private static final String[] STRING_TYPES = {
+		"",
+		"android.sensor.accelerometer",
+		"android.sensor.magnetic_field",
+		"android.sensor.orientation",
+		"android.sensor.gyroscope",
+		"android.sensor.light",
+		"android.sensor.pressure",
+		"android.sensor.temperature",
+		"android.sensor.proximity",
+		"android.sensor.gravity",
+		"android.sensor.linear_acceleration",
+		"android.sensor.rotation_vector",
+		"android.sensor.relative_humidity",
+		"android.sensor.ambient_temperature",
+		"android.sensor.magnetic_field_uncalibrated",
+		"android.sensor.game_rotation_vector",
+		"android.sensor.gyroscope_uncalibrated",
+		"android.sensor.significant_motion",
+		"android.sensor.step_detector",
+		"android.sensor.step_counter",
+		"android.sensor.geomagnetic_rotation_vector",
+	};
+
+	/**
+	 * @return the reverse-domain name of this sensor's type, or null for a
+	 * vendor type ATL does not know a name for (which is what AOSP answers).
+	 */
+	public String getStringType() {
+		if (mStringType != null)
+			return mStringType;
+		if (mType >= 0 && mType < STRING_TYPES.length)
+			return STRING_TYPES[mType];
+		return null;
+	}
+
+	/** No direct sensor channels here; the app asks before it builds one. */
+	public int getHighestDirectReportRateLevel() {
+		return 0; // SensorDirectChannel.RATE_STOP
+	}
+
+	public boolean isDirectChannelTypeSupported(int sharedMemType) {
+		return false;
 	}
 
 	/**

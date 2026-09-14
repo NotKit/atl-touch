@@ -21,6 +21,12 @@ public class ActivityManager {
 		public int pid;
 		public int uid;
 		public String processName;
+		/* AOSP's "why is this process at this importance" pair; ATL has one
+		 * process and no reason to give */
+		public int importanceReasonCode;
+		public int importanceReasonPid;
+		public android.content.ComponentName importanceReasonComponent;
+		public int lastTrimLevel;
 
 		// GMS' BackgroundDetector news one up itself; absent, that is a
 		// NoSuchMethodError on the GoogleApiHandler thread and the app halts.
@@ -43,6 +49,16 @@ public class ActivityManager {
 	}
 
 	public boolean isLowRamDevice() { return false; }
+
+	/* ATL is nobody's test harness, and the kernel's low-memory kill reports
+	 * are not readable from a host process */
+	public static boolean isRunningInTestHarness() { return false; }
+
+	public static boolean isRunningInUserTestHarness() { return false; }
+
+	public static boolean isLowMemoryKillReportSupported() { return false; }
+
+	public void setProcessStateSummary(byte[] state) {}
 
 	public boolean isBackgroundRestricted() { return false; }
 
@@ -100,6 +116,11 @@ public class ActivityManager {
 	}
 
 	public List<ApplicationExitInfo> getHistoricalProcessExitReasons(String pkgname, int pid, int maxNum) {
+		return Collections.emptyList();
+	}
+
+	/* ATL keeps no history of process starts or exits */
+	public List<ApplicationExitInfo> getHistoricalProcessStartReasons(int maxNum) {
 		return Collections.emptyList();
 	}
 

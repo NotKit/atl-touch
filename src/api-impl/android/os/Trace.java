@@ -190,6 +190,25 @@ public final class Trace {
 	}
 
 	/**
+	 * The public counter/async-section API (API 29+). Nothing here records
+	 * anything: no trace tag is ever enabled, so these are the same no-ops the
+	 * rest of this class is.
+	 */
+	public static void setCounter(String counterName, long counterValue) {
+		if (isTagEnabled(TRACE_TAG_APP)) {
+			nativeTraceCounter(TRACE_TAG_APP, counterName, (int)counterValue);
+		}
+	}
+
+	public static void beginAsyncSection(String methodName, int cookie) {
+		asyncTraceBegin(TRACE_TAG_APP, methodName, cookie);
+	}
+
+	public static void endAsyncSection(String methodName, int cookie) {
+		asyncTraceEnd(TRACE_TAG_APP, methodName, cookie);
+	}
+
+	/**
 	 * Set whether application tracing is allowed for this process.  This is intended to be set
 	 * once at application start-up time based on whether the application is debuggable.
 	 *
@@ -331,5 +350,4 @@ public final class Trace {
 		return isTagEnabled(TRACE_TAG_APP);
 	}
 
-	public static void setCounter(java.lang.String a0, long a1) { }
 }

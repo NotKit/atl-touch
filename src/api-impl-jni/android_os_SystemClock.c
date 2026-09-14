@@ -18,6 +18,13 @@ JNIEXPORT jlong JNICALL Java_android_os_SystemClock_uptimeMillis(JNIEnv *env, jc
 	return now.tv_sec * 1000 + lround(now.tv_nsec / 1e6);
 }
 
+JNIEXPORT jlong JNICALL Java_android_os_SystemClock_uptimeNanos(JNIEnv *env, jclass this)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return now.tv_sec * 1000000000 + now.tv_nsec;
+}
+
 JNIEXPORT jlong JNICALL Java_android_os_SystemClock_elapsedRealtimeNanos(JNIEnv *env, jclass this)
 {
 	struct timespec t;

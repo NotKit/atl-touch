@@ -1,6 +1,7 @@
 package android.view;
 
 import android.R;
+import android.animation.Animator;
 import android.animation.AnimatorInflater;
 import android.animation.StateListAnimator;
 import android.annotation.NonNull;
@@ -1525,7 +1526,9 @@ public class View implements Drawable.Callback {
 	}
 
 	private OnScrollChangeListener on_scroll_change_listener = null;
-	public void setOnScrollChangeListener(OnScrollChangeListener l) {}
+	public void setOnScrollChangeListener(OnScrollChangeListener l) {
+		on_scroll_change_listener = l;
+	}
 
 	public /*native*/ void setOnSystemUiVisibilityChangeListener(OnSystemUiVisibilityChangeListener l) {}
 	public final int getWidth() {
@@ -1788,9 +1791,16 @@ public class View implements Drawable.Callback {
 		onVisibilityChanged(changedView, visibility);
 	}
 
+	private static final boolean DEBUG_VISIBILITY = System.getenv("ATL_DEBUG_VISIBILITY") != null;
+
 	public void setVisibility(int visibility) {
 		if (visibility == this.visibility)
 			return;
+		if (DEBUG_VISIBILITY) {
+			System.err.println("ATL_VIS: " + getClass().getName() + " id=0x" + Integer.toHexString(getId())
+			    + " " + this.visibility + " -> " + visibility);
+			new Throwable().printStackTrace();
+		}
 		if ((visibility == View.GONE) != (this.visibility == View.GONE) && parent instanceof ViewGroup) {
 			((ViewGroup)parent).requestLayout();
 		}
@@ -1828,9 +1838,15 @@ public class View implements Drawable.Callback {
 	}
 
 	public void scrollTo(int x, int y) {
+		if (scrollX == x && scrollY == y)
+			return;
+		int oldX = scrollX, oldY = scrollY;
 		scrollX = x;
 		scrollY = y;
 		invalidate();
+		onScrollChanged(x, y, oldX, oldY);
+		if (on_scroll_change_listener != null)
+			on_scroll_change_listener.onScrollChange(this, x, y, oldX, oldY);
 	}
 
 	protected int computeVerticalScrollOffset() {
@@ -2600,6 +2616,16 @@ public class View implements Drawable.Callback {
 
 	public boolean getClipToOutline() { return clipToOutline; }
 
+	/* ATL's renderer has no effect pipeline; the effect is kept so the getter
+	 * answers, and drawing ignores it */
+	public void setRenderEffect(android.graphics.RenderEffect renderEffect) {
+		this.renderEffect = renderEffect;
+	}
+
+	public android.graphics.RenderEffect getRenderEffect() { return renderEffect; }
+
+	private android.graphics.RenderEffect renderEffect;
+
 	public boolean hasTransientState() { return false; }
 
 	public final void cancelPendingInputEvents() {}
@@ -2610,11 +2636,29 @@ public class View implements Drawable.Callback {
 		invalidate();
 	}
 
-	public void setStateListAnimator(StateListAnimator stateListAnimator) {
-		if (stateListAnimator != null && stateListAnimator.enabledAnimator != null) {
-			stateListAnimator.enabledAnimator.setTarget(this);
-			stateListAnimator.enabledAnimator.start();
+	private StateListAnimator stateListAnimator;
+
+	public void setStateListAnimator(StateListAnimator animator) {
+		stateListAnimator = animator;
+		if (animator == null || animator.enabledAnimator == null)
+			return;
+		animator.enabledAnimator.setTarget(this);
+		/* An animator may only be started from a Looper thread, and apps do
+		 * inflate views on a worker one (Google Camera builds its whole viewfinder
+		 * off the main thread). AOSP runs the state animator from the view's own
+		 * handler; this at least does not throw out of a constructor. */
+		if (Looper.myLooper() != null) {
+			animator.enabledAnimator.start();
+		} else {
+			final Animator enabled = animator.enabledAnimator;
+			new Handler(Looper.getMainLooper()).post(new Runnable() {
+				public void run() { enabled.start(); }
+			});
 		}
+	}
+
+	public StateListAnimator getStateListAnimator() {
+		return stateListAnimator;
 	}
 
 	private static final AtomicInteger nextGeneratedId = new AtomicInteger(1);
@@ -2788,8 +2832,6 @@ public class View implements Drawable.Callback {
 	public boolean isHapticFeedbackEnabled() {
 		return hapticFeedbackEnabled;
 	}
-
-	public StateListAnimator getStateListAnimator() { return null; }
 
 	public void requestFitSystemWindows() {}
 

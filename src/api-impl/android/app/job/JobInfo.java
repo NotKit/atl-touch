@@ -128,6 +128,11 @@ public class JobInfo {
 			return this;
 		}
 
+		/* a scheduling hint for metered networks; nothing here schedules */
+		public Builder setEstimatedNetworkBytes(long downloadBytes, long uploadBytes) {
+			return this;
+		}
+
 		public JobInfo build() {
 			return jobInfo;
 		}

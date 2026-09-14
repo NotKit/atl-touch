@@ -25,6 +25,14 @@ JNIEXPORT jlong JNICALL Java_android_os_SystemClock_uptimeMillis
 
 /*
  * Class:     android_os_SystemClock
+ * Method:    uptimeNanos
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_android_os_SystemClock_uptimeNanos
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_os_SystemClock
  * Method:    elapsedRealtime
  * Signature: ()J
  */

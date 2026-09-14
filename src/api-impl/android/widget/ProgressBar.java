@@ -12,6 +12,7 @@ import android.view.View;
 public class ProgressBar extends View {
 
 	protected int max = 100;
+	protected int min = 0;
 	protected int progress = 0;
 	private boolean indeterminate = false;
 	private Drawable indeterminateDrawable;
@@ -63,20 +64,37 @@ public class ProgressBar extends View {
 
 	public void setMax(int max) {
 		this.max = max;
-		native_setProgress(widget, progress / (float)max);
+		native_setProgress(widget, fraction());
 	}
 
 	public int getMax() {
 		return max;
 	}
 
+	/* API 26: a progress bar can start somewhere other than zero, and the
+	 * fraction the widget is drawn with is relative to (max - min) */
+	public void setMin(int min) {
+		this.min = min;
+		native_setProgress(widget, fraction());
+	}
+
+	public int getMin() {
+		return min;
+	}
+
+	private float fraction() {
+		int span = max - min;
+
+		return span <= 0 ? 0 : (progress - min) / (float)span;
+	}
+
 	public void setProgress(int progress) {
 		if (progress > max)
 			progress = max;
-		else if (progress < 0)
-			progress = 0;
+		else if (progress < min)
+			progress = min;
 		this.progress = progress;
-		native_setProgress(widget, progress / (float)max);
+		native_setProgress(widget, fraction());
 	}
 
 	public void setProgress(int progress, boolean animate) {

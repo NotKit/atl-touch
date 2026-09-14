@@ -138,6 +138,19 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		return window.findViewById(id);
 	}
 
+	/* the same do-nothing dispatcher an Activity hands out: ATL has no
+	 * predictive back, and a dialog that asks for one must still get one */
+	private final android.window.OnBackInvokedDispatcher onBackInvokedDispatcher =
+	    new android.window.OnBackInvokedDispatcher() {
+		public void registerOnBackInvokedCallback(int priority,
+		    android.window.OnBackInvokedCallback callback) {}
+		public void unregisterOnBackInvokedCallback(android.window.OnBackInvokedCallback callback) {}
+	};
+
+	public android.window.OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
+		return onBackInvokedDispatcher;
+	}
+
 	public void show() {
 		Runnable action = new Runnable() {
 			@Override

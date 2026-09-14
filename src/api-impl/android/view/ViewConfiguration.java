@@ -47,6 +47,10 @@ public class ViewConfiguration {
 		return 16;
 	}
 
+	public int getScaledOverscrollDistance() {
+		return 10;
+	}
+
 	public boolean hasPermanentMenuKey() {
 		return false;
 	}
