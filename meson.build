@@ -173,6 +173,8 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/audio/audio.c',
                                                                   	'src/api-impl-jni/camera/android_graphics_SurfaceTexture.c',
                                                                   	'src/api-impl-jni/camera/android_hardware_Camera.c',
+                                                                  	'src/api-impl-jni/camera/android_hardware_camera2_impl_CameraMetadataNative.c',
+                                                                  	'src/api-impl-jni/camera/camera2_metadata.c',
                                                                   	'src/api-impl-jni/camera/camera_backend.c',
                                                                   	'src/api-impl-jni/camera/camera_backend_gst.c',
                                                                   	'src/api-impl-jni/camera/camera_backend_hybris.c',
