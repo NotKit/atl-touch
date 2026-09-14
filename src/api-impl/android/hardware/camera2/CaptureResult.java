@@ -109,6 +109,11 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 		return results;
 	}
 
+	@Override
+	CameraMetadataNative getAtlBag() {
+		return results;
+	}
+
 	/* the frame's own metadata, for a reprocess request built from it */
 	CameraMetadataNative copySettings() {
 		return results.copy();

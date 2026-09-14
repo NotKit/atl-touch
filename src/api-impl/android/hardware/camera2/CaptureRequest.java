@@ -87,6 +87,11 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 	}
 
 	@Override
+	CameraMetadataNative getAtlBag() {
+		return settings;
+	}
+
+	@Override
 	public List<Key<?>> getKeys() {
 		List<Key<?>> list = new ArrayList<Key<?>>();
 
