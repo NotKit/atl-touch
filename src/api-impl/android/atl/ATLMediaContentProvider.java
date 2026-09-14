@@ -2,12 +2,15 @@ package android.atl;
 
 import android.content.ContentProvider;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
@@ -72,6 +75,10 @@ public class ATLMediaContentProvider extends ContentProvider {
 	 * several media uris reloads once per observer, and a second reload that
 	 * picked would pop the picker with nobody asking for it. */
 	private static final long REFRESH_SETTLE_MS = 1000;
+
+	/* the rows an app has inserted, i.e. the media it saves rather than imports */
+	private final ATLMediaStore store = new ATLMediaStore();
+	private static final boolean DEBUG = System.getenv("ATL_DEBUG_MEDIA") != null;
 
 	private final Handler expiryHandler = new Handler(Looper.getMainLooper());
 	private final Runnable expiry = new Runnable() {
@@ -352,9 +359,114 @@ public class ATLMediaContentProvider extends ContentProvider {
 		return "application/octet-stream";
 	}
 
+	/* the columns an app reads back off a row it inserted itself */
+	private void fillStoreRow(Object[] row, String[] projection, ATLMediaStore.Row stored) {
+		int[] bounds = null;
+		for (int i = 0; i < projection.length; i++) {
+			switch (projection[i]) {
+				case "_id":
+					row[i] = Long.valueOf(stored.id);
+					break;
+				case "_data":
+					row[i] = stored.file.getAbsolutePath();
+					break;
+				case "_display_name":
+				case "title":
+					row[i] = stored.file.getName();
+					break;
+				case "mime_type":
+					row[i] = ATLMediaStore.mimeOf(stored);
+					break;
+				case "media_type":
+					row[i] = stored.video ? 3 : 1;
+					break;
+				case "is_pending":
+					row[i] = stored.pending ? 1 : 0;
+					break;
+				case "date_modified":
+				case "date_added":
+					row[i] = stored.file.lastModified() / 1000;
+					break;
+				case "datetaken":
+					row[i] = stored.file.lastModified();
+					break;
+				case "_size":
+					row[i] = stored.file.length();
+					break;
+				case "relative_path": {
+					String root = store.storeRoot().getAbsolutePath() + "/";
+					String path = stored.file.getParentFile().getAbsolutePath() + "/";
+					row[i] = path.startsWith(root) ? path.substring(root.length()) : path;
+					break;
+				}
+				case "bucket_display_name":
+					row[i] = stored.file.getParentFile().getName();
+					break;
+				case "bucket_id":
+					row[i] = stored.file.getParentFile().getAbsolutePath().hashCode();
+					break;
+				case "width":
+				case "height":
+					if (!stored.video) {
+						if (bounds == null)
+							bounds = decodeBounds(stored.file);
+						row[i] = "width".equals(projection[i]) ? bounds[0] : bounds[1];
+					} else {
+						row[i] = 0;
+					}
+					break;
+				case "orientation":
+				case "duration":
+					row[i] = 0;
+					break;
+			}
+		}
+	}
+
+	/* The structured (Bundle) form is how a modern app reads back its own
+	 * rows; the gallery import that pops the picker is the older form
+	 * Telegram uses. So this form never picks, whatever it asks. */
+	private final ThreadLocal<Boolean> bundleQuery = new ThreadLocal<Boolean>();
+
+	@Override
+	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) {
+		if (DEBUG)
+			System.err.println("ATLMediaContentProvider: bundle query " + uri + " args="
+			    + (queryArgs == null ? "null" : queryArgs.keySet().toString()));
+		bundleQuery.set(Boolean.TRUE);
+		try {
+			return super.query(uri, projection, queryArgs, cancellationSignal);
+		} finally {
+			bundleQuery.set(null);
+		}
+	}
+
 	@Override
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+		if (DEBUG)
+			System.err.println("ATLMediaContentProvider: query " + uri + " projection=" + java.util.Arrays.toString(projection)
+			    + " selection=" + selection + " args=" + java.util.Arrays.toString(selectionArgs) + " sort=" + sortOrder);
+		ATLMediaStore.Row stored = store.byUri(uri);
 		boolean video = isVideoUri(uri);
+
+		// a row the app inserted answers for itself and never pops the picker
+		if (stored != null && projection != null) {
+			MatrixCursor cursor = new MatrixCursor(projection);
+			Object[] row = new Object[projection.length];
+
+			fillStoreRow(row, projection, stored);
+			cursor.addRow(row);
+			return cursor;
+		}
+
+		// A folder query (relative_path LIKE 'DCIM/Camera/%') is an app reading
+		// back what it saved, e.g. a camera app filling its thumbnail with the
+		// last shot. It gets the files in that folder under the store root, and
+		// never the picker: nobody asked to import anything.
+		String folder = relativePathArg(selection, selectionArgs);
+		if (folder != null && projection != null)
+			return queryFolder(folder, projection, video);
+
 		boolean count = projection != null && projection.length == 1 && projection[0] != null
 		    && projection[0].toUpperCase(Locale.ROOT).startsWith("COUNT");
 		boolean distinct = uri.getQueryParameter("distinct") != null;
@@ -364,7 +476,10 @@ public class ATLMediaContentProvider extends ContentProvider {
 
 		// Pop the picker when Telegram starts enumerating the gallery (its images
 		// query). The video query that follows reuses the result.
-		if (!count && !distinct && !idLookup && !video && selectedFiles == null) {
+		// only a bare enumeration (no selection) is an import; a filtered query
+		// is an app reading back its own rows and must not pop anything
+		if (!count && !distinct && !idLookup && !video && selection == null && bundleQuery.get() == null
+		    && selectedFiles == null) {
 			boolean refresh;
 			synchronized (this) {
 				long now = SystemClock.uptimeMillis();
@@ -413,6 +528,53 @@ public class ATLMediaContentProvider extends ContentProvider {
 		return cursor;
 	}
 
+	private static String relativePathArg(String selection, String[] selectionArgs) {
+		if (selection == null || selectionArgs == null)
+			return null;
+		// the n-th '?' in the selection is answered by selectionArgs[n]
+		int arg = 0;
+		int at = selection.indexOf("relative_path");
+		if (at < 0)
+			return null;
+		for (int i = 0; i < at; i++)
+			if (selection.charAt(i) == '?')
+				arg++;
+		if (arg >= selectionArgs.length)
+			return null;
+		String value = selectionArgs[arg];
+		return value.replaceAll("%+$", "").replaceAll("^/+", "").replaceAll("/+$", "");
+	}
+
+	private Cursor queryFolder(String folder, String[] projection, boolean video) {
+		File dir = new File(store.storeRoot(), folder);
+		File[] entries = dir.listFiles();
+		List<File> files = new ArrayList<File>();
+		Set<String> exts = video ? VIDEO_EXT : IMAGE_EXT;
+		if (entries != null) {
+			for (File f : entries)
+				if (f.isFile() && hasExt(f, exts))
+					files.add(f);
+		}
+		Collections.sort(files, new java.util.Comparator<File>() {
+			@Override
+			public int compare(File a, File b) {
+				return Long.compare(b.lastModified(), a.lastModified());
+			}
+		});
+		MatrixCursor cursor = new MatrixCursor(projection);
+		for (File f : files) {
+			ATLMediaStore.Row row = store.rowFor(f, video);
+			if (row.pending)
+				continue;
+			Object[] values = new Object[projection.length];
+			fillStoreRow(values, projection, row);
+			cursor.addRow(values);
+		}
+		if (DEBUG)
+			System.err.println("ATLMediaContentProvider: " + dir + " -> " + cursor.getCount() + " rows");
+		return cursor;
+	}
+
 	// resolve a file for the single-file access paths (openFile/getType)
 	private File fileFor(Uri uri) {
 		touchSelection();
@@ -436,13 +598,21 @@ public class ATLMediaContentProvider extends ContentProvider {
 
 	@Override
 	public String getType(Uri uri) {
+		ATLMediaStore.Row row = store.byUri(uri);
+
+		if (row != null)
+			return ATLMediaStore.mimeOf(row);
 		File file = fileFor(uri);
 		return file == null ? "application/octet-stream" : mimeOf(file);
 	}
 
 	@Override
 	public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
-		File file = fileFor(uri);
+		ATLMediaStore.Row row = store.byUri(uri);
+		// a write only ever addresses a row the app inserted; the picked gallery
+		// files are the user's own and are read-only here
+		File file = row != null ? row.file : "r".equals(mode) ? fileFor(uri) : null;
+
 		if (file == null)
 			throw new FileNotFoundException(uri.toString());
 		return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode));
@@ -450,25 +620,23 @@ public class ATLMediaContentProvider extends ContentProvider {
 
 	@Override
 	public Uri insert(Uri uri, ContentValues values) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'insert'");
+		ATLMediaStore.Row row = store.insert(uri, values);
+
+		return row == null ? null : ContentUris.withAppendedId(uri, row.id);
 	}
 
 	@Override
 	public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'update'");
+		return store.update(uri, values);
 	}
 
 	@Override
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'delete'");
+		return store.delete(uri);
 	}
 
 	@Override
 	public AssetFileDescriptor openAssetFile(Uri uri, String mode) throws FileNotFoundException {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'openAssetFile'");
+		return new AssetFileDescriptor(openFile(uri, mode), 0, AssetFileDescriptor.UNKNOWN_LENGTH);
 	}
 }

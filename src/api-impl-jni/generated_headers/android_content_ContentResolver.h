@@ -7,6 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_content_ContentResolver_QUERY_SORT_DIRECTION_ASCENDING
+#define android_content_ContentResolver_QUERY_SORT_DIRECTION_ASCENDING 0L
+#undef android_content_ContentResolver_QUERY_SORT_DIRECTION_DESCENDING
+#define android_content_ContentResolver_QUERY_SORT_DIRECTION_DESCENDING 1L
 /*
  * Class:     android_content_ContentResolver
  * Method:    native_query_file_info

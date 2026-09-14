@@ -143,7 +143,10 @@ public class ContentResolver {
 	}
 
 	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) {
-		if ("file".equals(uri.getScheme())) {
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		if (provider != null) {
+			return provider.query(uri, projection, queryArgs, cancellationSignal);
+		} else if ("file".equals(uri.getScheme())) {
 			MatrixCursor cursor = new MatrixCursor(projection);
 			Object[] row = new Object[projection.length];
 			native_query_file_info(uri.getPath(), projection, row);
@@ -203,6 +206,51 @@ public class ContentResolver {
 			return provider.update(uri, values, selection, selectionArgs);
 		else
 			return 0;
+	}
+
+	public static final String QUERY_ARG_SQL_SELECTION = "android:query-arg-sql-selection";
+	public static final String QUERY_ARG_SQL_SELECTION_ARGS = "android:query-arg-sql-selection-args";
+	public static final String QUERY_ARG_SQL_SORT_ORDER = "android:query-arg-sql-sort-order";
+	public static final String QUERY_ARG_SORT_COLUMNS = "android:query-arg-sort-columns";
+	public static final String QUERY_ARG_SORT_DIRECTION = "android:query-arg-sort-direction";
+	public static final String QUERY_ARG_SORT_COLLATION = "android:query-arg-sort-collation";
+	public static final String QUERY_ARG_LIMIT = "android:query-arg-limit";
+	public static final String QUERY_ARG_OFFSET = "android:query-arg-offset";
+	public static final String QUERY_ARG_SQL_LIMIT = "android:query-arg-sql-limit";
+	public static final int QUERY_SORT_DIRECTION_ASCENDING = 0;
+	public static final int QUERY_SORT_DIRECTION_DESCENDING = 1;
+
+	/* API 30's bundle form; ATL's providers take the selection args directly */
+	public int update(Uri uri, ContentValues values, Bundle extras) {
+		String selection = extras == null ? null : extras.getString(QUERY_ARG_SQL_SELECTION);
+		String[] args = extras == null ? null : extras.getStringArray(QUERY_ARG_SQL_SELECTION_ARGS);
+
+		return update(uri, values, selection, args);
+	}
+
+	/**
+	 * Apply a batch of operations to one authority's provider. They are applied
+	 * in order and each one's result is reported; ATL has no transaction to roll
+	 * back, so a failure leaves the earlier ones applied.
+	 */
+	public ContentProviderResult[] applyBatch(String authority,
+	    ArrayList<ContentProviderOperation> operations)
+	    throws OperationApplicationException {
+		ContentProvider provider = ContentProvider.atl_get_content_provider(authority);
+
+		if (provider == null)
+			throw new OperationApplicationException("no provider for " + authority);
+
+		ContentProviderResult[] results = new ContentProviderResult[operations.size()];
+		for (int i = 0; i < operations.size(); i++)
+			results[i] = operations.get(i).apply(provider);
+		return results;
+	}
+
+	public final Bundle call(Uri uri, String method, String arg, Bundle extras) {
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+
+		return provider == null ? null : provider.call(method, arg, extras);
 	}
 
 	public List getPersistedUriPermissions() {
