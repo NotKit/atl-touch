@@ -235,15 +235,25 @@ void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **arr
 		return NULL;
 	}
 	class = _CLASS(buffer);
-	pointer = _PTR((*env)->GetLongField(env, buffer, _FIELD_ID(class, "address", "J")));
 	elementSizeShift = nio_element_size_shift(env, buffer);
 	position = (*env)->GetIntField(env, buffer, _FIELD_ID(class, "position", "I"));
-	if (pointer) { // buffer is direct
+	/* isDirect(), not a non-zero address: the JDK gives a heap buffer an
+	 * address too -- the array base offset it reads the array through with
+	 * Unsafe, 16 on HotSpot -- and passing that to a driver as a pointer
+	 * faults at 0x10. On libcore only a direct buffer has one at all. */
+	if ((*env)->CallBooleanMethod(env, buffer, _METHOD(class, "isDirect", "()Z"))) {
 		*array_ref = NULL;
+		pointer = _PTR((*env)->GetLongField(env, buffer, _FIELD_ID(class, "address", "J")));
 		pointer += position << elementSizeShift;
-	} else { // buffer is indirect
+	} else {
 		*array_ref = (*env)->CallObjectMethod(env, buffer, _METHOD(class, "array", "()Ljava/lang/Object;"));
 		jint offset = (*env)->CallIntMethod(env, buffer, _METHOD(class, "arrayOffset", "()I"));
+		/* a read-only heap buffer has no array to hand out */
+		if (!*array_ref) {
+			(*env)->ExceptionClear(env);
+			*array = NULL;
+			return NULL;
+		}
 		pointer = *array = (*env)->GetPrimitiveArrayCritical(env, *array_ref, NULL);
 		pointer += (offset + position) << elementSizeShift;
 	}
