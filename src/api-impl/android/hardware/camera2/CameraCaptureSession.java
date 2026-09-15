@@ -78,18 +78,61 @@ public class CameraCaptureSession implements AutoCloseable {
 	}
 
 	/* one submitted request and where its results go */
+	/*
+	 * What the requests of one burst share. The backend takes a burst as one
+	 * native request each, so the map below is keyed by the native id, but the
+	 * app was handed a single sequence id and must hear onCaptureSequenceCompleted
+	 * exactly once -- after the last frame, as AOSP specifies. Guarded by
+	 * `sequences`.
+	 */
+	private static final class Burst {
+		/* the first member's native id; assigned by the first submit, so the
+		 * whole burst is counted before any frame of it can complete */
+		int sequenceId = -1;
+		int outstanding;
+		long lastFrameNumber = -1;
+		boolean reported;
+
+		Burst(int outstanding) {
+			this.outstanding = outstanding;
+		}
+
+		/** this frame ends one request; true when it ended the whole sequence */
+		boolean frameDone(long frameNumber) {
+			if (frameNumber > lastFrameNumber)
+				lastFrameNumber = frameNumber;
+			if (outstanding > 0)
+				outstanding--;
+			if (outstanding > 0 || reported)
+				return false;
+			reported = true;
+			return true;
+		}
+
+		/** true for whichever member reports the abort, so it is reported once */
+		boolean claimReport() {
+			if (reported)
+				return false;
+			reported = true;
+			return true;
+		}
+	}
+
 	private static final class Sequence {
 		final CaptureRequest request;
 		final CaptureCallback callback;
 		final Executor executor;
 		final boolean repeating;
+		final Burst burst;
 		long lastFrameNumber = -1;
 
-		Sequence(CaptureRequest request, CaptureCallback callback, Executor executor, boolean repeating) {
+		Sequence(CaptureRequest request, CaptureCallback callback, Executor executor,
+		         boolean repeating, Burst burst) {
 			this.request = request;
 			this.callback = callback;
 			this.executor = executor;
 			this.repeating = repeating;
+			this.burst = burst;
 		}
 	}
 
@@ -232,10 +275,23 @@ public class CameraCaptureSession implements AutoCloseable {
 		if (requests == null || requests.isEmpty())
 			throw new IllegalArgumentException("a burst needs at least one request");
 
-		int id = 0;
-		for (CaptureRequest request : requests)
-			id = capture(request, listener, handler);
-		return id;
+		/* One sequence, however many requests: the app gets a frame callback
+		 * each but hears the sequence completed once, after the last one. */
+		Burst burst = new Burst(requests.size());
+
+		for (CaptureRequest request : requests) {
+			int id = submit(request, listener, handler, false, burst);
+
+			if (!nativeDevice.capture(id, request.getSettings(), targetMask(request))) {
+				forget(id);
+				synchronized (sequences) {
+					burst.outstanding--;
+				}
+				throw new CameraAccessException(CameraAccessException.CAMERA_ERROR,
+				    "the camera backend refused the capture");
+			}
+		}
+		return burst.sequenceId;
 	}
 
 	public int setRepeatingRequest(CaptureRequest request, CaptureCallback listener, Handler handler)
@@ -300,21 +356,29 @@ public class CameraCaptureSession implements AutoCloseable {
 			sequences.clear();
 		}
 		for (Map.Entry<Integer, Sequence> entry : aborted) {
-			final int sequenceId = entry.getKey().intValue();
+			final int nativeId = entry.getKey().intValue();
 			final Sequence sequence = entry.getValue();
 
 			if (sequence.callback == null)
 				continue;
-			final boolean failed = failedIds.contains(Integer.valueOf(sequenceId));
+			final boolean failed = failedIds.contains(Integer.valueOf(nativeId));
+			final int reportedId = sequence.burst.sequenceId;
+			/* every dropped request of a burst is reported failed, but the
+			 * sequence is aborted once */
+			final boolean reportAbort;
+			synchronized (sequences) {
+				reportAbort = sequence.burst.claimReport();
+			}
 			HandlerExecutor.run(sequence.executor, new Runnable() {
 				@Override
 				public void run() {
 					if (failed)
 						sequence.callback.onCaptureFailed(CameraCaptureSession.this,
 						    sequence.request, new CaptureFailure(sequence.request,
-						        CaptureFailure.REASON_FLUSHED, true, sequenceId,
+						        CaptureFailure.REASON_FLUSHED, true, reportedId,
 						        sequence.lastFrameNumber));
-					sequence.callback.onCaptureSequenceAborted(CameraCaptureSession.this, sequenceId);
+					if (reportAbort)
+						sequence.callback.onCaptureSequenceAborted(CameraCaptureSession.this, reportedId);
 				}
 			});
 		}
@@ -426,6 +490,15 @@ public class CameraCaptureSession implements AutoCloseable {
 	}
 
 	private int submit(CaptureRequest request, CaptureCallback listener, Handler handler, boolean repeating) {
+		return submit(request, listener, handler, repeating, null);
+	}
+
+	/**
+	 * @param burst the state shared with the rest of the burst, or null for a
+	 *              request that is a sequence of its own
+	 */
+	private int submit(CaptureRequest request, CaptureCallback listener, Handler handler,
+	                   boolean repeating, Burst burst) {
 		if (request == null)
 			throw new IllegalArgumentException("request must not be null");
 		if (outputs == null)
@@ -437,7 +510,11 @@ public class CameraCaptureSession implements AutoCloseable {
 		synchronized (sequences) {
 			int id = nextSequenceId++;
 
-			sequences.put(id, new Sequence(request, listener, HandlerExecutor.of(handler), repeating));
+			if (burst == null)
+				burst = new Burst(1);
+			if (burst.sequenceId < 0)
+				burst.sequenceId = id;
+			sequences.put(id, new Sequence(request, listener, HandlerExecutor.of(handler), repeating, burst));
 			return id;
 		}
 	}
@@ -510,17 +587,17 @@ public class CameraCaptureSession implements AutoCloseable {
 			repeatingId = -1;
 		}
 		for (Map.Entry<Integer, Sequence> entry : lost) {
-			final int sequenceId = entry.getKey().intValue();
 			final Sequence sequence = entry.getValue();
 
 			if (sequence.callback == null)
 				continue;
+			final int reportedId = sequence.burst.sequenceId;
 			HandlerExecutor.run(sequence.executor, new Runnable() {
 				@Override
 				public void run() {
 					sequence.callback.onCaptureFailed(CameraCaptureSession.this, sequence.request,
 					    new CaptureFailure(sequence.request, CaptureFailure.REASON_ERROR, true,
-					        sequenceId, sequence.lastFrameNumber));
+					        reportedId, sequence.lastFrameNumber));
 				}
 			});
 		}
@@ -529,21 +606,32 @@ public class CameraCaptureSession implements AutoCloseable {
 	/* the HAL dropped this frame: the request failed, and a one-shot is done */
 	void dispatchCaptureFailed(final int sequenceId, final long frameNumber) {
 		final Sequence sequence;
+		final boolean endsSequence;
 
 		synchronized (sequences) {
 			sequence = sequences.get(sequenceId);
 			if (sequence != null && !sequence.repeating)
 				sequences.remove(sequenceId);
+			/* a dropped frame still ends its request: without this a burst
+			 * that loses one frame would never report the sequence completed
+			 * and an app waiting on that callback would wait forever */
+			endsSequence = sequence != null && !sequence.repeating
+			            && sequence.burst.frameDone(frameNumber);
 		}
 		if (sequence == null || sequence.callback == null)
 			return;
 
+		final int reportedId = sequence.burst.sequenceId;
+		final long lastFrameNumber = sequence.burst.lastFrameNumber;
 		HandlerExecutor.run(sequence.executor, new Runnable() {
 			@Override
 			public void run() {
 				sequence.callback.onCaptureFailed(CameraCaptureSession.this, sequence.request,
 				    new CaptureFailure(sequence.request, CaptureFailure.REASON_ERROR, true,
-				        sequenceId, frameNumber));
+				        reportedId, frameNumber));
+				if (endsSequence)
+					sequence.callback.onCaptureSequenceCompleted(CameraCaptureSession.this,
+					    reportedId, lastFrameNumber);
 			}
 		});
 	}
@@ -572,6 +660,7 @@ public class CameraCaptureSession implements AutoCloseable {
 
 	void dispatchCaptureCompleted(final int sequenceId, final long frameNumber, CameraMetadataNative result) {
 		final Sequence sequence;
+		final boolean endsSequence;
 
 		synchronized (sequences) {
 			sequence = sequences.get(sequenceId);
@@ -580,6 +669,8 @@ public class CameraCaptureSession implements AutoCloseable {
 				if (!sequence.repeating)
 					sequences.remove(sequenceId);
 			}
+			endsSequence = sequence != null && !sequence.repeating
+			            && sequence.burst.frameDone(frameNumber);
 		}
 		if (sequence == null || sequence.callback == null || result == null) {
 			if (result != null)
@@ -587,15 +678,18 @@ public class CameraCaptureSession implements AutoCloseable {
 			return;
 		}
 
+		/* the id the app was given for the whole burst, not this frame's */
+		final int reportedId = sequence.burst.sequenceId;
+		final long lastFrameNumber = sequence.burst.lastFrameNumber;
 		final TotalCaptureResult total =
-		    new TotalCaptureResult(result, sequence.request, frameNumber, sequenceId, device.getId());
+		    new TotalCaptureResult(result, sequence.request, frameNumber, reportedId, device.getId());
 		HandlerExecutor.run(sequence.executor, new Runnable() {
 			@Override
 			public void run() {
 				sequence.callback.onCaptureCompleted(CameraCaptureSession.this, sequence.request, total);
-				if (!sequence.repeating)
+				if (endsSequence)
 					sequence.callback.onCaptureSequenceCompleted(CameraCaptureSession.this,
-					    sequenceId, frameNumber);
+					    reportedId, lastFrameNumber);
 			}
 		});
 	}
