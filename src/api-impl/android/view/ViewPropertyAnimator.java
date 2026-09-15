@@ -130,6 +130,30 @@ public class ViewPropertyAnimator {
 		return this;
 	}
 
+	public ViewPropertyAnimator translationYBy(float translationY) {
+		values.add(PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, view.getTranslationY() + translationY));
+		scheduleAutoStart();
+		return this;
+	}
+
+	public ViewPropertyAnimator scaleXBy(float scaleX) {
+		values.add(PropertyValuesHolder.ofFloat(View.SCALE_X, view.getScaleX() + scaleX));
+		scheduleAutoStart();
+		return this;
+	}
+
+	public ViewPropertyAnimator scaleYBy(float scaleY) {
+		values.add(PropertyValuesHolder.ofFloat(View.SCALE_Y, view.getScaleY() + scaleY));
+		scheduleAutoStart();
+		return this;
+	}
+
+	public ViewPropertyAnimator alphaBy(float alpha) {
+		values.add(PropertyValuesHolder.ofFloat(View.ALPHA, view.getAlpha() + alpha));
+		scheduleAutoStart();
+		return this;
+	}
+
 	public void start() {
 		start_pending = false;
 		if (animator != null)
