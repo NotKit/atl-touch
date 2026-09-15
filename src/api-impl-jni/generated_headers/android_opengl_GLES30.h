@@ -651,6 +651,22 @@ extern "C" {
 #define android_opengl_GLES30_GL_RGB16F 34843L
 #undef android_opengl_GLES30_GL_SRGB8_ALPHA8
 #define android_opengl_GLES30_GL_SRGB8_ALPHA8 35907L
+#undef android_opengl_GLES30_GL_UNIFORM_BUFFER
+#define android_opengl_GLES30_GL_UNIFORM_BUFFER 35345L
+#undef android_opengl_GLES30_GL_TRANSFORM_FEEDBACK_BUFFER
+#define android_opengl_GLES30_GL_TRANSFORM_FEEDBACK_BUFFER 35982L
+#undef android_opengl_GLES30_GL_MAP_READ_BIT
+#define android_opengl_GLES30_GL_MAP_READ_BIT 1L
+#undef android_opengl_GLES30_GL_MAP_WRITE_BIT
+#define android_opengl_GLES30_GL_MAP_WRITE_BIT 2L
+#undef android_opengl_GLES30_GL_MAP_INVALIDATE_RANGE_BIT
+#define android_opengl_GLES30_GL_MAP_INVALIDATE_RANGE_BIT 4L
+#undef android_opengl_GLES30_GL_MAP_INVALIDATE_BUFFER_BIT
+#define android_opengl_GLES30_GL_MAP_INVALIDATE_BUFFER_BIT 8L
+#undef android_opengl_GLES30_GL_MAP_FLUSH_EXPLICIT_BIT
+#define android_opengl_GLES30_GL_MAP_FLUSH_EXPLICIT_BIT 16L
+#undef android_opengl_GLES30_GL_MAP_UNSYNCHRONIZED_BIT
+#define android_opengl_GLES30_GL_MAP_UNSYNCHRONIZED_BIT 32L
 /*
  * Class:     android_opengl_GLES30
  * Method:    glReadBuffer
@@ -665,6 +681,62 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES30_glReadBuffer
  * Signature: (IIIII)V
  */
 JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexStorage2D
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBindBufferBase
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBindBufferBase
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glMapBufferRange
+ * Signature: (IIII)Ljava/nio/Buffer;
+ */
+JNIEXPORT jobject JNICALL Java_android_opengl_GLES30_glMapBufferRange
+  (JNIEnv *, jclass, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUnmapBuffer
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glUnmapBuffer
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform1ui
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform1ui
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform2ui
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform2ui
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform3ui
+ * Signature: (IIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform3ui
+  (JNIEnv *, jclass, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform4ui
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform4ui
   (JNIEnv *, jclass, jint, jint, jint, jint, jint);
 
 #ifdef __cplusplus

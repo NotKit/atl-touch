@@ -529,6 +529,7 @@ srcs = [
 	'android/opengl/GLES11Ext.java',
 	'android/opengl/GLES20.java',
 	'android/opengl/GLES30.java',
+	'android/opengl/GLES31.java',
 	'android/opengl/GLException.java',
 	'android/opengl/GLSurfaceView.java',
 	'android/opengl/GLU.java',

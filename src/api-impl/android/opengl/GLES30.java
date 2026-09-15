@@ -36,6 +36,15 @@ public class GLES30 extends GLES20 {
 	public static final int GL_RGB16F = 0x881B;
 	public static final int GL_SRGB8_ALPHA8 = 0x8C43;
 
+	public static final int GL_UNIFORM_BUFFER = 0x8A11;
+	public static final int GL_TRANSFORM_FEEDBACK_BUFFER = 0x8C8E;
+	public static final int GL_MAP_READ_BIT = 0x0001;
+	public static final int GL_MAP_WRITE_BIT = 0x0002;
+	public static final int GL_MAP_INVALIDATE_RANGE_BIT = 0x0004;
+	public static final int GL_MAP_INVALIDATE_BUFFER_BIT = 0x0008;
+	public static final int GL_MAP_FLUSH_EXPLICIT_BIT = 0x0010;
+	public static final int GL_MAP_UNSYNCHRONIZED_BIT = 0x0020;
+
 	// C function void glReadBuffer ( GLenum mode )
 
 	public static native void glReadBuffer(int mode);
@@ -48,4 +57,53 @@ public class GLES30 extends GLES20 {
 	    int internalformat,
 	    int width,
 	    int height);
+
+	// C function void glBindBufferBase ( GLenum target, GLuint index, GLuint buffer )
+
+	public static native void glBindBufferBase(
+	    int target,
+	    int index,
+	    int buffer);
+
+	// C function GLvoid * glMapBufferRange ( GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access )
+
+	public static native java.nio.Buffer glMapBufferRange(
+	    int target,
+	    int offset,
+	    int length,
+	    int access);
+
+	// C function GLboolean glUnmapBuffer ( GLenum target )
+
+	public static native boolean glUnmapBuffer(int target);
+
+	// C function void glUniform1ui ( GLint location, GLuint v0 )
+
+	public static native void glUniform1ui(
+	    int location,
+	    int v0);
+
+	// C function void glUniform2ui ( GLint location, GLuint v0, GLuint v1 )
+
+	public static native void glUniform2ui(
+	    int location,
+	    int v0,
+	    int v1);
+
+	// C function void glUniform3ui ( GLint location, GLuint v0, GLuint v1, GLuint v2 )
+
+	public static native void glUniform3ui(
+	    int location,
+	    int v0,
+	    int v1,
+	    int v2);
+
+	// C function void glUniform4ui ( GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3 )
+
+	public static native void glUniform4ui(
+	    int location,
+	    int v0,
+	    int v1,
+	    int v2,
+	    int v3);
 }
