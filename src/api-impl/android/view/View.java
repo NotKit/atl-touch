@@ -38,6 +38,7 @@ import android.util.LayoutDirection;
 import android.util.Property;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.StateSet;
 import android.util.TypedValue;
 import android.view.animation.Animation;
 import android.view.autofill.AutofillId;
@@ -1226,14 +1227,29 @@ public class View implements Drawable.Callback {
 
 	/* AOSP contract: the returned array has extraSpace zeroed slots at the end
 	 * which subclasses fill in (directly or via mergeDrawableStates). Apps rely
-	 * on this, e.g. state[state.length - 1] = state_pressed. */
+	 * on this, e.g. state[state.length - 1] = state_pressed.
+	 *
+	 * state_accelerated and the two drag states are left out: nothing here
+	 * tracks them yet, and a bit that is never set only costs a wrong lookup. */
 	protected int[] onCreateDrawableState(int extraSpace) {
-		int[] state = new int[2 + extraSpace];
-		state[0] = R.attr.state_enabled;
-		if (pressed) {
-			state[1] = R.attr.state_pressed;
-		}
-		return state;
+		int viewStateIndex = 0;
+
+		if (pressed) viewStateIndex |= StateSet.VIEW_STATE_PRESSED;
+		if (enabled) viewStateIndex |= StateSet.VIEW_STATE_ENABLED;
+		if (isFocused()) viewStateIndex |= StateSet.VIEW_STATE_FOCUSED;
+		if (selected) viewStateIndex |= StateSet.VIEW_STATE_SELECTED;
+		if (hasWindowFocus()) viewStateIndex |= StateSet.VIEW_STATE_WINDOW_FOCUSED;
+		if (activated) viewStateIndex |= StateSet.VIEW_STATE_ACTIVATED;
+		if (hovered) viewStateIndex |= StateSet.VIEW_STATE_HOVERED;
+
+		int[] drawableState = StateSet.get(viewStateIndex);
+
+		if (extraSpace == 0)
+			return drawableState;
+
+		int[] fullState = new int[drawableState.length + extraSpace];
+		System.arraycopy(drawableState, 0, fullState, 0, drawableState.length);
+		return fullState;
 	}
 
 	protected static int[] mergeDrawableStates(int[] curState, int[] newState) {
@@ -3208,7 +3224,8 @@ public class View implements Drawable.Callback {
 
 	public void restoreHierarchyState(SparseArray<Parcelable> container) {}
 
-	public boolean isHovered() { return false; }
+	private boolean hovered = false;
+	public boolean isHovered() { return hovered; }
 
 	public void scrollBy(int x, int y) {
 		scrollTo(scrollX + x, scrollY + y);
@@ -3395,7 +3412,13 @@ public class View implements Drawable.Callback {
 
 	public void destroyDrawingCache() {}
 
-	public void setHovered(boolean isHovered) {}
+	public void setHovered(boolean hovered) {
+		if (this.hovered != hovered) {
+			this.hovered = hovered;
+			refreshDrawableState();
+			onHoverChanged(hovered);
+		}
+	}
 
 	public void setVerticalFadingEdgeEnabled(boolean verticalFadingEdgeEnabled) {}
 
