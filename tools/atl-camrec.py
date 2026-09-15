@@ -5,6 +5,7 @@
     atl-camrec.py info <file>              cameras, streams and the burst
     atl-camrec.py meta <file> [camera]     one camera's characteristics
     atl-camrec.py frames <file>            one line per recorded buffer
+    atl-camrec.py stats <file>             min, max and mean of every buffer
     atl-camrec.py requests <file>          the requests the app submitted
     atl-camrec.py dump <file> <dir>        every buffer's planes, as files
     atl-camrec.py png <file> <dir>         the NV21 reference frames, as PNGs
@@ -340,6 +341,36 @@ def cmd_png(path, out):
               "(ATL_CAMERA_RECORD_PREVIEW=0 turns them off)")
 
 
+def cmd_stats(path):
+    """What is in the pixels. A buffer a backend mapped but never filled reads
+    as min=max=0, which no camera pointed at a lit scene gives."""
+    import array
+
+    _header, _cameras, _streams, events, _burst = read_all(path)
+    index = 0
+    for event in events:
+        if event["kind"] != BUFFER:
+            continue
+        for n, plane in enumerate(event["planes"]):
+            data = plane["data"]
+            if event["format"] in (0x20, 0x26):
+                values = array.array("H")
+                values.frombytes(data[:len(data) & ~1])
+                if sys.byteorder != "little":
+                    values.byteswap()
+            else:
+                values = array.array("B", data)
+            if not values:
+                print("%4d stream %d plane %d: empty" % (index, event["stream"], n))
+                continue
+            high = max(values)
+            print("%4d stream %d %-11s plane %d: %d samples min=%d max=%d mean=%.1f%s" %
+                  (index, event["stream"], fmt_name(event["format"]), n, len(values),
+                   min(values), high, sum(values) / len(values),
+                   "   <- all zero" if high == 0 else ""))
+        index += 1
+
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
@@ -352,6 +383,8 @@ def main():
         cmd_meta(path, rest[0] if rest else None)
     elif command == "frames":
         cmd_frames(path)
+    elif command == "stats":
+        cmd_stats(path)
     elif command == "requests":
         cmd_requests(path)
     elif command == "dump":
