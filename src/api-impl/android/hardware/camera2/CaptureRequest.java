@@ -246,6 +246,8 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 	    new Key<Integer>("android.statistics.faceDetectMode", Integer.class);
 	public static final Key<Integer> NOISE_REDUCTION_MODE =
 	    new Key<Integer>("android.noiseReduction.mode", Integer.class);
+	public static final Key<Integer> HOT_PIXEL_MODE =
+	    new Key<Integer>("android.hotPixel.mode", Integer.class);
 	public static final Key<Integer> EDGE_MODE =
 	    new Key<Integer>("android.edge.mode", Integer.class);
 	public static final Key<Integer> TONEMAP_MODE =

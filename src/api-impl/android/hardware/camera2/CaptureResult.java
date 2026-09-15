@@ -204,6 +204,8 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 	    new Key<Integer>("android.edge.mode", Integer.class);
 	public static final Key<Integer> TONEMAP_MODE =
 	    new Key<Integer>("android.tonemap.mode", Integer.class);
+	public static final Key<Integer> SHADING_MODE =
+	    new Key<Integer>("android.shading.mode", Integer.class);
 	public static final Key<Integer> COLOR_CORRECTION_MODE =
 	    new Key<Integer>("android.colorCorrection.mode", Integer.class);
 	public static final Key<ColorSpaceTransform> COLOR_CORRECTION_TRANSFORM =
@@ -268,6 +270,8 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 
 	public static final Key<float[]> SENSOR_DYNAMIC_BLACK_LEVEL =
 	    new Key<float[]>("android.sensor.dynamicBlackLevel", float[].class);
+	public static final Key<Integer> SENSOR_DYNAMIC_WHITE_LEVEL =
+	    new Key<Integer>("android.sensor.dynamicWhiteLevel", Integer.class);
 	/* one (S, O) pair per CFA channel */
 	public static final Key<Pair<Double, Double>[]> SENSOR_NOISE_PROFILE =
 	    new Key("android.sensor.noiseProfile", Pair[].class);
