@@ -490,6 +490,40 @@ static void map_explain(const struct atl_hardware_buffer *buffer,
 	        (void *)frame->planes[2].data, frame->planes[2].row_stride, frame->planes[2].pixel_stride);
 }
 
+/*
+ * A gralloc buffer that is nobody's atl_hardware_buffer: a camera HAL's own,
+ * out of a PRIVATE Image. Only lockPlanes can say where the chroma is, and a
+ * buffer with fewer than three planes is not one this can read.
+ */
+bool atl_gralloc_lock_planes(void *ahardwarebuffer, struct atl_window_frame *frame)
+{
+	struct hb_planes planes = {0};
+
+	if (!ahardwarebuffer || !frame || !gralloc_load() || !gralloc.lock_planes || !gralloc.unlock)
+		return false;
+	if (gralloc.lock_planes(ahardwarebuffer, HB_USAGE_CPU_READ_OFTEN, -1, NULL, &planes) ||
+	    planes.plane_count < 3)
+		return false;
+	for (int i = 0; i < 3; i++) {
+		if (!planes.planes[i].data) {
+			gralloc.unlock(ahardwarebuffer, NULL);
+			return false;
+		}
+		frame->planes[i] = (struct atl_window_plane){
+		    planes.planes[i].data,
+		    planes.planes[i].row_stride,
+		    planes.planes[i].pixel_stride,
+		};
+	}
+	return true;
+}
+
+void atl_gralloc_unlock(void *ahardwarebuffer)
+{
+	if (ahardwarebuffer && gralloc.unlock)
+		gralloc.unlock(ahardwarebuffer, NULL);
+}
+
 bool atl_hardware_buffer_map(void *handle, struct atl_window_frame *frame)
 {
 	struct atl_hardware_buffer *buffer = native_handle_lookup(handle);

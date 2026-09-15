@@ -77,8 +77,17 @@ static const struct atl_camera_backend *backend_pick(void)
 			fprintf(stderr, "Camera: using backend '%s'\n", backend->name);
 		return backend;
 	}
+	if (name && !strcmp(name, "replay")) {
+		backend = atl_camera_backend_replay_get();
+		if (!backend)
+			fprintf(stderr, "Camera: backend 'replay' requested but no recording could be "
+			                "read, no cameras\n");
+		else
+			fprintf(stderr, "Camera: using backend '%s'\n", backend->name);
+		return backend;
+	}
 	if (name && strcmp(name, "gst")) {
-		fprintf(stderr, "Camera: unknown backend '%s' (gst, camera2ndk, hybris, none), "
+		fprintf(stderr, "Camera: unknown backend '%s' (gst, camera2ndk, hybris, replay, none), "
 		                "no cameras\n", name);
 		return NULL;
 	}

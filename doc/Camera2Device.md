@@ -170,6 +170,12 @@ The numbers are caiman's — 2 cameras, both `FULL`, 138/120 metadata entries,
   debugger.
 * **Photos** land in the app's own data dir under `ANDROID_APP_DATA_DIR`
   (Open Camera: `<data>/<apk name>_/DCIM/OpenCamera`).
+* **A whole capture.** `ATL_CAMERA_RECORD=<dir>` keeps the session in a ring and
+  writes the burst around each still - frames, results, requests and the
+  camera's characteristics - as one file, which
+  `ATL_CAMERA_BACKEND=replay` then serves back to an app on a desktop. That is
+  the short way to argue about a merge without the phone in the loop;
+  `doc/CameraRecording.md`.
 ## 5. Environment variables
 
 | var | meaning |
@@ -184,6 +190,7 @@ The numbers are caiman's — 2 cameras, both `FULL`, 138/120 metadata entries,
 | `ATL_CAMERA2_HIDE_PHYSICAL_IDS=<id>[,…]` | drop physical camera ids from a logical camera's list and refuse their characteristics. Measured on caiman with Google Camera: hiding the ultrawide (`3`) makes the app take its virtual sibling (`9`) instead, and hiding both makes its camera setup NPE - so not the answer there |
 | `ATL_CAMERA2_DROP_REQUEST_TAGS=<substr>[,…]` | request entries whose tag name contains a substring never reach the HAL. Inert for Google Camera's lens switches, which the Pixel HAL decides on its own (`vendor.camera.debug.st_3a_overwrite_enable`) |
 | `ATL_SDK_INT=<level>` | the level ATL claims. Per app: Open Camera runs at 23, Google Camera needs 36 |
+| `ATL_CAMERA_RECORD=<dir>` | record the camera2 session and write a burst around each capture; `ATL_CAMERA_BACKEND=replay` with `ATL_CAMERA_REPLAY=<file>` plays one back. `doc/CameraRecording.md` |
 | `ATL_TEST_MAINLOOP=1` | headless runs only: preload a GLib main loop, needed by anything that waits on an ATL callback |
 | `ANDROID_APP_DATA_DIR=<dir>` | the app data dir; a fresh one is what makes repeated runs start from identical first-launch state |
 | `ATL_MEDIA_FOLDER=<dir>` | stops `ATLMediaContentProvider` popping its folder picker when an app queries MediaStore at startup |

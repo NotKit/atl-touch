@@ -53,6 +53,7 @@ libportal-dev
 libcontent-hub-glib-dev
 libsqlite3-dev
 libvulkan-dev
+libzstd-dev
 libwayland-dev
 wayland-protocols
 libfontconfig-dev

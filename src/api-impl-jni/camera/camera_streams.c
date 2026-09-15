@@ -32,6 +32,7 @@
 
 #include "camera2_metadata.h"
 #include "camera_frame.h"
+#include "camera_record.h"
 #include "camera_streams.h"
 
 #define JPEG_QUALITY_DEFAULT 90
@@ -132,6 +133,7 @@ static void on_started(void *user, int request_id, int64_t frame_number, int64_t
 {
 	struct atl_camera_streams *s = user;
 
+	atl_camera_record_started(s, request_id, frame_number, timestamp);
 	if (s->callbacks.started)
 		s->callbacks.started(s->user, request_id, frame_number, timestamp);
 }
@@ -141,6 +143,7 @@ static void on_result(void *user, int request_id, int64_t frame_number,
 {
 	struct atl_camera_streams *s = user;
 
+	atl_camera_record_result(s, request_id, frame_number, result);
 	g_mutex_lock(&s->lock);
 	oneshot_done_locked(s, request_id);
 	g_mutex_unlock(&s->lock);
@@ -154,6 +157,7 @@ static void on_failed(void *user, int request_id, int64_t frame_number)
 {
 	struct atl_camera_streams *s = user;
 
+	atl_camera_record_failed(s, request_id, frame_number);
 	g_mutex_lock(&s->lock);
 	oneshot_done_locked(s, request_id);
 	g_mutex_unlock(&s->lock);
@@ -165,6 +169,7 @@ static void on_buffer(void *user, struct atl_camera_buffer *buffer)
 {
 	struct atl_camera_streams *s = user;
 
+	atl_camera_record_buffer(s, buffer);
 	if (s->callbacks.buffer)
 		s->callbacks.buffer(s->user, buffer);
 	else
@@ -175,6 +180,7 @@ static void on_buffer_lost(void *user, int request_id, int64_t frame_number, int
 {
 	struct atl_camera_streams *s = user;
 
+	atl_camera_record_lost(s, request_id, frame_number, stream);
 	if (s->callbacks.buffer_lost)
 		s->callbacks.buffer_lost(s->user, request_id, frame_number, stream);
 }
@@ -559,8 +565,7 @@ static void emu_deliver_locked(struct atl_camera_streams *s, int request_id,
 			buffers[i] = emu_buffer_take_locked(s, i);
 	g_mutex_unlock(&s->lock);
 
-	if (s->callbacks.started)
-		s->callbacks.started(s->user, request_id, frame_number, timestamp);
+	on_started(s, request_id, frame_number, timestamp);
 
 	for (int i = 0; i < n_streams; i++) {
 		struct emu_buffer *buffer = buffers[i];
@@ -642,6 +647,7 @@ bool atl_camera_streams_reprocess(struct atl_camera_streams *s, int request_id,
 	}
 	if (!timestamp)
 		timestamp = (int64_t)g_get_monotonic_time() * 1000;
+	atl_camera_record_request(s, request_id, settings, targets, false, true, timestamp);
 	emu_deliver_locked(s, request_id, settings, targets, nv21, width, height, width, timestamp);
 	g_mutex_unlock(&s->lock);
 	return true;
@@ -679,6 +685,7 @@ bool atl_camera_streams_submit_reprocess(struct atl_camera_streams *s, int reque
 	g_mutex_lock(&s->lock);
 	oneshot_add_locked(s, request_id);
 	g_mutex_unlock(&s->lock);
+	atl_camera_record_request(s, request_id, settings, targets, false, true, input_timestamp);
 	if (s->backend->submit_reprocess(s->camera, request_id, settings, targets, input_timestamp))
 		return true;
 	g_mutex_lock(&s->lock);
@@ -801,6 +808,7 @@ static void streams_unref(struct atl_camera_streams *s)
 {
 	if (!g_atomic_int_dec_and_test(&s->refcount))
 		return;
+	atl_camera_record_end(s);
 	g_queue_free_full(s->pending, (GDestroyNotify)pending_free);
 	g_array_free(s->oneshots, TRUE);
 	free(s->scratch_nv21);
@@ -855,6 +863,7 @@ bool atl_camera_streams_configure(struct atl_camera_streams *s,
 	s->real = false;
 	s->has_input = false;
 	g_mutex_unlock(&s->lock);
+	atl_camera_record_end(s);
 	if (!n_streams)
 		return true;
 
@@ -871,6 +880,7 @@ bool atl_camera_streams_configure(struct atl_camera_streams *s,
 			s->has_input = input != NULL;
 			s->configured = true;
 			g_mutex_unlock(&s->lock);
+			atl_camera_record_session(s, s->backend, configs, n_streams, input);
 			return true;
 		}
 		/* an input is the app's raw frames going back to the camera; the
@@ -890,6 +900,7 @@ bool atl_camera_streams_configure(struct atl_camera_streams *s,
 	g_mutex_lock(&s->lock);
 	s->configured = true;
 	g_mutex_unlock(&s->lock);
+	atl_camera_record_session(s, s->backend, configs, n_streams, input);
 	return true;
 }
 
@@ -922,6 +933,7 @@ bool atl_camera_streams_submit(struct atl_camera_streams *s, int request_id,
 	}
 	if (!repeating)
 		oneshot_add_locked(s, request_id);
+	atl_camera_record_request(s, request_id, settings, targets, repeating, false, 0);
 	if (real) {
 		g_mutex_unlock(&s->lock);
 		if (s->backend->submit_request(s->camera, request_id, settings, targets, repeating))

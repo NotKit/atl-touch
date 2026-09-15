@@ -71,12 +71,13 @@ script instead (`doc/CameraClickPackaging.md`).
 
 ---
 
-`ATL_CAMERA_BACKEND=<gst|camera2ndk|hybris|none>` - camera backend; default is the first whose libraries
+`ATL_CAMERA_BACKEND=<gst|camera2ndk|hybris|replay|none>` - camera backend; default is the first whose libraries
                                          load: camera2ndk, then hybris, then gst. `camera2ndk` (the device's
                                          own Android camera2 stack through libhybris) is the only backend
                                          that serves `android.hardware.camera2` on a device; `hybris` is
                                          Camera1 only. A backend named here never falls back to another one,
-                                         `none` reports zero cameras.
+                                         `none` reports zero cameras. `replay` is a recording as a camera,
+                                         see `ATL_CAMERA_REPLAY` and `doc/CameraRecording.md`.
 
 ---
 
@@ -121,6 +122,47 @@ script instead (`doc/CameraClickPackaging.md`).
                                  Off by default, because it makes Google Camera *worse*: libgcam builds its
                                  own camera list out of the RAW configurations and refuses to open a camera
                                  without them. It is for an app that configures a stream ATL never fills.
+
+---
+
+`ATL_CAMERA_RECORD=<dir>` - if set, every camera2 session is kept in a ring in memory and a burst around
+                            each still capture is written to `<dir>/capture-*.atlcam`, frames, results,
+                            requests and characteristics together. See `doc/CameraRecording.md`
+
+---
+
+`ATL_CAMERA_RECORD_MB=<n>` - how much of that ring there is, default 512. It bounds the pre-roll: about
+                             32 full-sensor RAW10 frames per 512 MiB
+
+---
+
+`ATL_CAMERA_RECORD_AFTER=<n>` - frames to keep recording after a trigger before the file is written,
+                                default 12
+
+---
+
+`ATL_CAMERA_RECORD_TRIGGER=<oneshot|intent|manual>` - what starts a burst: any non-repeating request
+                                                      (default), only one whose `CONTROL_CAPTURE_INTENT`
+                                                      is `STILL_CAPTURE`, or only the trigger file
+                                                      (`touch <dir>/trigger`, which works in every mode)
+
+---
+
+`ATL_CAMERA_RECORD_PREVIEW=<px>` - long edge of the downsampled NV21 reference kept for a PRIVATE
+                                   viewfinder stream, default 640; 0 records no pixels for it at all
+
+---
+
+`ATL_CAMERA_RECORD_LEVEL=<n>` - zstd level for the writer, default 1. Raw Bayer barely compresses; the
+                                level is there for the metadata-heavy and YUV cases
+
+---
+
+`ATL_CAMERA_REPLAY=<file>` - the recording the `replay` backend serves. The whole file is read into memory
+
+---
+
+`ATL_CAMERA_REPLAY_SPEED=<factor>` - how fast the recorded intervals are played back, default 1.0
 
 ---
 

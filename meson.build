@@ -191,6 +191,9 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/camera/camera_frame.c',
                                                                   	'src/api-impl-jni/camera/camera_frame_encode.cpp',
                                                                   	'src/api-impl-jni/camera/camera_preview.c',
+                                                                  	'src/api-impl-jni/camera/camera_record.c',
+                                                                  	'src/api-impl-jni/camera/camera_recording.c',
+                                                                  	'src/api-impl-jni/camera/camera_replay.c',
                                                                   	'src/api-impl-jni/camera/camera_streams.c',
                                                                   	'src/api-impl-jni/com_google_android_gles_jni_GLImpl.c',
                                                                   	'src/api-impl-jni/content/android_content_ClipboardManager.c',
@@ -270,6 +273,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'),
                                                                   	dependency('gstreamer-1.0'), dependency('gstreamer-app-1.0'), dependency('gstreamer-video-1.0'),
+                                                                  	dependency('libzstd'),
                                                                         libart_dep, wayland_protos_dep, skia_dep, minikin_dep
                                                                   ],
                                                                   link_with: [ libandroid_so ],
