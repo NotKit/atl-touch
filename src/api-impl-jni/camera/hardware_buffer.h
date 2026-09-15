@@ -81,4 +81,13 @@ void *atl_hardware_buffer_native(struct atl_hardware_buffer *buffer);
 bool atl_hardware_buffer_map(void *handle, struct atl_window_frame *frame);
 void atl_hardware_buffer_unmap(void *handle);
 
+/*
+ * The three planes of a gralloc buffer somebody else allocated - a camera HAL's
+ * opaque (PRIVATE) buffer, which has no planes the NDK will describe. False
+ * where there is no gralloc, or where the buffer is not a 4:2:0 one; only the
+ * planes of `frame` are filled in. Paired with atl_gralloc_unlock().
+ */
+bool atl_gralloc_lock_planes(void *ahardwarebuffer, struct atl_window_frame *frame);
+void atl_gralloc_unlock(void *ahardwarebuffer);
+
 #endif

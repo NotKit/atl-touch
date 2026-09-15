@@ -16,6 +16,8 @@
  *    camera2 stack, loaded with libhybris. The Ubuntu Touch device backend.
  *  - "hybris" (camera_backend_hybris.c): libhybris libcamera_compat_layer,
  *    the Camera1 device backend; it serves no camera2.
+ *  - "replay" (camera_replay.c): the frames of a recording ATL_CAMERA_RECORD
+ *    made on a device, played back on a desktop.
  *  - "none": no cameras; also the result of ATL_UGLY_ENABLE_CAMERA being unset.
  */
 
@@ -346,5 +348,10 @@ const struct atl_camera_backend *atl_camera_backend_camera2ndk_get(void);
 /* camera_backend_hybris.c; NULL when the libhybris camera compat layer cannot
  * be dlopen'd (i.e. everywhere but a Halium device) */
 const struct atl_camera_backend *atl_camera_backend_hybris_get(void);
+
+/* camera_replay.c; the recorded frames of ATL_CAMERA_REPLAY as a camera2
+ * backend of their own, NULL when that file is missing or unreadable */
+const struct atl_camera_backend *atl_camera_backend_replay_get(void);
+
 
 #endif
