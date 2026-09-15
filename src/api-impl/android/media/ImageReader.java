@@ -306,7 +306,9 @@ public class ImageReader implements AutoCloseable {
 			private final int index;
 			private final int rowStride;
 			private final int pixelStride;
-			private ByteBuffer buffer;
+			/* AOSP's name for the mapping: camera apps swap it by reflection to
+			 * feed their pipeline a buffer of their own */
+			private ByteBuffer mBuffer;
 
 			SurfacePlane(int index) {
 				this.index = index;
@@ -319,9 +321,9 @@ public class ImageReader implements AutoCloseable {
 			@Override
 			public synchronized ByteBuffer getBuffer() {
 				throwISEIfInvalid();
-				if (buffer == null)
-					buffer = native_planeBuffer(imagePtr, index);
-				return buffer;
+				if (mBuffer == null)
+					mBuffer = native_planeBuffer(imagePtr, index);
+				return mBuffer;
 			}
 
 			@Override

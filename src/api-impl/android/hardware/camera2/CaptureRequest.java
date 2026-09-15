@@ -63,14 +63,15 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 		}
 	}
 
-	private final CameraMetadataNative settings;
+	/* AOSP's name for the bag, because camera apps reach it by reflection */
+	private final CameraMetadataNative mLogicalCameraSettings;
 	private final List<Surface> targets;
 	private final Object tag;
 	private final boolean reprocess;
 
-	private CaptureRequest(CameraMetadataNative settings, Set<Surface> targets, Object tag,
+	private CaptureRequest(CameraMetadataNative mLogicalCameraSettings, Set<Surface> targets, Object tag,
 	    boolean reprocess) {
-		this.settings = settings;
+		this.mLogicalCameraSettings = mLogicalCameraSettings;
 		this.targets = Collections.unmodifiableList(new ArrayList<Surface>(targets));
 		this.tag = tag;
 		this.reprocess = reprocess;
@@ -83,20 +84,20 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 
 	@SuppressWarnings("unchecked")
 	public <T> T get(Key<T> key) {
-		return (T)settings.get(key.getName(), key.getType());
+		return (T)mLogicalCameraSettings.get(key.getName(), key.getType());
 	}
 
 	@Override
 	CameraMetadataNative getAtlBag() {
-		return settings;
+		return mLogicalCameraSettings;
 	}
 
 	@Override
 	public List<Key<?>> getKeys() {
 		List<Key<?>> list = new ArrayList<Key<?>>();
 
-		for (int tag : settings.getTags()) {
-			String name = settings.getTagName(tag);
+		for (int tag : mLogicalCameraSettings.getTags()) {
+			String name = mLogicalCameraSettings.getTagName(tag);
 
 			if (name != null)
 				list.add(new Key<Object>(name, Object.class));
@@ -116,9 +117,9 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 		return tag;
 	}
 
-	/** the settings themselves, for the session that submits this request */
+	/** the mLogicalCameraSettings themselves, for the session that submits this request */
 	CameraMetadataNative getSettings() {
-		return settings;
+		return mLogicalCameraSettings;
 	}
 
 	@Override

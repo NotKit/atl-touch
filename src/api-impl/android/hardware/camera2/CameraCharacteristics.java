@@ -67,12 +67,13 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	}
 
 	private final String cameraId;
-	private final CameraMetadataNative metadata;
+	/* AOSP's name for the bag, because camera apps reach it by reflection */
+	private final CameraMetadataNative mProperties;
 	private List<Key<?>> keys;
 
 	CameraCharacteristics(String cameraId, CameraMetadataNative metadata) {
 		this.cameraId = cameraId;
-		this.metadata = metadata;
+		this.mProperties = metadata;
 	}
 
 	String getId() {
@@ -80,22 +81,22 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	}
 
 	CameraMetadataNative getMetadata() {
-		return metadata;
+		return mProperties;
 	}
 
 	/** the bag behind these characteristics, for the camera2 NDK bridge */
 	public CameraMetadataNative getAtlNativeMetadata() {
-		return metadata;
+		return mProperties;
 	}
 
 	@Override
 	CameraMetadataNative getAtlBag() {
-		return metadata;
+		return mProperties;
 	}
 
 	@SuppressWarnings("unchecked")
 	public <T> T get(Key<T> key) {
-		return (T)metadata.get(key.getName(), key.getType());
+		return (T)mProperties.get(key.getName(), key.getType());
 	}
 
 	@Override
@@ -105,7 +106,7 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 
 			for (int tag : CameraMetadataNative.getAvailableKeys(cameraId,
 			    CameraMetadataNative.KEYS_CHARACTERISTICS)) {
-				String name = metadata.getTagName(tag);
+				String name = mProperties.getTagName(tag);
 				if (name == null)
 					continue; /* a tag nothing names is only reachable by id */
 				Key<?> known = KEYS_BY_NAME.get(name);
@@ -161,7 +162,7 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 
 	/**
 	 * The sub-cameras a logical multi-camera is made of, straight out of the
-	 * backend's metadata: the HAL packs them as NUL-terminated strings in one
+	 * backend's mProperties: the HAL packs them as NUL-terminated strings in one
 	 * byte[]. Each of them is a camera id CameraManager.getCameraCharacteristics
 	 * answers for, while getCameraIdList() keeps to the logical cameras, which
 	 * is what AOSP does too.
@@ -198,7 +199,7 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 		List<String> names = new ArrayList<String>();
 
 		for (int tag : CameraMetadataNative.getAvailableKeys(cameraId, which)) {
-			String name = metadata.getTagName(tag);
+			String name = mProperties.getTagName(tag);
 
 			if (name != null)
 				names.add(name);

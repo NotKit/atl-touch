@@ -2,7 +2,10 @@ package android.hardware.camera2.impl;
 
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.params.BlackLevelPattern;
 import android.hardware.camera2.params.ColorSpaceTransform;
 import android.hardware.camera2.params.DeviceStateSensorOrientationMap;
@@ -375,6 +378,29 @@ public final class CameraMetadataNative {
 		long[] integral = asLongs(value);
 		if (integral != null)
 			native_writeLongs(ptr(), tag, integral);
+	}
+
+	/*
+	 * AOSP's typed writers. A camera app that overrides what the HAL reported -
+	 * a black level, a colour transform - has no public way to do it, so it
+	 * reaches these by reflection off the bag it pulled out of the
+	 * characteristics, the result or the request. The three Key classes share
+	 * no supertype, hence three overloads over the one writer above.
+	 */
+	public <T> void setBase(CameraCharacteristics.Key<T> key, T value) {
+		set(key.getName(), value);
+	}
+
+	public <T> void set(CameraCharacteristics.Key<T> key, T value) {
+		set(key.getName(), value);
+	}
+
+	public <T> void set(CaptureResult.Key<T> key, T value) {
+		set(key.getName(), value);
+	}
+
+	public <T> void set(CaptureRequest.Key<T> key, T value) {
+		set(key.getName(), value);
 	}
 
 	private static double[] asDoubles(Object value) {

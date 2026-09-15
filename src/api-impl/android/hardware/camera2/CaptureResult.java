@@ -64,13 +64,14 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 		}
 	}
 
-	private final CameraMetadataNative results;
+	/* AOSP's name for the bag, because camera apps reach it by reflection */
+	private final CameraMetadataNative mResults;
 	private final CaptureRequest request;
 	private final long frameNumber;
 	private final int sequenceId;
 
-	CaptureResult(CameraMetadataNative results, CaptureRequest request, long frameNumber, int sequenceId) {
-		this.results = results;
+	CaptureResult(CameraMetadataNative mResults, CaptureRequest request, long frameNumber, int sequenceId) {
+		this.mResults = mResults;
 		this.request = request;
 		this.frameNumber = frameNumber;
 		this.sequenceId = sequenceId;
@@ -78,15 +79,15 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 
 	@SuppressWarnings("unchecked")
 	public <T> T get(Key<T> key) {
-		return (T)results.get(key.getName(), key.getType());
+		return (T)mResults.get(key.getName(), key.getType());
 	}
 
 	@Override
 	public List<Key<?>> getKeys() {
 		List<Key<?>> list = new ArrayList<Key<?>>();
 
-		for (int tag : results.getTags()) {
-			String name = results.getTagName(tag);
+		for (int tag : mResults.getTags()) {
+			String name = mResults.getTagName(tag);
 
 			if (name != null)
 				list.add(new Key<Object>(name, Object.class));
@@ -106,17 +107,17 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 	 * frames in it.
 	 */
 	public CameraMetadataNative getAtlNativeMetadata() {
-		return results;
+		return mResults;
 	}
 
 	@Override
 	CameraMetadataNative getAtlBag() {
-		return results;
+		return mResults;
 	}
 
 	/* the frame's own metadata, for a reprocess request built from it */
 	CameraMetadataNative copySettings() {
-		return results.copy();
+		return mResults.copy();
 	}
 
 	public long getFrameNumber() {
