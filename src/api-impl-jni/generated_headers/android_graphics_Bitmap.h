@@ -129,6 +129,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1set_1pixels
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1get_1pixels_1ptr
   (JNIEnv *, jclass, jlong);
 
+/*
+ * Class:     android_graphics_Bitmap
+ * Method:    native_copy_from_buffer
+ * Signature: (JLjava/nio/Buffer;II)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1from_1buffer
+  (JNIEnv *, jclass, jlong, jobject, jint, jint);
+
 #ifdef __cplusplus
 }
 #endif

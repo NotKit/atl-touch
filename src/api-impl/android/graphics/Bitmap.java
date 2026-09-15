@@ -295,7 +295,28 @@ public final class Bitmap {
 
 	public void copyPixelsToBuffer(Buffer buffer) {
 		native_copy_to_buffer(getTexture(), buffer, config.android_memory_format, getRowBytes());
-		buffer.position(buffer.position() + getAllocationByteCount());
+		advance(buffer, getAllocationByteCount());
+	}
+
+	/* the other direction, and the one an app that renders with GL uses to get
+	 * a frame back into a Bitmap: the buffer's bytes are this bitmap's pixels,
+	 * in its own config, so the only conversion is the one the config names */
+	public void copyPixelsFromBuffer(Buffer buffer) {
+		native_copy_from_buffer(getTexture(), buffer, config.android_memory_format, getRowBytes());
+		advance(buffer, getAllocationByteCount());
+	}
+
+	/* position counts elements, not bytes, so an IntBuffer advances by a
+	 * quarter of what a ByteBuffer does over the same pixels */
+	private static void advance(Buffer buffer, int bytes) {
+		int shift = 0;
+		if (buffer instanceof java.nio.ShortBuffer || buffer instanceof java.nio.CharBuffer)
+			shift = 1;
+		else if (buffer instanceof java.nio.IntBuffer || buffer instanceof java.nio.FloatBuffer)
+			shift = 2;
+		else if (buffer instanceof java.nio.LongBuffer || buffer instanceof java.nio.DoubleBuffer)
+			shift = 3;
+		buffer.position(buffer.position() + (bytes >> shift));
 	}
 
 	public int getByteCount() {
@@ -389,6 +410,5 @@ public final class Bitmap {
 	private static native byte[] native_save_to_webp(long bitmap, int quality, boolean lossless);
 	private static native void native_set_pixels(long bitmap, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native long native_get_pixels_ptr(long bitmap);
-
-	public void copyPixelsFromBuffer(java.nio.Buffer a0) { }
+	private static native void native_copy_from_buffer(long bitmap, Buffer buffer, int format, int stride);
 }
