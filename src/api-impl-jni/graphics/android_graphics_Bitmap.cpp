@@ -152,6 +152,34 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1to_1buffer(JNI
 	env->ReleaseByteArrayElements(array_ref, array, 0);
 }
 
+/* the inverse of the above: a camera or GL app hands back the frame it rendered
+ * as a buffer of this bitmap's own pixels. notifyPixelsChanged because a bitmap
+ * that has already been drawn has a GPU texture cached against its generation. */
+JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1from_1buffer(JNIEnv *env, jclass clazz, jlong bitmap_ptr, jobject buffer, jint format, jint stride)
+{
+	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
+	SkImageInfo info = image_info_for_format(bitmap->width(), bitmap->height(), format);
+	void *data = env->GetDirectBufferAddress(buffer);
+
+	if (data) {
+		bitmap->writePixels(SkPixmap(info, data, stride), 0, 0);
+		bitmap->notifyPixelsChanged();
+		return;
+	}
+	/* heap buffer: copy via the backing array */
+	jclass buffer_class = env->GetObjectClass(buffer);
+	jbyteArray array_ref = (jbyteArray)env->CallObjectMethod(buffer, env->GetMethodID(buffer_class, "array", "()Ljava/lang/Object;"));
+	if (!array_ref) {
+		env->ExceptionClear();
+		return;
+	}
+	jint array_offset = env->CallIntMethod(buffer, env->GetMethodID(buffer_class, "arrayOffset", "()I"));
+	jbyte *array = env->GetByteArrayElements(array_ref, NULL);
+	bitmap->writePixels(SkPixmap(info, array + array_offset, stride), 0, 0);
+	env->ReleaseByteArrayElements(array_ref, array, JNI_ABORT);
+	bitmap->notifyPixelsChanged();
+}
+
 JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1get_1pixels_1ptr(JNIEnv *env, jclass clazz, jlong bitmap_ptr)
 {
 	SkBitmap *bitmap = (SkBitmap *)_PTR(bitmap_ptr);
