@@ -1221,6 +1221,29 @@ public class View implements Drawable.Callback {
 			int resId = a.getResourceId(com.android.internal.R.styleable.View_stateListAnimator, 0);
 			setStateListAnimator(AnimatorInflater.loadStateListAnimator(context, resId));
 		}
+
+		/* the render transform: the setters were all here, nothing read the
+		 * attributes, so a layout that scales or rotates a view was drawn at
+		 * 1:1. Pivot first -- scale and rotation are taken about it. */
+		if (a.hasValue(com.android.internal.R.styleable.View_transformPivotX))
+			setPivotX(a.getDimension(com.android.internal.R.styleable.View_transformPivotX, 0));
+		if (a.hasValue(com.android.internal.R.styleable.View_transformPivotY))
+			setPivotY(a.getDimension(com.android.internal.R.styleable.View_transformPivotY, 0));
+		if (a.hasValue(com.android.internal.R.styleable.View_scaleX))
+			setScaleX(a.getFloat(com.android.internal.R.styleable.View_scaleX, 1f));
+		if (a.hasValue(com.android.internal.R.styleable.View_scaleY))
+			setScaleY(a.getFloat(com.android.internal.R.styleable.View_scaleY, 1f));
+		if (a.hasValue(com.android.internal.R.styleable.View_rotation))
+			setRotation(a.getFloat(com.android.internal.R.styleable.View_rotation, 0f));
+		if (a.hasValue(com.android.internal.R.styleable.View_translationX))
+			setTranslationX(a.getDimension(com.android.internal.R.styleable.View_translationX, 0));
+		if (a.hasValue(com.android.internal.R.styleable.View_translationY))
+			setTranslationY(a.getDimension(com.android.internal.R.styleable.View_translationY, 0));
+		if (a.hasValue(com.android.internal.R.styleable.View_alpha))
+			setAlpha(a.getFloat(com.android.internal.R.styleable.View_alpha, 1f));
+		if (a.hasValue(com.android.internal.R.styleable.View_elevation))
+			setElevation(a.getDimension(com.android.internal.R.styleable.View_elevation, 0));
+
 		a.recycle();
 		onCreateDrawableState(0);
 	}
