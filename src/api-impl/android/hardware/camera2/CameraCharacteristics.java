@@ -403,6 +403,10 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	    new Key<ColorSpaceTransform>("android.sensor.colorTransform1", ColorSpaceTransform.class);
 	public static final Key<ColorSpaceTransform> SENSOR_COLOR_TRANSFORM2 =
 	    new Key<ColorSpaceTransform>("android.sensor.colorTransform2", ColorSpaceTransform.class);
+	public static final Key<ColorSpaceTransform> SENSOR_FORWARD_MATRIX1 =
+	    new Key<ColorSpaceTransform>("android.sensor.forwardMatrix1", ColorSpaceTransform.class);
+	public static final Key<ColorSpaceTransform> SENSOR_FORWARD_MATRIX2 =
+	    new Key<ColorSpaceTransform>("android.sensor.forwardMatrix2", ColorSpaceTransform.class);
 
 	/* built from android.info.deviceStateOrientations, which pairs a folded-state
 	 * bitmask with the sensor orientation that state implies */
