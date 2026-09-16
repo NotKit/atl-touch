@@ -375,6 +375,8 @@ public final class ATLLoadedApp {
 	}
 
 	public boolean stopService(Intent intent) {
+		if (intent.getComponent() == null)
+			return false;
 		String className = intent.getComponent().getClassName();
 		ServiceRecord record = running_services.get(className);
 		if (record == null)
