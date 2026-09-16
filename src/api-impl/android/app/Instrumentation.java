@@ -38,19 +38,21 @@ public class Instrumentation {
 
 			System.out.println("targetPackage: " + target_package);
 
-			String target_path = android.os.Environment.getExternalStorageDirectory() + "/../_installed_apks_/" + target_package + ".apk";
+			if (target_package != null) {
+				String target_path = android.os.Environment.getExternalStorageDirectory() + "/../_installed_apks_/" + target_package + ".apk";
 
-			ATLLoadedApp.getPrimaryApplication().default_resources.getAssets().addAssetPath(target_path);
+				ATLLoadedApp.getPrimaryApplication().default_resources.getAssets().addAssetPath(target_path);
 
-			ATLSharedLibraries.appendToClassPath(ATLLoadedApp.getPrimaryApplication().class_loader,
-			    new File(target_path));
+				ATLSharedLibraries.appendToClassPath(ATLLoadedApp.getPrimaryApplication().class_loader,
+				    new File(target_path));
+			}
 
 			Class<? extends Instrumentation> cls = ATLLoadedApp.getPrimaryApplication()
 			                                           .loadClass(className)
 			                                           .asSubclass(Instrumentation.class);
 			Constructor<? extends Instrumentation> constructor = cls.getConstructor();
 			Instrumentation i = constructor.newInstance();
-			i.onCreate(arguments.getExtras());
+			i.onCreate(arguments != null ? arguments.getExtras() : null);
 
 			return i;
 		} catch (Exception e) {
