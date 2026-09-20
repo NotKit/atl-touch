@@ -201,6 +201,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/content/android_content_ContentResolver.c',
                                                                   	'src/api-impl-jni/content/android_content_Context.c',
                                                                   	'src/api-impl-jni/content/android_content_res_XmlBlock.c',
+                                                                  	'src/api-impl-jni/content/content_hub_clipboard.c',
                                                                   	'src/api-impl-jni/content/svg_icon.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteCommon.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteConnection.c',

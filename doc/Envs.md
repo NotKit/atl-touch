@@ -171,6 +171,22 @@ script instead (`doc/CameraClickPackaging.md`).
 
 ---
 
+`ATL_CONTENT_HUB_CLIPBOARD=0` - do not copy and paste through Ubuntu Touch's content-hub. ATL publishes
+                                every copy to the hub as well as to the Wayland selection, and prefers what
+                                the hub has on paste, because the selection only reaches other Wayland
+                                clients while the hub is what every Qt app on the system uses. The hub only
+                                serves the focused app, and one too old to accept a client without a Mir
+                                surface id refuses us; either way ATL falls back to the Wayland selection,
+                                and off UT there is no hub to answer at all, so this is rarely needed.
+
+---
+
+`ATL_DEBUG_CLIPBOARD=1` - log what content-hub does with each copy and paste: why a call failed, and when
+                          the hub refuses a copy (which is what an unfocused app or an older hub looks
+                          like).
+
+---
+
 `ATL_DUMP_HIERARCHY=1` - prints every View in every window with its class, id, bounds, measured size,
                          visibility and (for a TextView) its text. It is the substitute for a screenshot
                          on a device where nothing can capture one; accumulate the parents' left/top for
