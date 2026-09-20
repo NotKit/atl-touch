@@ -1756,7 +1756,13 @@ public class View implements Drawable.Callback {
 	protected void onFinishInflate() {}
 
 	public void invalidateDrawable(Drawable drawable) {
-		invalidate();
+		/* AOSP damages the drawable's bounds and never routes this through the
+		 * no-arg invalidate(). A subclass that overrides invalidate() and calls
+		 * Drawable.invalidateSelf() from it -- Material's progress indicators --
+		 * recursed until the stack ran out. */
+		Rect dirty = drawable.getDirtyBounds();
+		invalidate(dirty.left + scrollX, dirty.top + scrollY,
+		           dirty.right + scrollX, dirty.bottom + scrollY);
 	}
 
 	public void scheduleDrawable(Drawable drawable, Runnable runnable, long time) {
