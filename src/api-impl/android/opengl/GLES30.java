@@ -7,7 +7,8 @@ package android.opengl;
  * this class is the 3.0-only surface. Only what an app has been seen to call is
  * here: Google Camera's viewfinder pipeline reads back through glReadBuffer and
  * allocates its textures with glTexStorage2D, and the class not existing at all
- * killed the thread that draws its preview.
+ * killed the thread that draws its preview. PhotonCamera caches its linked
+ * compute programs through the glProgramBinary trio.
  *
  * The constants are for reading, not for apps: javac inlines a static final int
  * into the caller's dex, so an app never looks one up here.
@@ -44,6 +45,11 @@ public class GLES30 extends GLES20 {
 	public static final int GL_MAP_INVALIDATE_BUFFER_BIT = 0x0008;
 	public static final int GL_MAP_FLUSH_EXPLICIT_BIT = 0x0010;
 	public static final int GL_MAP_UNSYNCHRONIZED_BIT = 0x0020;
+
+	public static final int GL_PROGRAM_BINARY_RETRIEVABLE_HINT = 0x8257;
+	public static final int GL_PROGRAM_BINARY_LENGTH = 0x8741;
+	public static final int GL_NUM_PROGRAM_BINARY_FORMATS = 0x87FE;
+	public static final int GL_PROGRAM_BINARY_FORMATS = 0x87FF;
 
 	// C function void glReadBuffer ( GLenum mode )
 
@@ -106,4 +112,39 @@ public class GLES30 extends GLES20 {
 	    int v1,
 	    int v2,
 	    int v3);
+
+	// C function void glGetProgramBinary ( GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, GLvoid *binary )
+
+	public static native void glGetProgramBinary(
+	    int program,
+	    int bufSize,
+	    int[] length,
+	    int lengthOffset,
+	    int[] binaryFormat,
+	    int binaryFormatOffset,
+	    java.nio.Buffer binary);
+
+	// C function void glGetProgramBinary ( GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, GLvoid *binary )
+
+	public static native void glGetProgramBinary(
+	    int program,
+	    int bufSize,
+	    java.nio.IntBuffer length,
+	    java.nio.IntBuffer binaryFormat,
+	    java.nio.Buffer binary);
+
+	// C function void glProgramBinary ( GLuint program, GLenum binaryFormat, const GLvoid *binary, GLsizei length )
+
+	public static native void glProgramBinary(
+	    int program,
+	    int binaryFormat,
+	    java.nio.Buffer binary,
+	    int length);
+
+	// C function void glProgramParameteri ( GLuint program, GLenum pname, GLint value )
+
+	public static native void glProgramParameteri(
+	    int program,
+	    int pname,
+	    int value);
 }
