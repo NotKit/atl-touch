@@ -153,6 +153,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		requested_orientation = orientation;
 	}
 
+	/**
+	 * There is no keyguard under ATL, so an activity is always "shown over" it
+	 * and the screen is always on. Camera apps call both from onCreate for the
+	 * secure-camera intents; without them the call throws and takes the whole
+	 * activity down.
+	 */
+	public void setShowWhenLocked(boolean showWhenLocked) {}
+
+	public void setTurnScreenOn(boolean turnScreenOn) {}
+
 	public boolean isFinishing() {
 		return finishing;
 	}
