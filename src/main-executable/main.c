@@ -811,7 +811,8 @@ static void open(GApplication *app, GFile **files, gint nfiles, const gchar *hin
 
 		GString *desktop_entry = g_string_new("[Desktop Entry]\n"
 		                                      "Type=Application\n"
-		                                      "DBusActivatable=true\n");
+		                                      "DBusActivatable=true\n"
+		                                      "StartupNotify=true\n");
 		g_string_append_printf(desktop_entry, "Name=%s\n", app_label);
 		if (icon_path_installed) {
 			g_string_append_printf(desktop_entry, "Icon=%s\n", icon_path_installed);
