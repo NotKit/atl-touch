@@ -34,6 +34,18 @@ public class Vibrator {
 			Slog.v("Vibrator", "vibration motor go burrrr for " + millis + "ms");
 	}
 
+	public void vibrate(VibrationEffect effect) {
+		long[] pattern = effect.pattern;
+		if (pattern.length == 2 && pattern[0] == 0)
+			vibrate(pattern[1]);
+		else
+			vibrate(pattern, -1);
+	}
+
+	public void vibrate(VibrationEffect effect, android.media.AudioAttributes attributes) {
+		vibrate(effect);
+	}
+
 	public void vibrate(final long[] pattern, int repeat) {
 		Thread t = new Thread(new Runnable() {
 			public void run() {
