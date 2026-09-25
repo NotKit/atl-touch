@@ -13,9 +13,9 @@ extern "C" {
  * with the immutable GSK render node tree.
  */
 
-JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateSnapshot(JNIEnv *env, jobject thiz)
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateSnapshot(JNIEnv *env, jobject thiz, jint left, jint top, jint right, jint bottom)
 {
-	return _INTPTR(ATLCanvas::new_recording());
+	return _INTPTR(ATLCanvas::new_recording(SkIRect::MakeLTRB(left, top, right, bottom)));
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateNode(JNIEnv *env, jobject thiz, jlong snapshot_ptr)

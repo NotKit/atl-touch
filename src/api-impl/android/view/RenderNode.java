@@ -33,7 +33,7 @@ public class RenderNode {
 	private float alpha = 1.0f;
 	private Outline outline = null;
 
-	private native long nativeCreateSnapshot();
+	private native long nativeCreateSnapshot(int left, int top, int right, int bottom);
 	private native long nativeCreateNode(long snapshot);
 	private native long nativePatchNode(long node, long old_child, long new_child);
 	private native long nativeTransform(long node, float scaleX, float scaleY, float translationX, float translationY, float rotation, float pivotX, float pivotY);
@@ -293,13 +293,19 @@ public class RenderNode {
 	}
 
 	public DisplayListCanvas start(int width, int height) {
+		return start(width, height, 0, 0);
+	}
+
+	/* View records its content scrolled (drawChild applies the scroll outside
+	 * the recording), so the clip it reports is the scrolled window */
+	DisplayListCanvas start(int width, int height, int scrollX, int scrollY) {
 		this.width = width;
 		this.height = height;
 		children.clear();
 		children_nodes.clear();
 		/* a RecordingCanvas so android.graphics.RenderNode.beginRecording() can
 		 * hand out the type its own API promises */
-		return new RecordingCanvas(nativeCreateSnapshot()) {
+		return new RecordingCanvas(nativeCreateSnapshot(scrollX, scrollY, scrollX + width, scrollY + height)) {
 			/* the native recording canvas has no meaningful size (infinite cull
 			 * rect); report the node's size like AOSP's RecordingCanvas */
 			@Override

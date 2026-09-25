@@ -44,9 +44,10 @@ ATLCanvas *ATLCanvas::for_bitmap(SkBitmap *bitmap)
 	return atl_canvas;
 }
 
-ATLCanvas *ATLCanvas::new_recording(void)
+ATLCanvas *ATLCanvas::new_recording(SkIRect bounds)
 {
 	ATLCanvas *atl_canvas = new ATLCanvas();
+	atl_canvas->record_bounds = bounds;
 	atl_canvas->recorder = new SkPictureRecorder();
 	/* R-tree of op bounds: replaying a partially-visible recording (an
 	 * offscreen list row, a damage-clipped frame) then skips the culled ops */

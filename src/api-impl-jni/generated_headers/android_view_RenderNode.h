@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     android_view_RenderNode
  * Method:    nativeCreateSnapshot
- * Signature: ()J
+ * Signature: (IIII)J
  */
 JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateSnapshot
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jint, jint, jint, jint);
 
 /*
  * Class:     android_view_RenderNode

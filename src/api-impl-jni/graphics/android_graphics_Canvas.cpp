@@ -92,6 +92,11 @@ JNIEXPORT void JNICALL Java_android_graphics_BaseCanvas_nPunchHole(JNIEnv *env, 
 JNIEXPORT jboolean JNICALL Java_android_graphics_Canvas_nGetClipBounds(JNIEnv *env, jclass, jlong canvas_ptr, jobject rect)
 {
 	SkIRect bounds = CANVAS(canvas_ptr)->getDeviceClipBounds();
+	/* a display list's clip starts at the view's bounds, as in AOSP; views
+	 * size what they draw from it (e.g. a highlight spanning the clip height) */
+	ATLCanvas *atl_canvas = (ATLCanvas *)_PTR(canvas_ptr);
+	if (atl_canvas->is_recording() && !bounds.intersect(atl_canvas->record_bounds))
+		bounds.setEmpty();
 	/* AOSP reports clip bounds in local coordinates */
 	SkRect local = SkRect::Make(bounds);
 	SkMatrix inverse;

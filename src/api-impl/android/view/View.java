@@ -1356,7 +1356,7 @@ public class View implements Drawable.Callback {
 		}
 		if (contentDisplayList == null)
 			contentDisplayList = new RenderNode();
-		DisplayListCanvas recording = contentDisplayList.start(getWidth(), getHeight());
+		DisplayListCanvas recording = contentDisplayList.start(getWidth(), getHeight(), scrollX, scrollY);
 		try {
 			drawBackground(recording);
 			onDraw(recording);

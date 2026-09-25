@@ -39,10 +39,13 @@ struct ATLCanvas {
 	SkPictureRecorder *recorder = nullptr;
 	sk_sp<SkSurface> surface; // GPU mode: persistent Ganesh render target
 	std::vector<sk_sp<ATLNode>> stubs; // stub nodes recorded into a display list
+	/* recording mode: the part of the view on screen, which is what AOSP's
+	 * RecordingCanvas reports as its clip; the cull rect stays unbounded */
+	SkIRect record_bounds = SkIRect::MakeEmpty();
 
 	static ATLCanvas *new_raster(int width, int height);
 	static ATLCanvas *for_bitmap(SkBitmap *bitmap);
-	static ATLCanvas *new_recording(void);
+	static ATLCanvas *new_recording(SkIRect bounds);
 	static ATLCanvas *new_gpu(GrDirectContext *context, int width, int height);
 	bool is_recording() const { return recorder != nullptr; }
 	bool is_gpu() const { return surface != nullptr; }
