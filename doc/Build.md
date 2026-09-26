@@ -1,3 +1,7 @@
+libsecret is optional (`libsecret-1-dev` on Debian). With a running Secret
+Service it persists Android keys and accounts. Without it, keys remain in
+memory for the session and AccountManager reports no stored accounts.
+
 ## Dependencies
 ### Debian
 ```sh
