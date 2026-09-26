@@ -156,7 +156,7 @@ public final class ATLLoadedApp {
 		} catch (Exception e) {
 			Slog.w(TAG, "could not install the app's shared libraries", e);
 		}
-		resources.applyPackageQuirks(pkg.applicationInfo.minSdkVersion);
+
 		// Support for MicroG and other custom GMS implementations.
 		if (play_services.contains(pkg.packageName)) {
 			ATLSigHelper.addGMSSignatures(pkg);
@@ -197,7 +197,6 @@ public final class ATLLoadedApp {
 		if (configuration == null)
 			configuration = Context.sys_config;
 		Resources resources = new Resources(this.default_resources.getAssets(), displayMetrics, configuration);
-		resources.applyPackageQuirks(this.pkg.applicationInfo.minSdkVersion);
 		return resources;
 	}
 
