@@ -3,6 +3,7 @@ package android.view;
 import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import java.lang.reflect.InvocationTargetException;
 
@@ -32,6 +33,9 @@ public class ContextThemeWrapper extends ContextWrapper {
 		super(context);
 		mTheme = context.getResources().newTheme();
 		mTheme.setTo(theme);
+	}
+
+	public void applyOverrideConfiguration(Configuration overrideConfiguration) {
 	}
 
 	@Override
