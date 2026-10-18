@@ -24,6 +24,7 @@ import android.util.Slog;
 import android.util.Xml;
 import java.io.FileReader;
 import java.lang.reflect.Constructor;
+import java.util.HashMap;
 import java.util.LinkedList;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -31,6 +32,8 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 public class LayoutInflater {
 	private static final String TAG = "LayoutInflater";
+
+	private static HashMap<String, Constructor<? extends View>> constructorCache = new HashMap<>();
 
 	/* pretty print for debugging */
 	private int indent = 1;
@@ -86,13 +89,17 @@ public class LayoutInflater {
 	public final View createView(String name, String prefix, AttributeSet attrs) throws Exception {
 		Slog.v(TAG, tabs(indent) + "createView(" + name + ", " + prefix + ", " + attrs + ");");
 
-		String view_class_name = prefix != null ? prefix + name : name;
-		ClassLoader classLoader = context.getClassLoader();
-		if (classLoader == null)
-			classLoader = ClassLoader.getSystemClassLoader();
-		Class view_class = Class.forName(view_class_name, false, classLoader);
+		Constructor<? extends View> constructor = constructorCache.get(name);
+		if (constructor == null) {
+			String view_class_name = prefix != null ? prefix + name : name;
+			ClassLoader classLoader = context.getClassLoader();
+			if (classLoader == null)
+				classLoader = ClassLoader.getSystemClassLoader();
+			Class<? extends View> view_class = Class.forName(view_class_name, false, classLoader).asSubclass(View.class);
 
-		Constructor constructor = view_class.getConstructor(Context.class, AttributeSet.class);
+			constructor = view_class.getConstructor(Context.class, AttributeSet.class);
+			constructorCache.put(name, constructor);
+		}
 
 		Context context = this.context;
 		final TypedArray ta = context.obtainStyledAttributes(attrs, new int[] {com.android.internal.R.attr.theme});
