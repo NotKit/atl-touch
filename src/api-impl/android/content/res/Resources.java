@@ -108,17 +108,24 @@ public class Resources {
 	/*package*/ final Object mAccessLock = new Object();
 	/*package*/ final Configuration mTmpConfig = new Configuration();
 	/*package*/ TypedValue mTmpValue = new TypedValue();
+	private ThemedResourceCache<Drawable.ConstantState> mDrawableCacheInternal = new ThemedResourceCache<Drawable.ConstantState>() {
+		@Override
+		protected boolean shouldInvalidateEntry(Drawable.ConstantState entry, int configChanges) {
+			// TODO Auto-generated method stub
+			throw new UnsupportedOperationException("Unimplemented method 'shouldInvalidateEntry'");
+		}
+	};
 	/*package*/ Object mDrawableCache = Build.VERSION.SDK_INT < 23
-	                                      ? new HashMap<Long, WeakReference<Drawable.ConstantState>>(0)
-	                                      : new ThemedResourceCache<Drawable>() {
-							@Override
-							protected boolean shouldInvalidateEntry(Drawable entry, int configChanges) {
-								// TODO Auto-generated method stub
-								throw new UnsupportedOperationException("Unimplemented method 'shouldInvalidateEntry'");
-							}
-						};
+	                                      ? new HashMap<String, LongSparseArray<WeakReference<Drawable.ConstantState>>>(0)
+	                                      : mDrawableCacheInternal;
 	private final ConfigurationBoundResourceCache<ComplexColor> mComplexColorCache = new ConfigurationBoundResourceCache<>(this);
-	/*package*/ final LongSparseArray<WeakReference<Drawable.ConstantState>> mColorDrawableCache = new LongSparseArray<WeakReference<Drawable.ConstantState>>(0);
+	/*package*/ final ThemedResourceCache<Drawable.ConstantState> mColorDrawableCache = new ThemedResourceCache<Drawable.ConstantState>() {
+		@Override
+		protected boolean shouldInvalidateEntry(Drawable.ConstantState entry, int configChanges) {
+			// TODO Auto-generated method stub
+			throw new UnsupportedOperationException("Unimplemented method 'shouldInvalidateEntry'");
+		}
+	};
 	/*package*/ boolean mPreloading;
 
 	/*package*/ TypedArray mCachedStyledAttributes = null;
@@ -1859,8 +1866,8 @@ public class Resources {
 				Slog.i(TAG, "**** Updating config of " + this + ": final config is " + mConfiguration + " final compat is " + mCompatibilityInfo);
 			}
 
-			//            clearDrawableCacheLocked(mDrawableCache, configChanges);
-			//            clearDrawableCacheLocked(mColorDrawableCache, configChanges);
+			mDrawableCacheInternal.onConfigurationChange(configChanges);
+			mColorDrawableCache.onConfigurationChange(configChanges);
 
 			mComplexColorCache.onConfigurationChange(configChanges);
 
@@ -1871,40 +1878,6 @@ public class Resources {
 				mPluralRule = PluralRules.forLocale(config.locale);
 			}
 		}
-	}
-
-	private void clearDrawableCacheLocked(
-	    LongSparseArray<WeakReference<ConstantState>> cache,
-	    int configChanges) {
-		/*int N = cache.size();
-		if (DEBUG_CONFIG) {
-			Log.d(TAG, "Cleaning up drawables config changes: 0x"
-			           + Integer.toHexString(configChanges));
-		}
-		for (int i = 0; i < N; i++) {
-			WeakReference<Drawable.ConstantState> ref = cache.valueAt(i);
-			if (ref != null) {
-				Drawable.ConstantState cs = ref.get();
-				if (cs != null) {
-					if (Configuration.needNewResources(
-						configChanges, cs.getChangingConfigurations())) {
-						if (DEBUG_CONFIG) {
-							Log.d(TAG, "FLUSHING #0x"
-							           + Long.toHexString(mDrawableCache.keyAt(i))
-							               + " / " + cs + " with changes: 0x"
-							               + Integer.toHexString(cs.getChangingConfigurations()));
-						}
-						cache.setValueAt(i, null);
-					} else if (DEBUG_CONFIG) {
-						Log.d(TAG, "(Keeping #0x"
-						           + Long.toHexString(cache.keyAt(i))
-						               + " / " + cs + " with changes: 0x"
-						               + Integer.toHexString(cs.getChangingConfigurations())
-						               + ")");
-					}
-				}
-			}
-		}*/
 	}
 
 	/**
@@ -2289,13 +2262,12 @@ public class Resources {
 		}
 		final long key = isColorDrawable ? value.data : (((long)value.assetCookie) << 32) | value.data;
 
-		Drawable dr = null;
-		/*Drawable dr = getCachedDrawable(isColorDrawable ? mColorDrawableCache : mDrawableCache, key);
+		Drawable dr = getCachedDrawable(isColorDrawable ? mColorDrawableCache : mDrawableCacheInternal, key, theme);
 
 		if (dr != null) {
 			return dr;
 		}
-		Drawable.ConstantState cs;
+		/*Drawable.ConstantState cs;
 		if (isColorDrawable) {
 			cs = sPreloadedColorDrawables.get(key);
 		} else {
@@ -2374,9 +2346,9 @@ public class Resources {
 
 		if (dr != null) {
 			dr.setChangingConfigurations(value.changingConfigurations);
-			/*cs = dr.getConstantState();
+			Drawable.ConstantState cs = dr.getConstantState();
 			if (cs != null) {
-				if (mPreloading) {
+				/*if (mPreloading) {
 					final int changingConfigs = cs.getChangingConfigurations();
 					if (isColorDrawable) {
 						if (verifyPreloadConfig(changingConfigs, 0, value.resourceId,
@@ -2398,42 +2370,37 @@ public class Resources {
 							}
 						}
 					}
-				} else {
+				} else*/
+				{
 					synchronized (mAccessLock) {
 						//Log.i(TAG, "Saving cached drawable @ #" +
 						//        Integer.toHexString(key.intValue())
 						//        + " in " + this + ": " + cs);
 						if (isColorDrawable) {
-							mColorDrawableCache.put(key, new WeakReference<Drawable.ConstantState>(cs));
+							mColorDrawableCache.put(key, theme, cs);
 						} else {
-							mDrawableCache.put(key, new WeakReference<Drawable.ConstantState>(cs));
+							mDrawableCacheInternal.put(key, theme, cs);
 						}
 					}
 				}
-			}*/
+			}
 		}
 
 		return dr;
 	}
 
 	private Drawable getCachedDrawable(
-	    LongSparseArray<WeakReference<ConstantState>> drawableCache,
-	    long key) { /*
-	 synchronized (mAccessLock) {
-	     WeakReference<Drawable.ConstantState> wr = drawableCache.get(key);
-	     if (wr != null) {   // we have the key
-		 Drawable.ConstantState entry = wr.get();
-		 if (entry != null) {
-		     //Log.i(TAG, "Returning cached drawable @ #" +
-		     //        Integer.toHexString(((Integer)key).intValue())
-		     //        + " in " + this + ": " + entry);
-		     return entry.newDrawable(this);
-		 }
-		 else {  // our entry has been purged
-		     drawableCache.delete(key);
-		 }
-	     }
-	 }*/
+	    ThemedResourceCache<Drawable.ConstantState> drawableCache,
+	    long key, Theme theme) {
+		synchronized (mAccessLock) {
+			Drawable.ConstantState entry = drawableCache.get(key, theme);
+			if (entry != null) {
+				//Log.i(TAG, "Returning cached drawable @ #" +
+				//        Integer.toHexString(((Integer)key).intValue())
+				//        + " in " + this + ": " + entry);
+				return entry.newDrawable(this);
+			}
+		}
 		return null;
 	}
 
