@@ -2655,18 +2655,13 @@ public class Resources {
 
 	/*package*/ XmlResourceParser loadXmlResourceParser(String file, int id,
 	                                                    int assetCookie, String type) throws NotFoundException {
-		try {
-			return mAssets.openXmlResourceParser(assetCookie, file);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-		/*if (id != 0) {
+		if (id != 0) {
 			try {
 				// These may be compiled...
 				synchronized (mCachedXmlBlockIds) {
 					// First see if this block is in our cache.
 					final int num = mCachedXmlBlockIds.length;
-					for (int i=0; i<num; i++) {
+					for (int i = 0; i < num; i++) {
 						if (mCachedXmlBlockIds[i] == id) {
 							//System.out.println("**** REUSING XML BLOCK!  id="
 							//                   + id + ", index=" + i);
@@ -2676,15 +2671,15 @@ public class Resources {
 
 					// Not in the cache, create a new block and put it at
 					// the next slot in the cache.
-					XmlBlock block = mAssets.openXmlBlockAsset(
-					assetCookie, file);
+					XmlBlock block = mAssets.openXmlBlockAsset(assetCookie, file);
 					if (block != null) {
-						int pos = mLastCachedXmlBlockIndex+1;
-						if (pos >= num) pos = 0;
+						int pos = mLastCachedXmlBlockIndex + 1;
+						if (pos >= num)
+							pos = 0;
 						mLastCachedXmlBlockIndex = pos;
 						XmlBlock oldBlock = mCachedXmlBlocks[pos];
 						if (oldBlock != null) {
-						oldBlock.close();
+							oldBlock.close();
 						}
 						mCachedXmlBlockIds[pos] = id;
 						mCachedXmlBlocks[pos] = block;
@@ -2694,17 +2689,17 @@ public class Resources {
 					}
 				}
 			} catch (Exception e) {
-				NotFoundException rnf = new NotFoundException("File " + file +
-					                                      " from xml type " + type +
-					                                      " resource ID #0x" + Integer.toHexString(id));
+				NotFoundException rnf = new NotFoundException("File " + file
+				                                              + " from xml type " + type
+				                                              + " resource ID #0x" + Integer.toHexString(id));
 				rnf.initCause(e);
 				throw rnf;
 			}
 		}
 
 		throw new NotFoundException(
-			"File " + file + " from xml type " + type + " resource ID #0x"
-			+ Integer.toHexString(id));*/
+		    "File " + file + " from xml type " + type + " resource ID #0x"
+		    + Integer.toHexString(id));
 	}
 
 	/**
