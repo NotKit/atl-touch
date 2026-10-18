@@ -22,6 +22,7 @@ import android.system.ErrnoException;
 // import android.os.Looper;
 import android.system.Os;
 import android.system.StructStat;
+import android.util.Log;
 import android.util.Slog;
 // import com.google.android.collect.Maps;
 import com.android.internal.util.XmlUtils;
@@ -203,7 +204,8 @@ public final class SharedPreferencesImpl implements SharedPreferences {
 	}
 
 	public Map<String, ?> getAll() {
-		Slog.v(TAG, "\n\n...> getAll()\n\n");
+		if (Log.isLoggable(TAG, Log.VERBOSE))
+			Slog.v(TAG, "\n\n...> getAll()\n\n");
 		synchronized (this) {
 			awaitLoadedLocked();
 			// noinspection unchecked
@@ -250,7 +252,8 @@ public final class SharedPreferencesImpl implements SharedPreferences {
 	}
 	public boolean getBoolean(String key, boolean defValue) {
 		synchronized (this) {
-			Slog.v(TAG, "android.app.SharedPreferencesImpl.getBoolean(" + key + ", " + defValue + ")");
+			if (Log.isLoggable(TAG, Log.VERBOSE))
+				Slog.v(TAG, "android.app.SharedPreferencesImpl.getBoolean(" + key + ", " + defValue + ")");
 			awaitLoadedLocked();
 			Boolean v = (Boolean)mMap.get(key);
 			return v != null ? v : defValue;

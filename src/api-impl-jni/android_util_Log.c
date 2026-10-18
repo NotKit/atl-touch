@@ -1,7 +1,10 @@
+#include <dlfcn.h>
 #include <stdio.h>
 
 #include "defines.h"
 #include "util.h"
+
+#include "generated_headers/android_util_Log.h"
 
 /* copied from AOSP:
 **
@@ -47,5 +50,28 @@ JNIEXPORT jint JNICALL Java_android_util_Log_println_1native(JNIEnv *env, jobjec
 		(*env)->ReleaseStringUTFChars(env, tagObj, tag);
 	(*env)->ReleaseStringUTFChars(env, msgObj, msg);
 
+	return res;
+}
+
+static int fallback_is_loggable(int prio, const char *tag, int default_prio)
+{
+	return default_prio <= prio;
+}
+
+JNIEXPORT jboolean JNICALL Java_android_util_Log_native_1is_1loggable(JNIEnv *env, jclass this, jint priority, jstring tag_jstr)
+{
+	static int (*_android_log_is_loggable)(int prio, const char *tag, int default_prio);
+	if (!_android_log_is_loggable) {
+		_android_log_is_loggable = dlsym(RTLD_DEFAULT, "__android_log_is_loggable");
+		if (!_android_log_is_loggable)
+			_android_log_is_loggable = fallback_is_loggable;
+	}
+
+	const char *tag = NULL;
+	if (tag_jstr)
+		tag = (*env)->GetStringUTFChars(env, tag_jstr, NULL);
+	jboolean res = _android_log_is_loggable(priority, tag, ANDROID_LOG_DEFAULT);
+	if (tag_jstr)
+		(*env)->ReleaseStringUTFChars(env, tag_jstr, tag);
 	return res;
 }

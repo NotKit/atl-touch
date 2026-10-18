@@ -35,6 +35,14 @@ extern "C" {
 JNIEXPORT jint JNICALL Java_android_util_Log_println_1native
   (JNIEnv *, jclass, jint, jint, jstring, jstring);
 
+/*
+ * Class:     android_util_Log
+ * Method:    native_is_loggable
+ * Signature: (ILjava/lang/String;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_util_Log_native_1is_1loggable
+  (JNIEnv *, jclass, jint, jstring);
+
 #ifdef __cplusplus
 }
 #endif

@@ -60,6 +60,7 @@ import android.security.keystore.AndroidKeyStoreProvider;
 import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.Slog;
 import android.view.Display;
 import android.view.LayoutInflater;
@@ -246,7 +247,8 @@ public abstract class Context {
 	}
 
 	public Context() {
-		Slog.v(TAG, "new Context! this one is: " + this);
+		if (Log.isLoggable(TAG, Log.VERBOSE))
+			Slog.v(TAG, "new Context! this one is: " + this);
 	}
 
 	public int checkPermission(String permission, int pid, int uid) {
@@ -477,7 +479,8 @@ public abstract class Context {
 	private static Map<String, SharedPreferences> sharedPrefs = new HashMap<String, SharedPreferences>();
 
 	public SharedPreferences getSharedPreferences(String name, int mode) {
-		Slog.v(TAG, "\n\n...> getSharedPreferences(" + name + ")\n\n");
+		if (Log.isLoggable(TAG, Log.VERBOSE))
+			Slog.v(TAG, "\n\n...> getSharedPreferences(" + name + ")\n\n");
 		if (sharedPrefs.containsKey(name)) {
 			return sharedPrefs.get(name);
 		} else {
@@ -494,14 +497,16 @@ public abstract class Context {
 
 	// TODO: do these both work? make them look more alike
 	public FileInputStream openFileInput(String name) throws FileNotFoundException {
-		Slog.v(TAG, "openFileInput called for: '" + name + "'");
+		if (Log.isLoggable(TAG, Log.VERBOSE))
+			Slog.v(TAG, "openFileInput called for: '" + name + "'");
 		File file = new File(getFilesDir(), name);
 
 		return new FileInputStream(file);
 	}
 
 	public FileOutputStream openFileOutput(String name, int mode) throws java.io.FileNotFoundException {
-		Slog.v(TAG, "openFileOutput called for: '" + name + "'");
+		if (Log.isLoggable(TAG, Log.VERBOSE))
+			Slog.v(TAG, "openFileOutput called for: '" + name + "'");
 		return new FileOutputStream(android.os.Environment.getExternalStorageDirectory().getPath() + "/files/" + name);
 	}
 

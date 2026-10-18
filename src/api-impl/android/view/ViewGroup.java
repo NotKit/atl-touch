@@ -10,6 +10,7 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Slog;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -625,10 +626,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void setClipToPadding(boolean clipToPadding) {}
 
 	public View findViewById(int id) {
-		Slog.v(TAG, "findViewById: looking for id: " + String.format("%x", id) + "(" + getResources().getAssets().getResourceName(id) + ")"
-		            + " | checking: " + this + ",id: " + String.format("%x", this.getId()) + ", id_str: " + this.getIdName());
+		if (Log.isLoggable(TAG, Log.VERBOSE))
+			Slog.v(TAG, "findViewById: looking for id: " + String.format("%x", id) + "(" + getResources().getAssets().getResourceName(id) + ")"
+			            + " | checking: " + this + ",id: " + String.format("%x", this.getId()) + ", id_str: " + this.getIdName());
 		if (this.id == id) {
-			Slog.v(TAG, "findViewById: found: " + this + " | id: " + String.format("%x", this.getId()) + ", id_str: " + this.getIdName());
+			if (Log.isLoggable(TAG, Log.VERBOSE))
+				Slog.v(TAG, "findViewById: found: " + this + " | id: " + String.format("%x", this.getId()) + ", id_str: " + this.getIdName());
 			return this;
 		}
 		for (View child : children) {
