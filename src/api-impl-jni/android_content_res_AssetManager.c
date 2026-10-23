@@ -130,7 +130,7 @@ JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_seekAsset(JNIEnv *
 	AM_SCOPEDLOCK(asset_manager)
 
 	struct Asset *asset = _PTR(_asset);
-	return Asset_seek(asset, offset, whence);
+	return Asset_seek(asset, offset, whence > 0 ? SEEK_END : (whence < 0 ? SEEK_SET : SEEK_CUR));
 }
 
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_destroyAsset(JNIEnv *env, jobject this, jlong _asset)
