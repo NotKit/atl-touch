@@ -97,7 +97,7 @@ public class MediaCodec {
 		outputBuffers = new ByteBuffer[4];
 		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
 		for (int i = 0; i < outputBuffers.length; i++) {
-			outputBuffers[i] = ByteBuffer.allocate(8192).order(ByteOrder.LITTLE_ENDIAN);
+			outputBuffers[i] = ByteBuffer.allocate(16384).order(ByteOrder.LITTLE_ENDIAN);
 			freeOutputBuffers.add(i);
 		}
 
