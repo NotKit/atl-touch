@@ -582,6 +582,7 @@ srcs = [
 	'android/os/OutcomeReceiver.java',
 	'android/os/Parcel.java',
 	'android/os/Parcelable.java',
+	'android/os/ParcelableException.java',
 	'android/os/ParcelFileDescriptor.java',
 	'android/os/ParcelFormatException.java',
 	'android/os/PatternMatcher.java',

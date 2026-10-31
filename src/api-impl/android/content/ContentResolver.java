@@ -248,10 +248,7 @@ public class ContentResolver {
 		if (provider == null)
 			throw new OperationApplicationException("no provider for " + authority);
 
-		ContentProviderResult[] results = new ContentProviderResult[operations.size()];
-		for (int i = 0; i < operations.size(); i++)
-			results[i] = operations.get(i).apply(provider);
-		return results;
+		return provider.applyBatch(authority, operations);
 	}
 
 	public final Bundle call(Uri uri, String method, String arg, Bundle extras) {

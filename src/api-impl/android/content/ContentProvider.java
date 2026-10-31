@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -55,6 +56,19 @@ public abstract class ContentProvider {
 
 	public Context getContext() {
 		return ATLLoadedApp.getPrimaryApplication().getApplication();
+	}
+
+	public ContentProviderResult[] applyBatch(String authority, ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
+		return applyBatch(operations);
+	}
+
+	public ContentProviderResult[] applyBatch(ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
+		final int numOperations = operations.size();
+		final ContentProviderResult[] results = new ContentProviderResult[numOperations];
+		for (int i = 0; i < numOperations; i++) {
+			results[i] = operations.get(i).apply(this, results, i);
+		}
+		return results;
 	}
 
 	public abstract Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder);

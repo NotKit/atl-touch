@@ -1,26 +1,154 @@
+/*
+ * Copyright (C) 2009 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package android.content;
 
 import android.net.Uri;
+import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.os.ParcelableException;
+import java.util.Objects;
 
-/** What one {@link ContentProviderOperation} of a batch did: a uri or a count. */
-public class ContentProviderResult {
-
+/**
+ * Contains the result of the application of a {@link ContentProviderOperation}.
+ * <p>
+ * It is guaranteed to have exactly one of {@link #uri}, {@link #count},
+ * {@link #extras}, or {@link #exception} set.
+ */
+public class ContentProviderResult implements Parcelable {
 	public final Uri uri;
 	public final Integer count;
+	public final Bundle extras;
+	public final Throwable exception;
 
 	public ContentProviderResult(Uri uri) {
-		this.uri = uri;
-		this.count = null;
+		this(Objects.requireNonNull(uri), null, null, null);
 	}
 
 	public ContentProviderResult(int count) {
-		this.uri = null;
-		this.count = Integer.valueOf(count);
+		this(null, count, null, null);
+	}
+
+	public ContentProviderResult(Bundle extras) {
+		this(null, null, Objects.requireNonNull(extras), null);
+	}
+
+	public ContentProviderResult(Throwable exception) {
+		this(null, null, null, exception);
+	}
+
+	public ContentProviderResult(Uri uri, Integer count, Bundle extras, Throwable exception) {
+		this.uri = uri;
+		this.count = count;
+		this.extras = extras;
+		this.exception = exception;
+	}
+
+	public ContentProviderResult(Parcel source) throws ReflectiveOperationException {
+		if (source.readInt() != 0) {
+			uri = Uri.CREATOR.createFromParcel(source);
+		} else {
+			uri = null;
+		}
+		if (source.readInt() != 0) {
+			count = source.readInt();
+		} else {
+			count = null;
+		}
+		if (source.readInt() != 0) {
+			extras = source.readBundle();
+		} else {
+			extras = null;
+		}
+		if (source.readInt() != 0) {
+			exception = ParcelableException.readFromParcel(source);
+		} else {
+			exception = null;
+		}
+	}
+
+	public ContentProviderResult(ContentProviderResult cpr, int userId) {
+		uri = cpr.uri;
+		count = cpr.count;
+		extras = cpr.extras;
+		exception = cpr.exception;
 	}
 
 	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		if (uri != null) {
+			dest.writeInt(1);
+			uri.writeToParcel(dest, flags);
+		} else {
+			dest.writeInt(0);
+		}
+		if (count != null) {
+			dest.writeInt(1);
+			dest.writeInt(count);
+		} else {
+			dest.writeInt(0);
+		}
+		if (extras != null) {
+			dest.writeInt(1);
+			dest.writeBundle(extras);
+		} else {
+			dest.writeInt(0);
+		}
+		if (exception != null) {
+			dest.writeInt(1);
+			ParcelableException.writeToParcel(dest, exception);
+		} else {
+			dest.writeInt(0);
+		}
+	}
+
+	public static final @android.annotation.NonNull Creator<ContentProviderResult> CREATOR = new Creator<ContentProviderResult>() {
+		@Override
+		public ContentProviderResult createFromParcel(Parcel source) {
+			try {
+				return new ContentProviderResult(source);
+			} catch (ReflectiveOperationException e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		@Override
+		public ContentProviderResult[] newArray(int size) {
+			return new ContentProviderResult[size];
+		}
+	};
+
+	@Override
 	public String toString() {
-		return uri != null ? "ContentProviderResult(uri=" + uri + ")"
-		                   : "ContentProviderResult(count=" + count + ")";
+		final StringBuilder sb = new StringBuilder("ContentProviderResult(");
+		if (uri != null) {
+			sb.append("uri=").append(uri).append(' ');
+		}
+		if (count != null) {
+			sb.append("count=").append(count).append(' ');
+		}
+		if (extras != null) {
+			sb.append("extras=").append(extras).append(' ');
+		}
+		if (exception != null) {
+			sb.append("exception=").append(exception).append(' ');
+		}
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append(")");
+		return sb.toString();
 	}
 }
