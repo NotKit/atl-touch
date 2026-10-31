@@ -55,7 +55,10 @@ public class Binder implements IBinder {
 	 */
 	@Override
 	public boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
-		return onTransact(code, data, reply, flags);
+		if (data != null) data.setDataPosition(0);
+		boolean handled = onTransact(code, data, reply, flags);
+		if (reply != null) reply.setDataPosition(0);
+		return handled;
 	}
 
 	protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
