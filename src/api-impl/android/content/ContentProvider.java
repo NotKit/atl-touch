@@ -123,6 +123,10 @@ public abstract class ContentProvider {
 		return null;
 	}
 
+	public Bundle call(String authority, String method, String arg, Bundle extras) {
+		return call(method, arg, extras);
+	}
+
 	public void attachInfo(Context context, ProviderInfo provider) {}
 
 	public String getCallingPackage() {

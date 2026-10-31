@@ -252,9 +252,14 @@ public class ContentResolver {
 	}
 
 	public final Bundle call(Uri uri, String method, String arg, Bundle extras) {
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		return call(uri.getAuthority(), method, arg, extras);
+	}
 
-		return provider == null ? null : provider.call(method, arg, extras);
+	public final Bundle call(String authority, String method, String arg, Bundle extras) {
+		ContentProvider provider = ContentProvider.atl_get_content_provider(authority);
+		if (provider == null)
+			throw new IllegalArgumentException("Unknown authority " + authority);
+		return provider.call(authority, method, arg, extras);
 	}
 
 	public List getPersistedUriPermissions() {
