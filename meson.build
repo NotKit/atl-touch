@@ -51,6 +51,12 @@ unifiedpush_connector = gnome.gdbus_codegen('unifiedpush-connector',
 extra_deps = []
 extra_jni_srcs = []
 
+libsecret_dep = dependency('libsecret-1', required: false)
+if libsecret_dep.found()
+	extra_deps += libsecret_dep
+	add_project_arguments('-DHAVE_LIBSECRET', language: ['c', 'cpp'])
+endif
+
 # Maliit D-Bus input method (soft keyboard on Lomiri/Ubuntu Touch and
 # SailfishOS); the generic backend framework always builds, this backend
 # only when maliit-glib is available.
@@ -167,6 +173,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/android_util_Log.c',
                                                                   	'src/api-impl-jni/android_view_Window.c',
                                                                   	'src/api-impl-jni/surface_post.c',
+                                                                  	'src/api-impl-jni/accounts/android_accounts_AccountManager.c',
                                                                   	'src/api-impl-jni/app/android_app_Activity.c',
                                                                                                                                     	'src/api-impl-jni/app/android_app_NotificationManager.c',
                                                                   	'src/api-impl-jni/app/android_app_WallpaperManager.c',
