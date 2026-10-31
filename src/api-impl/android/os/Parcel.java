@@ -376,6 +376,7 @@ public class Parcel {
 	}
 
 	public String readString() {
+		if (pos + 2 > size) return null;
 		try {
 			int len = is.readShort();
 			if (len == -1)
@@ -749,6 +750,7 @@ public class Parcel {
 	}
 
 	public void readException() {
+		if (pos >= size) return;
 		RuntimeException e = (RuntimeException)readSerializable();
 		if (e != null)
 			throw e;
