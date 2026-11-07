@@ -3,13 +3,13 @@ package android.widget;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
@@ -19,7 +19,6 @@ import android.view.MotionEvent;
 import java.util.ArrayList;
 
 public class EditText extends TextView {
-	private CharSequence hint = "";
 	/** Caret position; selStart==selEnd means a plain cursor (no range selection). */
 	private int selStart = 0, selEnd = 0;
 	/** Active IME composing region; composeStart==-1 means none. */
@@ -29,36 +28,19 @@ public class EditText extends TextView {
 	private final Paint cursorPaint = new Paint();
 
 	public EditText(Context context) {
-		super(context);
-		initDefaultSize();
+		this(context, null);
 	}
 
 	public EditText(Context context, AttributeSet attrs) {
-		super(context, attrs);
-		initDefaultSize();
+		this(context, attrs, com.android.internal.R.attr.editTextStyle);
 	}
 
 	public EditText(Context context, AttributeSet attrs, int defStyle) {
-		super(context, attrs, defStyle);
-		initDefaultSize();
+		this(context, attrs, defStyle, 0);
 	}
 
 	public EditText(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		super(context, attrs, defStyle, defStyleRes);
-		initDefaultSize();
-	}
-
-	/**
-	 * Give the field a touch-target-sized minimum height and vertically center its
-	 * content. ATL doesn't resolve the editbox/OutlinedBox style padding that would
-	 * normally supply this, so without a floor a single-line field collapses to the
-	 * bare text height (~23px) and is effectively invisible/unusable. Only applied
-	 * when nothing more specific was set.
-	 */
-	private void initDefaultSize() {
-		if (getMinimumHeight() <= 0)
-			setMinimumHeight((int)(48 * getResources().getDisplayMetrics().density));
-		setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
 		cursorPaint.setColor(0xFF000000);
 	}
 
@@ -378,28 +360,25 @@ public class EditText extends TextView {
 	}
 
 	@Override
-	public void onDraw(Canvas canvas) {
-		super.onDraw(canvas);
+	protected void drawEditor(Canvas canvas) {
 		if (!isFocused())
 			return;
-		/* the caret and the composing underline have to follow the text where
-		 * TextView actually drew it, gravity and all - not a line box of their own */
+		// TextView has already translated to the text layout's origin.
 		String cur = content();
 		Layout layout = getLayout();
-		float ox = getLayoutOffsetX(), oy = getLayoutOffsetY();
 		int caret = Math.max(0, Math.min(selEnd, cur.length()));
 		int caretLine = layout.getLineForOffset(caret);
 		if (composeStart >= 0 && composeEnd > composeStart && composeEnd <= cur.length()) {
 			int line = layout.getLineForOffset(composeStart);
-			float x0 = ox + layout.getPrimaryHorizontal(composeStart);
-			float x1 = ox + layout.getPrimaryHorizontal(composeEnd);
-			float y = oy + layout.getLineBaseline(line) + getPaint().getUnderlinePosition();
+			float x0 = layout.getPrimaryHorizontal(composeStart);
+			float x1 = layout.getPrimaryHorizontal(composeEnd);
+			float y = layout.getLineBaseline(line) + getPaint().getUnderlinePosition();
 			canvas.drawLine(x0, y, x1, y, getPaint());
 		}
 		if (!isCursorVisible())
 			return;
-		float cursorX = ox + layout.getPrimaryHorizontal(caret);
-		float top = oy + layout.getLineTop(caretLine), bottom = oy + layout.getLineBottom(caretLine);
+		float cursorX = layout.getPrimaryHorizontal(caret);
+		float top = layout.getLineTop(caretLine), bottom = layout.getLineBottomWithoutSpacing(caretLine);
 		Drawable cursor = getTextCursorDrawable();
 		if (cursor == null) {
 			canvas.drawLine(cursorX, top, cursorX, bottom, cursorPaint);
@@ -408,7 +387,20 @@ public class EditText extends TextView {
 		/* the drawable is the caret (API 29+), so it decides its own width; an
 		 * intrinsic-less one gets the hairline the fallback above would draw */
 		int width = Math.max(1, cursor.getIntrinsicWidth());
-		cursor.setBounds((int)cursorX, (int)top, (int)cursorX + width, (int)bottom);
+		Rect padding = new Rect();
+		cursor.getPadding(padding);
+		float horizontal = Math.max(0.5f, cursorX - 0.5f);
+		int scrollX = getScrollX();
+		int available = getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight();
+		int left;
+		if (horizontal - scrollX >= available - 1f)
+			left = available + scrollX - (width - padding.right);
+		else if (Math.abs(horizontal - scrollX) <= 1f)
+			left = scrollX - padding.left;
+		else
+			left = (int)horizontal - padding.left;
+		// Drawable bounds stay in layout coordinates, as in AOSP's Editor.
+		cursor.setBounds(left, (int)top - padding.top, left + width, (int)bottom + padding.bottom);
 		cursor.draw(canvas);
 	}
 
@@ -443,19 +435,6 @@ public class EditText extends TextView {
 	@Override
 	public void setOnEditorActionListener(OnEditorActionListener l) {
 		editorActionListener = l;
-	}
-
-	@Override
-	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {}
-
-	@Override
-	public void setHint(CharSequence s) {
-		hint = s == null ? "" : s.toString();
-	}
-
-	@Override
-	public CharSequence getHint() {
-		return hint;
 	}
 
 	public void selectAll() {

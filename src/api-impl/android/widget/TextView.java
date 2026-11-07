@@ -35,8 +35,10 @@ import android.view.View;
 public class TextView extends View implements android.view.ViewTreeObserver.OnPreDrawListener {
 	private ColorStateList colors = new ColorStateList(new int[][] {new int[0]}, new int[1]);
 	private CharSequence text = "";
+	private CharSequence hint;
+	private ColorStateList hintColors;
 	private TextPaint paint = new TextPaint();
-	private boolean include_padding = false;
+	private boolean include_padding = true;
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.TOP | Gravity.START;
@@ -75,6 +77,11 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			if (a.hasValue(com.android.internal.R.styleable.TextView_hint)) {
 				setHint(a.getText(com.android.internal.R.styleable.TextView_hint));
 			}
+
+			if (a.hasValue(com.android.internal.R.styleable.TextView_includeFontPadding))
+				setIncludeFontPadding(a.getBoolean(com.android.internal.R.styleable.TextView_includeFontPadding, true));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_textColorHint))
+				setHintTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColorHint));
 
 			int ap = a.getResourceId(com.android.internal.R.styleable.TextView_textAppearance, -1);
 			if (ap != -1) {
@@ -136,11 +143,16 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	private Layout text_layout;
+	private Layout hint_layout;
 
 	private float spacing_mult = 1.0f;
 	private float spacing_add = 0.0f;
 
 	private Layout makeLayout(int width) {
+		return makeLayout(text, width);
+	}
+
+	private Layout makeLayout(CharSequence text, int width) {
 		BoringLayout.Metrics boring = BoringLayout.isBoring(text, paint);
 		if (boring != null && (single_line || boring.width <= width)) {
 			return BoringLayout.make(text, paint, Math.max(width, boring.width), getLayoutAlignment(),
@@ -155,7 +167,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		    .setIncludePad(include_padding)
 		    .setBreakStrategy(break_strategy)
 		    .setHyphenationFrequency(hyphenation_frequency)
-		    .setMaxLines(single_line ? 1 : max_lines)
+		    .setMaxLines(single_line ? 1 : Integer.MAX_VALUE)
 		    .build();
 	}
 
@@ -165,7 +177,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		int widthSize = MeasureSpec.getSize(widthMeasureSpec);
 		final int hPadding = getCompoundPaddingLeft() + getCompoundPaddingRight();
 		final int vPadding = getCompoundPaddingTop() + getCompoundPaddingBottom();
-		int desiredWidth = (int)Math.ceil(Layout.getDesiredWidth(text, paint)) + hPadding;
+		int desiredWidth = (int)Math.ceil(Math.max(Layout.getDesiredWidth(text, paint),
+		    hint == null ? 0 : Layout.getDesiredWidth(hint, paint))) + hPadding;
 		int width;
 		if (widthMode == MeasureSpec.EXACTLY)
 			width = widthSize;
@@ -174,10 +187,14 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		else
 			width = Math.max(desiredWidth, getSuggestedMinimumWidth());
 		text_layout = makeLayout(Math.max(0, width - hPadding));
+		hint_layout = hint == null ? null : makeLayout(hint, Math.max(0, width - hPadding));
 		/* the layout may hold more lines than are visible (maxLines/singleLine) */
 		int visibleLines = Math.min(text_layout.getLineCount(), single_line ? 1 : max_lines);
 		int desiredHeight = (visibleLines < text_layout.getLineCount()
 		    ? text_layout.getLineTop(visibleLines) : text_layout.getHeight()) + vPadding;
+		if (hint_layout != null)
+			desiredHeight = Math.max(desiredHeight,
+			    hint_layout.getLineTop(Math.min(hint_layout.getLineCount(), single_line ? 1 : max_lines)) + vPadding);
 		/* a left/right drawable may be taller than the text */
 		if (drawableLeft != null)
 			desiredHeight = Math.max(desiredHeight, drawableLeft.getBounds().height() + paddingTop + paddingBottom);
@@ -238,12 +255,41 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public void onDraw(Canvas canvas) {
 		drawCompoundDrawables(canvas);
-		if (text_layout == null)
-			text_layout = makeLayout(Math.max(0, getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight()));
+		getLayout();
+		Layout layout = getDisplayLayout(false);
 		canvas.save();
-		canvas.translate(getLayoutOffsetX(), getLayoutOffsetY());
-		text_layout.draw(canvas);
+		// Read these before computing gravity: subclasses can suppress one read
+		// after translating the canvas themselves (Telegram's EditTextBoldCursor).
+		int top = getExtendedPaddingTop();
+		int bottom = getExtendedPaddingBottom();
+		int scrollY = getScrollY();
+		int maxScrollY = text_layout.getHeight() - getHeight()
+		    + getCompoundPaddingTop() + getCompoundPaddingBottom();
+		canvas.clipRect(getCompoundPaddingLeft() + getScrollX(), scrollY == 0 ? 0 : top + scrollY,
+		    getWidth() - getCompoundPaddingRight() + getScrollX(),
+		    getHeight() + scrollY - (scrollY == maxScrollY ? 0 : bottom));
+		int textOffset = getVerticalOffset(false);
+		int cursorOffset = getVerticalOffset(true);
+		canvas.translate(getLayoutOffsetX(), top + textOffset);
+		int color = paint.getColor();
+		if (layout == hint_layout && hintColors != null)
+			paint.setColor(hintColors.getColorForState(getDrawableState(), hintColors.getDefaultColor()));
+		layout.draw(canvas);
+		paint.setColor(color);
+		canvas.translate(0, cursorOffset - textOffset);
+		drawEditor(canvas);
 		canvas.restore();
+	}
+
+	protected void drawEditor(Canvas canvas) {}
+
+	private Layout getDisplayLayout(boolean forceNormal) {
+		if (!forceNormal && text.length() == 0 && hint != null) {
+			if (hint_layout == null)
+				hint_layout = makeLayout(hint, Math.max(0, getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight()));
+			return hint_layout;
+		}
+		return getLayout();
 	}
 
 	/** Where onDraw() puts the text layout horizontally; subclasses place carets by it. */
@@ -265,36 +311,38 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	/** Where onDraw() puts the text layout vertically. */
 	protected float getLayoutOffsetY() {
-		return verticalOffset(getHeight());
+		return getExtendedPaddingTop() + getVerticalOffset(true);
 	}
 
-	private float verticalOffset(int height) {
-		/* the extended padding, not the compound one: AOSP's onDraw starts from it
-		 * too, and an app that pre-translates by it (EditTextBoldCursor) suppresses
-		 * the next read to avoid applying it twice */
-		float ty = getExtendedPaddingTop();
-		if (text_layout == null)
-			return ty;
-		int innerHeight = height - getCompoundPaddingTop() - getCompoundPaddingBottom();
+	// Matches AOSP's reflected method and excludes the extended padding itself.
+	int getVerticalOffset(boolean forceNormal) {
 		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
-		if (verticalGravity == Gravity.CENTER_VERTICAL)
-			ty += Math.max(0, (innerHeight - text_layout.getHeight()) / 2);
-		else if (verticalGravity == Gravity.BOTTOM)
-			ty += Math.max(0, innerHeight - text_layout.getHeight());
-		return ty;
+		if (verticalGravity == Gravity.TOP)
+			return 0;
+		Layout layout = getDisplayLayout(forceNormal);
+		int padding = layout == hint_layout
+		    ? getCompoundPaddingTop() + getCompoundPaddingBottom()
+		    : getExtendedPaddingTop() + getExtendedPaddingBottom();
+		int free = Math.max(0, getMeasuredHeight() - padding - layout.getHeight());
+		return verticalGravity == Gravity.BOTTOM ? free : free / 2;
 	}
 
-	/* must mirror the vertical offsets applied in onDraw(); uses the measured
-	 * height because LinearLayout asks for the baseline during its measure pass */
 	@Override
 	public int getBaseline() {
-		if (text_layout == null)
-			return super.getBaseline();
-		return (int)verticalOffset(getMeasuredHeight()) + text_layout.getLineBaseline(0);
+		return getExtendedPaddingTop() + getVerticalOffset(true) + getLayout().getLineBaseline(0);
 	}
 
 	public void setGravity(int gravity) {
+		if ((gravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK) == 0)
+			gravity |= Gravity.START;
+		if ((gravity & Gravity.VERTICAL_GRAVITY_MASK) == 0)
+			gravity |= Gravity.TOP;
+		if (this.gravity == gravity)
+			return;
 		this.gravity = gravity;
+		text_layout = null;
+		hint_layout = null;
+		requestLayout();
 		invalidate();
 	}
 
@@ -309,6 +357,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setText(CharSequence text, BufferType type) {
 		this.text = text == null ? "" : text;
 		text_layout = null;
+		hint_layout = null;
 		if (!isLayoutRequested())
 			requestLayout();
 		invalidate();
@@ -337,6 +386,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			return;
 		paint.setTextSize(size);
 		text_layout = null;
+		hint_layout = null;
 		requestLayout();
 		invalidate();
 	}
@@ -381,6 +431,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		if (paint.getTypeface() != tf) {
 			paint.setTypeface(tf);
 			text_layout = null;
+			hint_layout = null;
 			requestLayout();
 			invalidate();
 		}
@@ -390,6 +441,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			spacing_add = add;
 			spacing_mult = mult;
 			text_layout = null;
+			hint_layout = null;
 			requestLayout();
 			invalidate();
 		}
@@ -405,6 +457,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		if (fallbackLineSpacing != enabled) {
 			fallbackLineSpacing = enabled;
 			text_layout = null;
+			hint_layout = null;
 			requestLayout();
 			invalidate();
 		}
@@ -506,8 +559,13 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return null;
 	}
 
-	public void setHintTextColor(ColorStateList colorStateList) {}
-	public void setHintTextColor(int i) {}
+	public void setHintTextColor(ColorStateList colorStateList) {
+		hintColors = colorStateList;
+		invalidate();
+	}
+	public void setHintTextColor(int color) {
+		setHintTextColor(ColorStateList.valueOf(color));
+	}
 	public void setLinkTextColor(ColorStateList colorStateList) {}
 
 	public void setSingleLine() {
@@ -556,6 +614,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			return;
 		max_lines = maxLines;
 		text_layout = null;
+		hint_layout = null;
 		requestLayout();
 		invalidate();
 	}
@@ -609,6 +668,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		if (pad != drawablePadding) {
 			drawablePadding = pad;
 			text_layout = null;
+			hint_layout = null;
 			requestLayout();
 			invalidate();
 		}
@@ -652,6 +712,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		drawableRight = applyCompoundTint(right);
 		drawableBottom = applyCompoundTint(bottom);
 		text_layout = null;
+		hint_layout = null;
 		requestLayout();
 		invalidate();
 	}
@@ -761,7 +822,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return new BaseMovementMethod();
 	}
 
-	public CharSequence getHint() { return "HINT"; }
+	public CharSequence getHint() { return hint; }
 
 	public int getMinHeight() { return 0; }
 	public int getMinWidth() { return 0; }
@@ -798,6 +859,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			return;
 		single_line = singleLine;
 		text_layout = null;
+		hint_layout = null;
 		requestLayout();
 		invalidate();
 	}
@@ -812,7 +874,12 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public boolean isTextSelectable() { return true; }
 
-	public void setHint(CharSequence s) {}
+	public void setHint(CharSequence hint) {
+		this.hint = hint;
+		hint_layout = null;
+		requestLayout();
+		invalidate();
+	}
 
 	public void setTextAppearance(int appearance) {
 		applyTextAppearance(getContext(), appearance);
@@ -830,7 +897,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public int getMaxWidth() { return 1000; }
 
-	public void nullLayouts() {}
+	public void nullLayouts() {
+		text_layout = null;
+		hint_layout = null;
+	}
 
 	public void setLinkTextColor(int color) {}
 
@@ -838,11 +908,29 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public void setCustomInsertionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
-	/* No ellipsizing layout here, so the extended padding is the compound one --
-	 * AOSP only grows it to hide the clipped lines of a maxLines ellipsis. */
-	public int getExtendedPaddingTop() { return getCompoundPaddingTop(); }
+	public int getExtendedPaddingTop() {
+		int top = getCompoundPaddingTop();
+		Layout layout = getLayout();
+		if (layout.getLineCount() <= max_lines)
+			return top;
+		int free = getHeight() - top - getCompoundPaddingBottom() - layout.getLineTop(max_lines);
+		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (free <= 0 || verticalGravity == Gravity.TOP)
+			return top;
+		return top + (verticalGravity == Gravity.BOTTOM ? free : free / 2);
+	}
 
-	public int getExtendedPaddingBottom() { return getCompoundPaddingBottom(); }
+	public int getExtendedPaddingBottom() {
+		int bottom = getCompoundPaddingBottom();
+		Layout layout = getLayout();
+		if (layout.getLineCount() <= max_lines)
+			return bottom;
+		int free = getHeight() - getCompoundPaddingTop() - bottom - layout.getLineTop(max_lines);
+		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (free <= 0 || verticalGravity == Gravity.BOTTOM)
+			return bottom;
+		return bottom + (verticalGravity == Gravity.TOP ? free : free / 2);
+	}
 
 	public void setRawInputType(int type) {}
 
@@ -863,7 +951,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setPaintFlags(int flags) {}
 
 	public int getLineHeight() {
-		return 10; // FIXME
+		return Math.round(paint.getFontMetricsInt(null) * spacing_mult + spacing_add);
 	}
 
 	public int getMaxHeight() {
@@ -889,12 +977,17 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public boolean getIncludeFontPadding() { return include_padding; }
 
 	public void setIncludeFontPadding(boolean includePadding) {
-		include_padding = includePadding;
+		if (include_padding != includePadding) {
+			include_padding = includePadding;
+			nullLayouts();
+			requestLayout();
+			invalidate();
+		}
 	}
 
-	public float getLineSpacingExtra() { return 0.f; }
+	public float getLineSpacingExtra() { return spacing_add; }
 
-	public float getLineSpacingMultiplier() { return 1.f; }
+	public float getLineSpacingMultiplier() { return spacing_mult; }
 
 	public TextDirectionHeuristic getTextDirectionHeuristic() {
 		return TextDirectionHeuristics.LTR;
@@ -910,16 +1003,19 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public int getTotalPaddingLeft() { return getCompoundPaddingLeft(); }
 
-	/* the extended padding plus what vertical gravity adds, i.e. where onDraw
-	 * puts the layout. An app places its own caret from the difference between
-	 * this and getExtendedPaddingTop(). */
-	public int getTotalPaddingTop() { return (int)getLayoutOffsetY(); }
+	public int getTotalPaddingTop() {
+		return getExtendedPaddingTop() + getVerticalOffset(true);
+	}
 
 	public int getTotalPaddingRight() { return getCompoundPaddingRight(); }
 
 	public int getTotalPaddingBottom() {
-		int used = (int)getLayoutOffsetY() + (text_layout == null ? 0 : text_layout.getHeight());
-		return Math.max(getCompoundPaddingBottom(), getHeight() - used);
+		int bottom = getExtendedPaddingBottom();
+		int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (verticalGravity == Gravity.BOTTOM)
+			return bottom;
+		int free = Math.max(0, getMeasuredHeight() - getExtendedPaddingTop() - bottom - getLayout().getHeight());
+		return bottom + (verticalGravity == Gravity.TOP ? free : free / 2);
 	}
 
 	public void setShadowLayer(float radius, float dx, float dy, int color) {}
