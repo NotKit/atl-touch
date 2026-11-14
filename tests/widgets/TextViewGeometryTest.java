@@ -89,6 +89,24 @@ public class TextViewGeometryTest {
 			}
 		}
 
+		for (String sample : new String[] {"Selected text", "first line\nsecond line", "שלום עולם"}) {
+			Field selected = field(new Field(context), Gravity.CENTER_VERTICAL, sample);
+			selected.setCursorVisible(false);
+			selected.setHighlightColor(0xff26a69a);
+			selected.setSelection(1, sample.length() - 1);
+			Bitmap selection = render(selected);
+			check(countColor(selection, 0xff26a69a) > 0, "selection must be visible: " + sample);
+			selected.setSelection(sample.length() - 1, 1);
+			checkSame(selection, render(selected), "reversed selection: " + sample);
+			selected.setSelection(1);
+			check(countColor(render(selected), 0xff26a69a) == 0, "collapsed selection must clear the highlight");
+			Field wrapped = field(new WrappedField(context), Gravity.CENTER_VERTICAL, sample);
+			wrapped.setCursorVisible(false);
+			wrapped.setHighlightColor(0xff26a69a);
+			wrapped.setSelection(1, sample.length() - 1);
+			checkSame(selection, render(wrapped), "translated selection: " + sample);
+		}
+
 		Field composer = field(new Field(context), Gravity.BOTTOM, "Hello");
 		composer.setBackgroundDrawable(null);
 		composer.measure(View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
@@ -113,6 +131,15 @@ public class TextViewGeometryTest {
 		composer.setIncludeFontPadding(false);
 		check(composer.getLayout() != padded, "font padding changes must rebuild the layout");
 		System.out.println("text view geometry: passed " + assertions + " assertions");
+	}
+
+	private static int countColor(Bitmap bitmap, int color) {
+		int count = 0;
+		for (int y = 0; y < bitmap.getHeight(); y++)
+			for (int x = 0; x < bitmap.getWidth(); x++)
+				if (bitmap.getPixel(x, y) == color)
+					count++;
+		return count;
 	}
 
 	private static <T extends Field> T field(T view, int gravity, String text) {

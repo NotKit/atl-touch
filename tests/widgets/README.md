@@ -19,5 +19,8 @@ single and multiline hints, and top, center, and bottom gravity. They also
 check default styling, cursor bounds, wrap-content height, maxLines padding,
 and layout invalidation after changing font padding.
 
+Selection checks cover the highlight color, multiline and RTL text, reversed
+ranges, clearing a selection, and the editor padding translation used by Telegram.
+
 Output and the runtime log are in `builddir/tests-widgets`; set
 `WIDGET_TEST_OUT` to override that directory.

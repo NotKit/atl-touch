@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -37,6 +39,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	private CharSequence text = "";
 	private CharSequence hint;
 	private ColorStateList hintColors;
+	private int highlightColor = 0x6633b5e5;
+	private Paint highlightPaint;
+	private Path highlightPath;
 	private TextPaint paint = new TextPaint();
 	private boolean include_padding = true;
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
@@ -92,11 +97,15 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 				if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textSize)) {
 					setRawTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
 				}
+				if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textColorHighlight))
+					setHighlightColor(aa.getColor(com.android.internal.R.styleable.TextAppearance_textColorHighlight, highlightColor));
 				aa.recycle();
 			}
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textColor)) {
 				setTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColor));
 			}
+			if (a.hasValue(com.android.internal.R.styleable.TextView_textColorHighlight))
+				setHighlightColor(a.getColor(com.android.internal.R.styleable.TextView_textColorHighlight, highlightColor));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textSize)) {
 				setRawTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10));
 			}
@@ -274,7 +283,19 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		int color = paint.getColor();
 		if (layout == hint_layout && hintColors != null)
 			paint.setColor(hintColors.getColorForState(getDrawableState(), hintColors.getDefaultColor()));
-		layout.draw(canvas);
+		Path selection = null;
+		int start = getSelectionStart(), end = getSelectionEnd();
+		if (isFocused() && layout == text_layout && start >= 0 && end >= 0 && start != end) {
+			if (highlightPaint == null) {
+				highlightPaint = new Paint();
+				highlightPath = new Path();
+			}
+			highlightPaint.setColor(highlightColor);
+			int length = layout.getText().length();
+			layout.getSelectionPath(Math.min(start, length), Math.min(end, length), highlightPath);
+			selection = highlightPath;
+		}
+		layout.draw(canvas, selection, highlightPaint, cursorOffset - textOffset);
 		paint.setColor(color);
 		canvas.translate(0, cursorOffset - textOffset);
 		drawEditor(canvas);
@@ -596,6 +617,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		try {
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textColor))
 				setTextColor(aa.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor));
+			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textColorHighlight))
+				setHighlightColor(aa.getColor(com.android.internal.R.styleable.TextAppearance_textColorHighlight, highlightColor));
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textSize))
 				setRawTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
 			if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textStyle))
@@ -889,7 +912,14 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return getText().length();
 	}
 
-	public void setHighlightColor(int color) {}
+	public void setHighlightColor(int color) {
+		highlightColor = color;
+		invalidate();
+	}
+
+	public int getHighlightColor() {
+		return highlightColor;
+	}
 
 	public Editable getEditableText() {
 		return new SpannableStringBuilder(getText());

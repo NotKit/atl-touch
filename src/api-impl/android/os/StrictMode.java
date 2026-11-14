@@ -4,6 +4,9 @@ import java.util.concurrent.Executor;
 
 public final class StrictMode {
 	public static void setThreadPolicy(final ThreadPolicy policy) {}
+	/** ATL enforces no VM policy, so nothing is ever penalized. */
+	public static boolean vmFileUriExposureEnabled() { return false; }
+	public static boolean vmContentUriWithoutPermissionEnabled() { return false; }
 	public static void setVmPolicy(final VmPolicy policy) {}
 	public static VmPolicy getVmPolicy() { return new VmPolicy.Builder().build(); }
 	public static ThreadPolicy allowThreadDiskWrites() {

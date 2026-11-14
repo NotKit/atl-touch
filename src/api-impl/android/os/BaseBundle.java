@@ -368,4 +368,9 @@ public class BaseBundle {
 			return null;
 		}
 	}
+
+	/** ATL keeps the map unpacked, so a bundle is never still parcelled. */
+	public boolean isParcelled() {
+		return false;
+	}
 }

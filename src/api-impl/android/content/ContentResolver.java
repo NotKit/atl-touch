@@ -19,6 +19,8 @@ import java.util.List;
 
 public class ContentResolver {
 	public static final String SCHEME_CONTENT = "content";
+	public static final String SCHEME_ANDROID_RESOURCE = "android.resource";
+	public static final String SCHEME_FILE = "file";
 
 	public static final String SYNC_EXTRAS_IGNORE_SETTINGS = "ignore_settings";
 
@@ -190,6 +192,11 @@ public class ContentResolver {
 			return provider.insert(uri, values);
 		else
 			return null;
+	}
+
+	/** The data types a provider can convert the uri to; ATL's providers offer none. */
+	public String[] getStreamTypes(Uri uri, String mimeTypeFilter) {
+		return null;
 	}
 
 	public String getType(Uri uri) {

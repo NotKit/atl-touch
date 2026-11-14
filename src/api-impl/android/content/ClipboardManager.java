@@ -66,9 +66,12 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	/**
 	 * {@hide}
 	 */
+	private final Context mContext;
 	public ClipboardManager(Context context, Handler handler) {
+		mContext = context;
 	}
 	public ClipboardManager() {
+		mContext = null;
 	}
 	/**
 	 * Sets the current primary clip on the clipboard.  This is the clip that
@@ -78,7 +81,14 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 */
 	public void setPrimaryClip(ClipData clip) {
 		// this is not the primary clipboard in UNIX sense (not middle click paste)
-		native_set_clipboard(clip.text);
+		if (clip == null || clip.getItemCount() == 0)
+			return;
+		// Only the text of the first item reaches the system clipboard: that is
+		// all the compositor's selection and content-hub carry.
+		CharSequence text = clip.getItemAt(0).coerceToText(mContext);
+		if (clip.getDescription() != null)
+			clip.getDescription().setTimestamp(System.currentTimeMillis());
+		native_set_clipboard(text != null ? text.toString() : "");
 	}
 	/**
 	 * Returns the current primary clip on the clipboard.
@@ -92,7 +102,8 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * but not a copy of its data.
 	 */
 	public ClipDescription getPrimaryClipDescription() {
-		return null;
+		ClipData clip = getPrimaryClip();
+		return clip != null ? clip.getDescription() : null;
 	}
 	/**
 	 * Returns true if there is currently a primary clip on the clipboard.
@@ -133,5 +144,7 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	public static native void native_set_clipboard(String text);
 	public static native String native_get_clipboard();
 
-	public void clearPrimaryClip() { }
+	public void clearPrimaryClip() {
+		native_set_clipboard("");
+	}
 }

@@ -17,6 +17,9 @@
  * refuse us, and the caller stays on the Wayland selection.
  */
 
+/* Whether ATL_DEBUG_CLIPBOARD asked for a log line per copy and paste. */
+bool atl_clipboard_debug(void);
+
 /* Publishes text as the system-wide paste. False if content-hub is not there
  * or would not take it. */
 bool atl_content_hub_clipboard_set(const char *text);

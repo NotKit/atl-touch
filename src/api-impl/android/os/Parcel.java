@@ -354,6 +354,15 @@ public class Parcel {
 		return value;
 	}
 
+	/* String8 is AOSP's UTF-8 variant of writeString; ATL writes UTF-8 either way. */
+	public void writeString8(String value) {
+		writeString(value);
+	}
+
+	public String readString8() {
+		return readString();
+	}
+
 	public void writeString(String value) {
 		try {
 			if (value == null)
@@ -379,6 +388,26 @@ public class Parcel {
 
 	public void writeBundle(Bundle value) {
 		writeMap(value == null ? null : value.mMap);
+	}
+
+	public void writePersistableBundle(PersistableBundle value) {
+		writeMap(value == null ? null : value.mMap);
+	}
+
+	public PersistableBundle readPersistableBundle() {
+		return readPersistableBundle(getClass().getClassLoader());
+	}
+
+	public PersistableBundle readPersistableBundle(ClassLoader loader) {
+		int size = readInt();
+		if (size == -1)
+			return null;
+		PersistableBundle bundle = new PersistableBundle();
+		for (int i = 0; i < size; i++) {
+			String key = readString();
+			bundle.mMap.put(key, readValue(loader));
+		}
+		return bundle;
 	}
 
 	public Bundle readBundle(ClassLoader loader) {

@@ -185,6 +185,9 @@ script instead (`doc/CameraClickPackaging.md`).
                           the hub refuses a copy (which is what an unfocused app or an older hub looks
                           like).
 
+Clipboard text crosses JNI as UTF-16 before conversion to UTF-8, including emoji.
+Editors expose Copy, Cut, Paste and Select all on long press and through Ctrl+C/X/V/A.
+
 ---
 
 `ATL_DUMP_HIERARCHY=1` - prints every View in every window with its class, id, bounds, measured size,

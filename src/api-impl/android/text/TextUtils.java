@@ -908,4 +908,18 @@ public class TextUtils {
 	public static final android.os.Parcelable.Creator<java.lang.CharSequence> CHAR_SEQUENCE_CREATOR = null;
 
 	public static void writeToParcel(java.lang.CharSequence a0, android.os.Parcel a1, int a2) { }
+
+	/** Whether the text carries any span that changes how it looks. */
+	public static boolean hasStyleSpan(Spanned spanned) {
+		final Class<?>[] styleClasses = {
+			android.text.style.CharacterStyle.class,
+			android.text.style.ParagraphStyle.class,
+			android.text.style.UpdateAppearance.class};
+		for (Class<?> clazz : styleClasses) {
+			if (spanned.nextSpanTransition(-1, spanned.length(), clazz) < spanned.length()) {
+				return true;
+			}
+		}
+		return false;
+	}
 }

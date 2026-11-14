@@ -144,7 +144,7 @@ public final class ContextImpl extends Context {
 			case "window":
 				return new WindowManagerImpl();
 			case "clipboard":
-				return new ClipboardManager();
+				return new ClipboardManager(this, null);
 			case "sensor":
 				return new SensorManager();
 			case "connectivity":

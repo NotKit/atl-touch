@@ -12195,6 +12195,7 @@ public final class R {
 	       of the clipboard into the text view.
 		 */
 		public static final int paste = 0x01020022;
+		public static final int pasteAsPlainText = 0x01020031;
 		public static final int primary = 0x0102000c;
 		public static final int progress = 0x0102000d;
 		public static final int secondaryProgress = 0x0102000f;

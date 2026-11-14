@@ -1,16 +1,23 @@
 package android.widget;
 
 import android.content.Context;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.text.Editable;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
+import android.view.Gravity;
+import android.view.ViewGroup;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
@@ -26,6 +33,8 @@ public class EditText extends TextView {
 	private final ArrayList<TextWatcher> watchers = new ArrayList<>();
 	private OnEditorActionListener editorActionListener;
 	private final Paint cursorPaint = new Paint();
+	private boolean contextMenuLongPress;
+	private PopupWindow textContextMenu;
 
 	public EditText(Context context) {
 		this(context, null);
@@ -42,6 +51,7 @@ public class EditText extends TextView {
 	public EditText(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		super(context, attrs, defStyle, defStyleRes);
 		cursorPaint.setColor(0xFF000000);
+		setLongClickable(true);
 	}
 
 	/** The current editable content as a plain String. */
@@ -62,6 +72,7 @@ public class EditText extends TextView {
 
 	@Override
 	public void setText(CharSequence text, BufferType type) {
+		dismissTextContextMenu();
 		String next = text == null ? "" : text.toString();
 		// watchers is null while TextView's constructor runs setText (field
 		// initializers haven't executed yet); skip notifications then.
@@ -83,6 +94,7 @@ public class EditText extends TextView {
 	// --- editing primitives ---
 
 	private void setContent(String next, int caret) {
+		dismissTextContextMenu();
 		fireBeforeTextChanged(content(), next);
 		super.setText(next, BufferType.NORMAL);
 		selStart = selEnd = Math.max(0, Math.min(caret, next.length()));
@@ -128,6 +140,7 @@ public class EditText extends TextView {
 	 * be instead of at the caret. Drop the region and tell the IME.
 	 */
 	private void caretMoved() {
+		dismissTextContextMenu();
 		if (composeStart >= 0) {
 			composeStart = composeEnd = -1;
 			InputMethodManager.onEditorCaretMoved(this);
@@ -153,6 +166,14 @@ public class EditText extends TextView {
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (event.isCtrlPressed() && !event.isAltPressed()) {
+			switch (keyCode) {
+				case KeyEvent.KEYCODE_A: return onTextContextMenuItem(android.R.id.selectAll);
+				case KeyEvent.KEYCODE_C: return onTextContextMenuItem(android.R.id.copy);
+				case KeyEvent.KEYCODE_X: return onTextContextMenuItem(android.R.id.cut);
+				case KeyEvent.KEYCODE_V: return onTextContextMenuItem(android.R.id.paste);
+			}
+		}
 		switch (keyCode) {
 			case KeyEvent.KEYCODE_DEL:
 				deleteBackward();
@@ -181,6 +202,156 @@ public class EditText extends TextView {
 		// which resolves the OS keyboard layout (Cyrillic, dead keys, ...). Don't
 		// insert from the keycode here or every character would be entered twice.
 		return super.onKeyDown(keyCode, event);
+	}
+
+	public boolean onTextContextMenuItem(int id) {
+		if (id == android.R.id.selectAll) {
+			selectAll();
+			return true;
+		}
+		ClipboardManager clipboard = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+		if (id == android.R.id.copy || id == android.R.id.cut) {
+			int start = Math.min(selStart, selEnd), end = Math.max(selStart, selEnd);
+			if (start == end)
+				return false;
+			clipboard.setPrimaryClip(ClipData.newPlainText(null, content().substring(start, end)));
+			if (id == android.R.id.cut) {
+				onFinishComposing();
+				replaceSelection("");
+			}
+			return true;
+		}
+		if (id == android.R.id.paste || id == android.R.id.pasteAsPlainText) {
+			ClipData clip = clipboard.getPrimaryClip();
+			if (clip == null || clip.getItemCount() == 0)
+				return false;
+			CharSequence text = clip.getItemAt(0).coerceToText(getContext());
+			if (text == null)
+				return false;
+			onFinishComposing();
+			replaceSelection(text.toString());
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public boolean performLongClick(float x, float y) {
+		contextMenuLongPress = super.performLongClick(x, y) || showContextMenu();
+		return contextMenuLongPress;
+	}
+
+	@Override
+	public boolean showContextMenu(float x, float y) {
+		return showContextMenu();
+	}
+
+	@Override
+	public boolean showContextMenu() {
+		dismissTextContextMenu();
+		if (!isAttachedToWindow())
+			return false;
+		ArrayList<CharSequence> labels = new ArrayList<>();
+		ArrayList<Integer> actions = new ArrayList<>();
+		if (selStart != selEnd) {
+			labels.add(getContext().getText(android.R.string.copy));
+			actions.add(android.R.id.copy);
+			labels.add(getContext().getText(android.R.string.cut));
+			actions.add(android.R.id.cut);
+		}
+		ClipboardManager clipboard = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+		if (clipboard.hasPrimaryClip()) {
+			labels.add(getContext().getText(android.R.string.paste));
+			actions.add(android.R.id.paste);
+		}
+		if (!content().isEmpty()) {
+			labels.add(getContext().getText(android.R.string.selectAll));
+			actions.add(android.R.id.selectAll);
+		}
+		if (actions.isEmpty())
+			return false;
+		requestFocus();
+		int color = getCurrentTextColor();
+		boolean dark = ((color >> 16) & 255) + ((color >> 8) & 255) + (color & 255) > 384;
+		LinearLayout toolbar = new LinearLayout(getContext());
+		toolbar.setOrientation(LinearLayout.HORIZONTAL);
+		toolbar.setPadding(menuDp(4), 0, menuDp(4), 0);
+		for (int i = 0; i < actions.size(); i++) {
+			final int action = actions.get(i);
+			TextView item = new TextView(getContext());
+			item.setText(labels.get(i));
+			item.setTextSize(14);
+			item.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+			item.setTextColor(dark ? 0xfff5f5f5 : 0xff212121);
+			item.setGravity(Gravity.CENTER);
+			item.setPadding(menuDp(16), 0, menuDp(16), 0);
+			StateListDrawable feedback = new StateListDrawable();
+			feedback.addState(new int[] {android.R.attr.state_pressed},
+			    menuBackground(dark ? 0xff394550 : 0xffeeeeee));
+			item.setBackground(feedback);
+			item.setOnClickListener(v -> {
+				dismissTextContextMenu();
+				onTextContextMenuItem(action);
+				if (action == android.R.id.selectAll)
+					post(() -> showContextMenu());
+			});
+			toolbar.addView(item, new LinearLayout.LayoutParams(
+			    ViewGroup.LayoutParams.WRAP_CONTENT, menuDp(48)));
+		}
+		Rect frame = new Rect(), editor = new Rect();
+		getWindowVisibleDisplayFrame(frame);
+		getGlobalVisibleRect(editor);
+		toolbar.measure(MeasureSpec.makeMeasureSpec(Math.max(0, frame.width() - menuDp(16)), MeasureSpec.AT_MOST),
+		    MeasureSpec.makeMeasureSpec(menuDp(48), MeasureSpec.EXACTLY));
+		Layout layout = getLayout();
+		int caret = clamp(Math.min(selStart, selEnd), content().length());
+		int line = layout.getLineForOffset(caret);
+		int x = editor.left + (int)(getLayoutOffsetX() + layout.getPrimaryHorizontal(caret))
+		    - getScrollX() - toolbar.getMeasuredWidth() / 2;
+		int top = editor.top + (int)getLayoutOffsetY() + layout.getLineTop(line) - getScrollY();
+		int y = top - toolbar.getMeasuredHeight() - menuDp(8);
+		if (y < frame.top + menuDp(8))
+			y = top + layout.getLineBottom(line) - layout.getLineTop(line) + menuDp(8);
+		x = Math.max(frame.left + menuDp(8), Math.min(x, frame.right - toolbar.getMeasuredWidth() - menuDp(8)));
+		y = Math.max(frame.top + menuDp(8), Math.min(y, frame.bottom - toolbar.getMeasuredHeight() - menuDp(8)));
+		// A non-focusable panel keeps the editor and its keyboard active.
+		PopupWindow menu = new PopupWindow(toolbar, toolbar.getMeasuredWidth(), toolbar.getMeasuredHeight(), false);
+		textContextMenu = menu;
+		menu.setBackgroundDrawable(menuBackground(dark ? 0xff1d2935 : 0xffffffff));
+		menu.setElevation(menuDp(6));
+		menu.showAtLocation(this, Gravity.TOP | Gravity.LEFT, x, y);
+		return menu.isShowing();
+	}
+
+	private int menuDp(int value) {
+		return Math.round(value * getResources().getDisplayMetrics().density);
+	}
+
+	private GradientDrawable menuBackground(int color) {
+		GradientDrawable background = new GradientDrawable();
+		background.setColor(color);
+		background.setCornerRadius(menuDp(12));
+		return background;
+	}
+
+	private void dismissTextContextMenu() {
+		if (textContextMenu != null) {
+			textContextMenu.dismiss();
+			textContextMenu = null;
+		}
+	}
+
+	@Override
+	protected void onDetachedFromWindow() {
+		dismissTextContextMenu();
+		super.onDetachedFromWindow();
+	}
+
+	@Override
+	protected void onFocusChanged(boolean gainFocus, int direction, Rect previous) {
+		if (!gainFocus)
+			dismissTextContextMenu();
+		super.onFocusChanged(gainFocus, direction, previous);
 	}
 
 	/**
@@ -332,7 +503,9 @@ public class EditText extends TextView {
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
-		if (event.getAction() == MotionEvent.ACTION_UP) {
+		if (event.getAction() == MotionEvent.ACTION_DOWN)
+			contextMenuLongPress = false;
+		if (event.getAction() == MotionEvent.ACTION_UP && !contextMenuLongPress) {
 			requestFocus();
 			setCaret(caretFromXY(event.getX(), event.getY()));
 			InputMethodManager imm = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -375,7 +548,7 @@ public class EditText extends TextView {
 			float y = layout.getLineBaseline(line) + getPaint().getUnderlinePosition();
 			canvas.drawLine(x0, y, x1, y, getPaint());
 		}
-		if (!isCursorVisible())
+		if (!isCursorVisible() || selStart != selEnd)
 			return;
 		float cursorX = layout.getPrimaryHorizontal(caret);
 		float top = layout.getLineTop(caretLine), bottom = layout.getLineBottomWithoutSpacing(caretLine);

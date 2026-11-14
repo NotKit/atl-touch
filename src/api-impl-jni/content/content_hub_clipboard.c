@@ -35,7 +35,7 @@ static const char *EMPTY_SURFACE_ID = "";
 #define MAX_FORMAT_COUNT 16
 #define MAX_BUFFER_SIZE (4 * 1024 * 1024)
 
-static bool debug(void)
+bool atl_clipboard_debug(void)
 {
 	static int on = -1;
 	if (on < 0)
@@ -66,7 +66,7 @@ static GDBusConnection *connection(void)
 	GError *err = NULL;
 	bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &err);
 	if (!bus) {
-		if (debug())
+		if (atl_clipboard_debug())
 			LOGE("no session bus: %s", err->message);
 		g_error_free(err);
 		hub_gone = true;
@@ -207,7 +207,7 @@ bool atl_content_hub_clipboard_set(const char *text)
 	g_free(id);
 	g_free(blob);
 	if (!reply) {
-		if (debug())
+		if (atl_clipboard_debug())
 			LOGE("CreatePaste failed: %s", err->message);
 		forget_hub(err);
 		g_error_free(err);
@@ -217,7 +217,9 @@ bool atl_content_hub_clipboard_set(const char *text)
 	gboolean created = FALSE;
 	g_variant_get(reply, "(b)", &created);
 	g_variant_unref(reply);
-	if (!created && debug()) {
+	if (created && atl_clipboard_debug())
+		LOGE("published %zu bytes to content-hub", size);
+	if (!created && atl_clipboard_debug()) {
 		/* Either the hub does not know about callers without a surface id, or
 		 * it does and we are not the focused app. */
 		LOGE("content-hub refused the clipboard contents");
@@ -237,7 +239,7 @@ char *atl_content_hub_clipboard_get(void)
 	                                              G_VARIANT_TYPE("(ay)"), G_DBUS_CALL_FLAGS_NONE, CALL_TIMEOUT_MS,
 	                                              NULL, &err);
 	if (!reply) {
-		if (debug())
+		if (atl_clipboard_debug())
 			LOGE("GetLatestPasteData failed: %s", err->message);
 		forget_hub(err);
 		g_error_free(err);
@@ -248,6 +250,9 @@ char *atl_content_hub_clipboard_get(void)
 	gsize size = 0;
 	const unsigned char *data = g_variant_get_fixed_array(blob, &size, sizeof(unsigned char));
 	char *text = data ? parse_paste(data, size) : NULL;
+	if (atl_clipboard_debug())
+		LOGE("content-hub returned %" G_GSIZE_FORMAT " bytes, %s", size,
+		     text ? "text/plain in it" : "no text/plain in it");
 	g_variant_unref(blob);
 	g_variant_unref(reply);
 	return text;
