@@ -816,6 +816,8 @@ srcs = [
 	'android/view/SoundEffectConstants.java',
 	'android/view/SubMenu.java',
 	'android/view/Surface.java',
+	'android/view/ScrollCaptureCallback.java',
+	'android/view/ScrollCaptureSession.java',
 	'android/view/SurfaceControl.java',
 	'android/view/SurfaceHolder.java',
 	'android/view/SurfaceView.java',
