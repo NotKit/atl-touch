@@ -185,8 +185,9 @@ public class ViewRootImpl implements ViewParent {
 		// owners *after* Dialog.show() returns, while Compose reads them in
 		// onAttachedToWindow. Attaching here would run first and throw.
 		panelLayoutPending = true;
-		// the layer below must not keep key/text input while a panel covers it
-		setFocusedView(null);
+		// Non-focusable popups, such as the text toolbar, leave input with the editor.
+		if ((params.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0)
+			setFocusedView(null);
 		WindowManagerGlobal.onPanelAdded(panelView);
 		invalidate();
 	}
