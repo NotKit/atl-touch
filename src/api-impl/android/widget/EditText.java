@@ -17,6 +17,7 @@ import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
@@ -289,11 +290,20 @@ public class EditText extends TextView {
 			feedback.addState(new int[] {android.R.attr.state_pressed},
 			    menuBackground(dark ? 0xff394550 : 0xffeeeeee));
 			item.setBackground(feedback);
-			item.setOnClickListener(v -> {
-				dismissTextContextMenu();
-				onTextContextMenuItem(action);
-				if (action == android.R.id.selectAll)
-					post(() -> showContextMenu());
+			item.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View view) {
+					dismissTextContextMenu();
+					onTextContextMenuItem(action);
+					if (action == android.R.id.selectAll) {
+						post(new Runnable() {
+							@Override
+							public void run() {
+								showContextMenu();
+							}
+						});
+					}
+				}
 			});
 			toolbar.addView(item, new LinearLayout.LayoutParams(
 			    ViewGroup.LayoutParams.WRAP_CONTENT, menuDp(48)));
