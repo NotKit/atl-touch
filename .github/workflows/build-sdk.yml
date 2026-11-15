@@ -9,6 +9,11 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the SDK as a release asset"
+        type: boolean
+        default: true
 
 # Don't cancel an in-flight SDK build (art_standalone is expensive); let it
 # finish and publish.
@@ -105,7 +110,7 @@ jobs:
       # are login-only). Both arch jobs push to the same sdk-<sha> tag; the
       # asset filenames differ, so they don't clobber each other.
       - name: Publish to GitHub release
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
