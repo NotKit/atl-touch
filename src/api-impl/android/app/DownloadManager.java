@@ -1,4 +1,7 @@
 package android.app;
+import android.content.Context;
+import android.database.MatrixCursor;
+
 
 import android.database.Cursor;
 import android.net.Uri;
@@ -44,7 +47,9 @@ public class DownloadManager {
 		public Request addRequestHeader(String header, String value) { return this; }
 
 		public Request setAllowedNetworkTypes(int flags) { return this; }
-	}
+	
+		public Request setDestinationInExternalFilesDir(Context context, String dirType, String path) { return this; }
+}
 
 	public static class Query {
 		public Query setFilterById(long... ids) { return this; }

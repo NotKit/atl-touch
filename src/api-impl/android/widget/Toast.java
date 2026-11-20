@@ -38,4 +38,6 @@ public class Toast {
 	}
 
 	public void setView(View view) {}
+
+	public void cancel() {}
 }

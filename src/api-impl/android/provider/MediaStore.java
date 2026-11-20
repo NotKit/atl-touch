@@ -1,4 +1,6 @@
 package android.provider;
+import java.io.IOException;
+
 
 import android.content.ContentResolver;
 import android.database.Cursor;
@@ -32,7 +34,9 @@ public class MediaStore {
 				ParcelFileDescriptor fd = contentResolver.openFileDescriptor(Media.EXTERNAL_CONTENT_URI.buildUpon().appendPath(String.valueOf(imageId)).build(), "r");
 				return BitmapFactory.decodeFileDescriptor(fd.getFileDescriptor(), null, options);
 			}
-		}
+		
+			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/images/media");
+}
 	}
 
 	public static class Video {
@@ -46,7 +50,19 @@ public class MediaStore {
 				return cr.query(uri, projection, selection, selectionArgs, sortOrder);
 			}
 		}
-	}
+	
+		public static class Thumbnails {
+
+			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/video/media");
+
+			public static Bitmap getThumbnail(ContentResolver contentResolver, long videoId, int kind, BitmapFactory.Options options) throws IOException {
+				Uri uri = Media.EXTERNAL_CONTENT_URI.buildUpon().appendPath(String.valueOf(videoId)).build();
+				try (ParcelFileDescriptor fd = contentResolver.openFileDescriptor(uri, "r")) {
+					return BitmapFactory.decodeFileDescriptor(fd.getFileDescriptor(), null, options);
+				}
+			}
+		}
+}
 
 	public static class Audio {
 

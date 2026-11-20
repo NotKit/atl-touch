@@ -301,4 +301,6 @@ public class Window {
 	public Transition getEnterTransition() {
 		return null;
 	}
+
+	public void setDimAmount(float dimAmount) {}
 }

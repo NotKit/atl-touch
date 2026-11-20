@@ -1,4 +1,9 @@
 srcs = [
+	'android/view/animation/CycleInterpolator.java',
+	'android/transition/TransitionInflater.java',
+	'android/text/Annotation.java',
+	'android/graphics/BitmapRegionDecoder.java',
+	'android/animation/TimeAnimator.java',
 	'android/transition/Slide.java',
 	'android/Manifest.java',
 	'android/R.java',

@@ -8,4 +8,6 @@ public class DigitsKeyListener extends NumberKeyListener {
 	public static DigitsKeyListener getInstance(String locale) {
 		return new DigitsKeyListener();
 	}
+
+	public DigitsKeyListener(boolean sign, boolean decimal) {}
 }

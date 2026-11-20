@@ -113,4 +113,8 @@ public final class PowerManager {
 	public boolean isDeviceIdleMode() {
 		return false;
 	}
+
+	public boolean isWakeLockLevelSupported(int level) {
+		return false;
+	}
 }

@@ -15,6 +15,8 @@
  */
 
 package android.text.style;
+import android.graphics.Paint;
+
 
 import android.annotation.DrawableRes;
 import android.annotation.NonNull;
@@ -266,4 +268,9 @@ public class ImageSpan extends DynamicDrawableSpan {
     public String getSource() {
         return mSource;
     }
+
+	@Override
+	public int getSize(Paint paint, CharSequence text, int start, int end, Paint.FontMetricsInt fm) {
+		return drawable.getIntrinsicWidth();
+	}
 }

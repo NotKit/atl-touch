@@ -15,6 +15,8 @@
  */
 
 package android.graphics;
+import android.util.Log;
+
 
 import android.annotation.NonNull;
 import android.annotation.UnsupportedAppUsage;

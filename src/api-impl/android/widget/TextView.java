@@ -1128,4 +1128,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public int getJustificationMode() {
 		return 0; // JUSTIFICATION_MODE_NONE
 	}
+
+	public void setImeActionLabel(CharSequence label, int actionId) {}
+
+	public boolean hasSelection() { return false; }
 }
