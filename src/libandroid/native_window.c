@@ -1,3 +1,4 @@
+#include <glib.h>
 /*
  * parts of this file originally from AOSP:
  *
@@ -473,6 +474,9 @@ ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceText
 
 // FIXME 1.5: this most likely belongs elsewhere
 
+static GHashTable *vk_surface_native_windows;
+G_LOCK_DEFINE_STATIC(vk_surfaces);
+
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
 	if (!pCreateInfo->window->wayland_display) {
@@ -486,16 +490,58 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 		.surface = pCreateInfo->window->wayland_surface,
 	};
 
-	return vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
+	VkResult result = vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
+	if (result == VK_SUCCESS) {
+		G_LOCK(vk_surfaces);
+		if (!vk_surface_native_windows)
+			vk_surface_native_windows = g_hash_table_new(NULL, NULL);
+		ANativeWindow_acquire(pCreateInfo->window);
+		g_hash_table_insert(vk_surface_native_windows, (gpointer)(uintptr_t)*pSurface, pCreateInfo->window);
+		G_UNLOCK(vk_surfaces);
+	}
+	return result;
+}
+
+void bionic_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *allocator)
+{
+	vkDestroySurfaceKHR(instance, surface, allocator);
+	G_LOCK(vk_surfaces);
+	if (vk_surface_native_windows) {
+		ANativeWindow *window = g_hash_table_lookup(vk_surface_native_windows, (gpointer)(uintptr_t)surface);
+		if (window) {
+			g_hash_table_remove(vk_surface_native_windows, (gpointer)(uintptr_t)surface);
+			ANativeWindow_release(window);
+		}
+	}
+	G_UNLOCK(vk_surfaces);
+}
+
+VkResult bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice device, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *caps)
+{
+	VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, caps);
+	G_LOCK(vk_surfaces);
+	if (result == VK_SUCCESS && caps && vk_surface_native_windows) {
+		ANativeWindow *window = g_hash_table_lookup(vk_surface_native_windows, (gpointer)(uintptr_t)surface);
+		if (window) {
+			caps->currentExtent.width = ANativeWindow_getWidth(window);
+			caps->currentExtent.height = ANativeWindow_getHeight(window);
+			caps->supportedTransforms |= VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR
+			    | VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR
+			    | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR;
+		}
+	}
+	G_UNLOCK(vk_surfaces);
+	return result;
 }
 
 VkResult bionic_vkCreateInstance(VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance)
 {
 	int original_extension_count = pCreateInfo->enabledExtensionCount;
-	int new_extension_count = original_extension_count + 1;
+	int new_extension_count = original_extension_count + 2;
 	const char **enabled_exts = malloc(new_extension_count * sizeof(char *));
 	memcpy(enabled_exts, pCreateInfo->ppEnabledExtensionNames, original_extension_count * sizeof(char *));
 	enabled_exts[original_extension_count] = "VK_KHR_wayland_surface";
+	enabled_exts[original_extension_count + 1] = "VK_KHR_surface";
 
 	pCreateInfo->enabledExtensionCount = new_extension_count;
 	pCreateInfo->ppEnabledExtensionNames = enabled_exts;
@@ -507,6 +553,12 @@ PFN_vkVoidFunction bionic_vkGetInstanceProcAddr(VkInstance instance, const char 
 	if (__unlikely__(!strcmp(pName, "vkCreateInstance")))
 		return (PFN_vkVoidFunction)bionic_vkCreateInstance;
 
+	if (!strcmp(pName, "vkCreateAndroidSurfaceKHR"))
+		return (PFN_vkVoidFunction)bionic_vkCreateAndroidSurfaceKHR;
+	if (!strcmp(pName, "vkDestroySurfaceKHR"))
+		return (PFN_vkVoidFunction)bionic_vkDestroySurfaceKHR;
+	if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR"))
+		return (PFN_vkVoidFunction)bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
 	return vkGetInstanceProcAddr(instance, pName);
 }
 
