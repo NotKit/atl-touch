@@ -808,4 +808,6 @@ public class Environment {
 	public static boolean isExternalStorageManager(File path) { return true; }
 
 	public static java.io.File getStorageDirectory() { return null; }
+
+	public static boolean isExternalStorageEmulated(File path) { return false; }
 }

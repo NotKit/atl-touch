@@ -1,4 +1,7 @@
 package android.view;
+import android.atl.GskCanvas;
+import android.atl.annotation.Export;
+
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -486,4 +489,10 @@ public class SurfaceView extends View {
 	}
 
 	public android.view.SurfaceControl getSurfaceControl() { return null; }
+
+	public SurfaceView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+
+		mSurface.widget = this.widget;
+	}
 }

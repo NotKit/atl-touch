@@ -1,4 +1,5 @@
 srcs = [
+	'android/view/animation/RotateAnimation.java',
 	'android/content/LocusId.java',
 	'android/view/animation/CycleInterpolator.java',
 	'android/transition/TransitionInflater.java',
