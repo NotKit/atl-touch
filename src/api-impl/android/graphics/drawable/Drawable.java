@@ -15,6 +15,13 @@
  */
 
 package android.graphics.drawable;
+import android.atl.GskCanvas;
+import android.content.res.XmlResourceParser;
+import android.util.LayoutDirection;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 
 import android.annotation.AttrRes;
 import android.annotation.ColorInt;

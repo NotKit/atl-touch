@@ -1,4 +1,5 @@
 srcs = [
+	'android/transition/Slide.java',
 	'android/Manifest.java',
 	'android/R.java',
 	'android/accounts/Account.java',

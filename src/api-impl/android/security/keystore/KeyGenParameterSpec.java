@@ -1,4 +1,7 @@
 package android.security.keystore;
+import java.math.BigInteger;
+import javax.security.auth.x500.X500Principal;
+
 
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Date;
@@ -90,7 +93,19 @@ public class KeyGenParameterSpec implements AlgorithmParameterSpec {
 		public KeyGenParameterSpec build() {
 			return spec;
 		}
-	}
+	
+		public Builder setCertificateSerialNumber(BigInteger serialNumber) {
+			return this;
+		}
+
+		public Builder setCertificateSubject(X500Principal subject) {
+			return this;
+		}
+
+		public Builder setSignaturePaddings(String[] signaturePaddings) {
+			return this;
+		}
+}
 
 	public int getKeySize() {
 		return keySize;
