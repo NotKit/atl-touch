@@ -1,4 +1,6 @@
 package android.text.format;
+import java.util.Locale;
+
 
 import android.content.Context;
 import java.util.Date;
@@ -46,5 +48,9 @@ public class DateUtils {
 
 	public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolutionMillis, int flags) {
 		return new Date(time).toString();
+	}
+
+	public static CharSequence getRelativeDateTimeString(Context context, long millis, long minResolution, long transitionResolution, int flags) {
+		return new Date(millis).toString();
 	}
 }
