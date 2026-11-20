@@ -2,10 +2,11 @@ package com.google.android.gms.maps.internal;
 
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.Binder;
 import android.os.IInterface;
 import android.os.Parcel;
 
-public class CreatorImpl implements IBinder {
+public class CreatorImpl extends Binder {
 
 	@Override
 	public String getInterfaceDescriptor() {
