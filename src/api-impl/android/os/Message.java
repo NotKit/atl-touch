@@ -518,10 +518,7 @@ public final class Message implements Parcelable {
 			obj = source.readParcelable(getClass().getClassLoader());
 		}
 		when = source.readLong();
-		try {
-			data = source.readBundle();
-		} catch (ReflectiveOperationException e) {
-		}
+		data = source.readBundle();
 		replyTo = Messenger.readMessengerOrNullFromParcel(source);
 	}
 
