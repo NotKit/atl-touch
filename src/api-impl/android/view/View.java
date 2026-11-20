@@ -4299,4 +4299,10 @@ public class View implements Drawable.Callback {
 	public void autofill(android.util.SparseArray<android.view.autofill.AutofillValue> a0) { }
 
 	public void onProvideAutofillVirtualStructure(android.view.ViewStructure a0, int a1) { }
+
+	private int mForegroundGravity = Gravity.START | Gravity.TOP;
+
+	public int getForegroundGravity() { return mForegroundGravity; }
+
+	public void setForegroundGravity(int gravity) { mForegroundGravity = gravity; }
 }
