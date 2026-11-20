@@ -171,4 +171,6 @@ public class AudioManager {
 	public static final int MODE_IN_CALL = 2;
 
 	public static final int MODE_NORMAL = 0;
+
+	public void playSoundEffect(int effectType) {}
 }

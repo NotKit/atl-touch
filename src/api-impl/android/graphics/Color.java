@@ -233,4 +233,18 @@ public class Color {
 	public static int HSVToColor(int alpha, float[] hsv) {
 		return (alpha << 24) | (HSVToColor(hsv) & 0xffffff);
 	}
+
+	private int color;
+
+	public Color(int color) {
+		this.color = color;
+	}
+
+	public static Color valueOf(int color) {
+		return new Color(color);
+	}
+
+	public int toArgb() {
+		return color;
+	}
 }

@@ -298,4 +298,6 @@ public class DisplayMetrics {
 		}
 		return DENSITY_DEFAULT;
 	}
+
+	public static int DENSITY_DEVICE_STABLE = getDeviceDensity();
 }

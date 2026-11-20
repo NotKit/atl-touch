@@ -3919,4 +3919,8 @@ public class PackageManager {
 	}
 
 	public static final java.lang.String FEATURE_CREDENTIALS = "android.software.credentials";
+
+	public boolean canRequestPackageInstalls() {
+		return false;
+	}
 }

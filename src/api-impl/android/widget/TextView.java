@@ -1124,4 +1124,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		}
 		return alignment;
 	}
+
+	public int getJustificationMode() {
+		return 0; // JUSTIFICATION_MODE_NONE
+	}
 }

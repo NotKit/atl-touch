@@ -141,4 +141,8 @@ public class JobInfo {
 	public static class TriggerContentUri {
 		public TriggerContentUri(Uri uri, int flags) {}
 	}
+
+	public static long getMinPeriodMillis() {
+		return 1000;
+	}
 }

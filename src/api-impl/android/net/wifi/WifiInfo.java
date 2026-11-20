@@ -24,4 +24,8 @@ public class WifiInfo {
 	public String getBSSID() {
 		return "";
 	}
+
+	public int getIpAddress() {
+		return -1;
+	}
 }

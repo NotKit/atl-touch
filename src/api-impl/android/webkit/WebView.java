@@ -300,4 +300,6 @@ public class WebView extends ViewGroup {
 	private native boolean native_motionEvent(long peer, int action, float x, float y, long timeMs);
 	private native boolean native_runJs(long peer, String script, long callbackId);
 	private native void native_draw(long peer, long canvasPtr, int width, int height);
+
+	public void removeJavascriptInterface(String name) {}
 }

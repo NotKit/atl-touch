@@ -43,4 +43,6 @@ public interface Menu {
 	public int addIntentOptions(int groupId, int itemId, int order, ComponentName caller, Intent[] specifics, Intent intent, int flags, MenuItem[] outSpecificItems);
 
 	int FIRST = 1;
+
+	public void close();
 }

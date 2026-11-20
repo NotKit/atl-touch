@@ -1,4 +1,7 @@
 package android.view.autofill;
+import android.graphics.Rect;
+import android.view.View;
+
 
 /* Autofill is not implemented; every notification is a no-op. The methods still
  * have to exist: Compose's AndroidAutofillManager calls them from

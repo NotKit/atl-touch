@@ -28,4 +28,6 @@ public class Linkify {
 	}
 
 	public static final boolean addLinks(Spannable text, Pattern urlPattern, String urlScheme) { return true; }
+
+	public static MatchFilter sPhoneNumberMatchFilter = null;
 }

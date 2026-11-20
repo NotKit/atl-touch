@@ -30,4 +30,6 @@ public class ContactsContract {
 	public static final class Data {
 		public static final Uri CONTENT_URI = Uri.parse("content://com.android.contacts/data");
 	}
+
+	public static final Uri AUTHORITY_URI = Uri.parse("content://com.android.contacts");
 }
