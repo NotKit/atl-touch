@@ -10,11 +10,7 @@ public class MediaMetadata {
 	public static final Creator<MediaMetadata> CREATOR = new Creator<MediaMetadata>() {
 		@Override
 		public MediaMetadata createFromParcel(Parcel source) {
-			try {
-				source.readBundle();
-			} catch (ReflectiveOperationException e) {
-				throw new RuntimeException(e);
-			}
+			source.readBundle();
 			return new MediaMetadata();
 		}
 

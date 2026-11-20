@@ -352,6 +352,10 @@ public final class Bitmap {
 	}
 
 	/* used by native function AndroidBitmap_lockPixels() */
+	public void setPixel(int x, int y, int color) {
+		setPixels(new int[] {color}, 0, 1, x, y, 1, 1);
+	}
+
 	long getPixelsPtr() {
 		getSnapshot(); // the caller may write to the pixels: invalidate the cached GdkTexture
 		return native_get_pixels_ptr(getTexture());

@@ -61,7 +61,7 @@ public class SoundPool {
 	}
 
 	public int load(Context context, int resId, int priority) throws IOException {
-		String fileName = context.getResources().getResourceEntryName(resId);
+		String fileName = context.getResources().getString(resId);
 		AssetManager.extractFromAPK(context.getPackageCodePath(), fileName, fileName);
 		return registerLoad(nativeLoad(nativePool, android.os.Environment.getExternalStorageDirectory().getPath() + "/" + fileName));
 	}
