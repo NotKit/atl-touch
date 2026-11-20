@@ -1,4 +1,6 @@
 package android.graphics;
+import java.io.File;
+
 
 import android.content.res.AssetManager;
 
@@ -172,4 +174,8 @@ public class Typeface {
 	private static native long nativeCreateFromFile(String path, int weight, int italic);
 	private static native int nativeGetStyle(long native_instance);
 	private static native int nativeGetWeight(long native_instance);
+
+	public static Typeface createFromFile(File file) {
+		return DEFAULT;
+	}
 }

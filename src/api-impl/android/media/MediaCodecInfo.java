@@ -66,6 +66,10 @@ public class MediaCodecInfo {
 	public static final java.lang.String FEATURE_EncodingStatistics = "encoding-statistics";
 
 	public static final java.lang.String FEATURE_TunneledPlayback = "tunneled-playback";
+
+		public int getMaxSupportedInstances() {
+			return 0;
+		}
 }
 
 	public static class CodecProfileLevel {

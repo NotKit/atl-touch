@@ -109,4 +109,8 @@ public final class PowerManager {
 	public void addThermalStatusListener(OnThermalStatusChangedListener listener) {}
 
 	public void removeThermalStatusListener(OnThermalStatusChangedListener listener) {}
+
+	public boolean isDeviceIdleMode() {
+		return false;
+	}
 }
