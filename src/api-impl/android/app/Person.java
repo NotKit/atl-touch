@@ -51,5 +51,41 @@ public class Person {
 		public Builder setImportant(boolean important) { person.important = important; return this; }
 
 		public Person build() { return person; }
+	
+		private CharSequence mName;
+
+		private Icon mIcon;
+
+		private String mUri;
+
+		private String mKey;
+
+		private boolean mIsBot;
+
+		private boolean mIsImportant;
+
+		public Builder() {
+		}
+}
+
+	private CharSequence mName;
+
+	private Icon mIcon;
+
+	private String mUri;
+
+	private String mKey;
+
+	private boolean mIsBot;
+
+	private boolean mIsImportant;
+
+	private Person(Builder builder) {
+		mName = builder.mName;
+		mIcon = builder.mIcon;
+		mUri = builder.mUri;
+		mKey = builder.mKey;
+		mIsBot = builder.mIsBot;
+		mIsImportant = builder.mIsImportant;
 	}
 }

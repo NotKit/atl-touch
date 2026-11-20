@@ -1,4 +1,8 @@
 package android.content.pm;
+import android.app.Person;
+import android.content.LocusId;
+import java.util.Set;
+
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -64,5 +68,13 @@ public class ShortcutInfo implements Parcelable {
 		public Builder setShortLabel(CharSequence shortLabel) {
 			return this;
 		}
-	}
+	
+		public Builder setLocusId(LocusId locusId) {
+			return this;
+		}
+
+		public Builder setPersons(Person[] persons) {
+			return this;
+		}
+}
 }
