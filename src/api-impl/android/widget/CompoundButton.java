@@ -48,6 +48,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 	public void setChecked(boolean checked) {
 		if (this.checked != checked) {
 			this.checked = checked;
+			refreshDrawableState();
 			if (on_checked_change_listener != null)
 				on_checked_change_listener.onCheckedChanged(this, checked);
 			invalidate();
@@ -63,6 +64,21 @@ public abstract class CompoundButton extends Button implements Checkable {
 	public boolean performClick() {
 		toggle();
 		return super.performClick();
+	}
+
+	@Override
+	protected int[] onCreateDrawableState(int extraSpace) {
+		int[] state = super.onCreateDrawableState(extraSpace + 1);
+		if (isChecked()) mergeDrawableStates(state, new int[] { R.attr.state_checked });
+		return state;
+	}
+
+	@Override
+	protected void drawableStateChanged() {
+		super.drawableStateChanged();
+		if (button_drawable != null && button_drawable.isStateful()
+		    && button_drawable.setState(getDrawableState()))
+			invalidateDrawable(button_drawable);
 	}
 
 	public void toggle() {
@@ -86,6 +102,10 @@ public abstract class CompoundButton extends Button implements Checkable {
 
 	public void setButtonDrawable(Drawable drawable) {
 		button_drawable = drawable;
+		if (drawable != null) {
+			drawable.setCallback(this);
+			if (drawable.isStateful()) drawable.setState(getDrawableState());
+		}
 	}
 
 	public Drawable getButtonDrawable() {

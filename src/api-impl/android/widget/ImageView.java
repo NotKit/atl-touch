@@ -44,6 +44,7 @@ public class ImageView extends View {
 		drawable = a.getDrawable(com.android.internal.R.styleable.ImageView_src);
 		if (drawable != null) {
 			drawable.setCallback(this);
+			if (drawable.isStateful()) drawable.setState(getDrawableState());
 			if (colorFilter != null)
 				drawable.setColorFilter(colorFilter);
 		}
@@ -82,6 +83,13 @@ public class ImageView extends View {
 		return scaleType;
 	}
 
+	@Override
+	protected void drawableStateChanged() {
+		super.drawableStateChanged();
+		if (drawable != null && drawable.isStateful() && drawable.setState(getDrawableState()))
+			invalidateDrawable(drawable);
+	}
+
 	public Drawable getDrawable() {
 		return drawable;
 	}
@@ -97,6 +105,7 @@ public class ImageView extends View {
 		this.drawable = drawable;
 		if (drawable != null) {
 			drawable.setCallback(this);
+			if (drawable.isStateful()) drawable.setState(getDrawableState());
 		}
 		bitmap = null;
 		requestLayout();

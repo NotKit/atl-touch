@@ -1259,6 +1259,10 @@ public class View implements Drawable.Callback {
 	 * state_accelerated and the two drag states are left out: nothing here
 	 * tracks them yet, and a bit that is never set only costs a wrong lookup. */
 	protected int[] onCreateDrawableState(int extraSpace) {
+		if (duplicateParentStateEnabled && getParent() instanceof View) {
+			int[] parentState = ((View)getParent()).getDrawableState();
+			return java.util.Arrays.copyOf(parentState, parentState.length + extraSpace);
+		}
 		int viewStateIndex = 0;
 
 		if (pressed) viewStateIndex |= StateSet.VIEW_STATE_PRESSED;
@@ -1677,6 +1681,8 @@ public class View implements Drawable.Callback {
 		return requestFocus(direction, null);
 	}
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
+		if (!isEnabled() || !isFocusable() || getVisibility() != VISIBLE)
+			return false;
 		ViewRootImpl root = getViewRootImpl();
 		if (root != null)
 			root.setFocusedView(this);
@@ -2482,7 +2488,11 @@ public class View implements Drawable.Callback {
 
 	public void saveHierarchyState(SparseArray<Parcelable> array) {}
 
-	public void setDuplicateParentStateEnabled(boolean enabled) {}
+	private boolean duplicateParentStateEnabled;
+	public void setDuplicateParentStateEnabled(boolean enabled) {
+		duplicateParentStateEnabled = enabled;
+		refreshDrawableState();
+	}
 
 	public boolean performClick() {
 		return callOnClick();
@@ -2550,7 +2560,7 @@ public class View implements Drawable.Callback {
 		return insets;
 	}
 
-	public final boolean isFocusable() { return true; }
+	public final boolean isFocusable() { return focusableAttr != NOT_FOCUSABLE; }
 
 	/* AOSP semantics: setOnClickListener() marks the view clickable. Apps use
 	 * this to probe for views that handle clicks themselves (e.g. Telegram's
@@ -3270,7 +3280,7 @@ public class View implements Drawable.Callback {
 
 	public WindowInsets computeSystemWindowInsets(WindowInsets insets, Rect contentInsets) { return insets; }
 
-	public boolean isDuplicateParentStateEnabled() { return false; }
+	public boolean isDuplicateParentStateEnabled() { return duplicateParentStateEnabled; }
 
 	public void setBackgroundTintMode(PorterDuff.Mode tintMode) {}
 
