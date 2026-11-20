@@ -1593,4 +1593,9 @@ public final class Configuration implements Comparable<Configuration> {
 	 * A fontWeightAdjustment value indicating that it is undefined.
 	 */
 	public static final int FONT_WEIGHT_ADJUSTMENT_UNDEFINED = Integer.MAX_VALUE;
+
+	public boolean isScreenRound() {
+		// HACK: return true when hardware is identifying as a watch
+		return System.getenv("ATL_IS_WATCH") != null;
+	}
 }
