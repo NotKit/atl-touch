@@ -50,4 +50,6 @@ public class AudioAttributes {
 	public static final int USAGE_UNKNOWN = 0;
 
 	public static final int USAGE_VOICE_COMMUNICATION = 2;
+
+	public static final int USAGE_MEDIA = 1;
 }

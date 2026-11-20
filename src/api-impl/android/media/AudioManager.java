@@ -173,4 +173,32 @@ public class AudioManager {
 	public static final int MODE_NORMAL = 0;
 
 	public void playSoundEffect(int effectType) {}
+
+	public static final int AUDIOFOCUS_NONE = 0;
+
+	public static final int AUDIOFOCUS_GAIN = 1;
+
+	public static final int AUDIOFOCUS_GAIN_TRANSIENT = 2;
+
+	public static final int AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK = 3;
+
+	public static final int AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE = 4;
+
+	public static final int AUDIOFOCUS_LOSS = -1 * AUDIOFOCUS_GAIN;
+
+	public static final int AUDIOFOCUS_LOSS_TRANSIENT = -1 * AUDIOFOCUS_GAIN_TRANSIENT;
+
+	public static final int AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK = -1 * AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+
+	public static final int AUDIOFOCUS_FLAG_DELAY_OK = 1 << 0;
+
+	public static final int AUDIOFOCUS_FLAG_PAUSES_ON_DUCKABLE_LOSS = 1 << 1;
+
+	public static final int AUDIOFOCUS_FLAG_LOCK = 1 << 2;
+
+	public static final int AUDIOFOCUS_REQUEST_FAILED = 0;
+
+	public static final int AUDIOFOCUS_REQUEST_GRANTED = 1;
+
+	public static final int AUDIOFOCUS_REQUEST_DELAYED = 2;
 }
