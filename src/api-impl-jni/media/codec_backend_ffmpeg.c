@@ -264,6 +264,13 @@ static struct atl_video_frame *ffmpeg_dequeue_video(struct atl_codec *ctx, int *
 	return out;
 }
 
+static void ffmpeg_flush(struct atl_codec *ctx)
+{
+	avcodec_flush_buffers(ctx->avctx);
+	if (ctx->avctx->codec_type == AVMEDIA_TYPE_AUDIO)
+		swr_free(&ctx->audio.swr);
+}
+
 static void ffmpeg_release(struct atl_codec *ctx)
 {
 	if (ctx->avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -288,5 +295,6 @@ const struct atl_codec_backend atl_codec_backend_ffmpeg = {
 	.queue_input = ffmpeg_queue_input,
 	.dequeue_audio = ffmpeg_dequeue_audio,
 	.dequeue_video = ffmpeg_dequeue_video,
+	.flush = ffmpeg_flush,
 	.release = ffmpeg_release,
 };

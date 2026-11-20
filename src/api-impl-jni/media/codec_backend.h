@@ -71,6 +71,7 @@ struct atl_codec_backend {
 	 * ATL_CODEC_AGAIN / ATL_CODEC_EOS / ATL_CODEC_ERROR. */
 	struct atl_video_frame *(*dequeue_video)(struct atl_codec *codec, int *status);
 
+	void (*flush)(struct atl_codec *codec);
 	void (*release)(struct atl_codec *codec);
 };
 

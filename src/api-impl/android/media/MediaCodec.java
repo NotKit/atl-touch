@@ -269,7 +269,17 @@ public class MediaCodec {
 		return format;
 	}
 
-	public void flush() {}
+	public void flush() {
+		if (encoder) return;
+		if (native_codec == 0) throw new IllegalStateException("codec is released");
+		native_flush(native_codec, outputBuffers);
+		freeInputBuffers.clear();
+		for (int i = 0; i < inputBuffers.length; i++) freeInputBuffers.add(i);
+		queuedInputBuffers.clear();
+		freeOutputBuffers.clear();
+		for (int i = 0; i < outputBuffers.length; i++) freeOutputBuffers.add(i);
+		outputFormatSet = false;
+	}
 
 	private void tryProcessInputBuffer() {
 		Integer index = queuedInputBuffers.peek();
@@ -357,6 +367,7 @@ public class MediaCodec {
 	private native int native_queueInputBuffer(long codec, ByteBuffer buffer, long presentationTimeUs);
 	private native int native_dequeueOutputBuffer(long codec, ByteBuffer buffer, BufferInfo info);
 	private native void native_releaseOutputBuffer(long codec, ByteBuffer buffer, boolean render);
+	private native void native_flush(long codec, ByteBuffer[] outputBuffers);
 	private native void native_release(long codec);
 
 	public static final class CryptoException extends RuntimeException {

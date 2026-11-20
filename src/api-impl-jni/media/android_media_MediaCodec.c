@@ -202,6 +202,19 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 	(*env)->DeleteLocalRef(env, bitmap);
 }
 
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1flush(JNIEnv *env, jobject this, jlong ptr, jobjectArray buffers)
+{
+	struct atl_media_codec *mc = _PTR(ptr);
+	if (mc->backend->is_video(mc->codec)) {
+		for (jsize i = 0; i < (*env)->GetArrayLength(env, buffers); i++) {
+			jobject buffer = (*env)->GetObjectArrayElement(env, buffers, i);
+			Java_android_media_MediaCodec_native_1releaseOutputBuffer(env, this, ptr, buffer, JNI_FALSE);
+			(*env)->DeleteLocalRef(env, buffer);
+		}
+	}
+	mc->backend->flush(mc->codec);
+}
+
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1release(JNIEnv *env, jobject this, jlong ptr)
 {
 	struct atl_media_codec *mc = _PTR(ptr);
