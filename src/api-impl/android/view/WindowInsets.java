@@ -1,4 +1,8 @@
 package android.view;
+import android.graphics.Rect;
+import android.view.DisplayCutout;
+import java.util.List;
+
 
 import android.graphics.Insets;
 
@@ -296,7 +300,31 @@ public class WindowInsets {
 		public WindowInsets build() {
 			return new WindowInsets(typeInsets.clone(), typeVisible.clone(), displayCutout, round);
 		}
-	}
+	
+		public Builder setPrivacyIndicatorBounds(Rect bounds) {
+			return this;
+		}
+
+		public Builder setAlwaysConsumeSystemBars(boolean alwaysConsumeSystemBars) {
+			return this;
+		}
+
+		public Builder setForceConsumingTypes(int forceConsumingTypes) {
+			return this;
+		}
+
+		public Builder setBoundingRects(int typeMask, List<Rect> rects) {
+			return this;
+		}
+
+		public Builder setBoundingRectsIgnoringVisibility(int typeMask, List<Rect> rects) {
+			return this;
+		}
+
+		public Builder setFrame(int width, int height) {
+			return this;
+		}
+}
 
 	/* Copyright (C) 2014 The Android Open Source Project */
 	public static final class Type {
