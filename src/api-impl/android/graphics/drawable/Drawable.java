@@ -15,7 +15,6 @@
  */
 
 package android.graphics.drawable;
-import android.atl.GskCanvas;
 import android.content.res.XmlResourceParser;
 import android.util.LayoutDirection;
 import java.nio.file.Files;

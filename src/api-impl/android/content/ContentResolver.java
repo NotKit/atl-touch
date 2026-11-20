@@ -89,9 +89,6 @@ public class ContentResolver {
 	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
 		notifyChange(uri, observer);
 	}
-	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
-		notifyChange(uri, observer);
-	}
 	public int getUserId() {
 		return 0;
 	}

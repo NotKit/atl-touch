@@ -23,6 +23,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class AndroidKeyStore extends KeyStoreSpi {
 
 	private final static String TAG = "AndroidKeyStore";
+	static final java.util.Map<String, Key> map = new java.util.concurrent.ConcurrentHashMap<>();
 	private static final java.util.Map<String, byte[]> sessionKeys = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private static native void nativeSetKey(String package_name, String alias, byte[] encoded);
@@ -36,7 +37,7 @@ public class AndroidKeyStore extends KeyStoreSpi {
 		if (data == null)
 			data = sessionKeys.get(alias);
 		if (data == null)
-			return null;
+			return map.get(alias);
 		ByteBuffer buffer = ByteBuffer.wrap(data);
 		byte[] algorithmBytes = new byte[buffer.getInt()];
 		buffer.get(algorithmBytes);
@@ -114,7 +115,7 @@ public class AndroidKeyStore extends KeyStoreSpi {
 	@Override
 	public boolean engineIsKeyEntry(String alias) {
 		byte[] data = nativeGetKey(ATLLoadedApp.getPrimaryApplication().getApplication().getPackageName(), alias);
-		return data != null || sessionKeys.containsKey(alias);
+		return data != null || sessionKeys.containsKey(alias) || map.containsKey(alias);
 	}
 
 	@Override

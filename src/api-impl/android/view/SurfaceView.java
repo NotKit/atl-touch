@@ -1,6 +1,4 @@
 package android.view;
-import android.atl.GskCanvas;
-import android.atl.annotation.Export;
 
 
 import android.content.Context;

@@ -77,5 +77,4 @@ public class Vibrator {
 	private native void native_vibrate(int fd, long millis);
 	private native int native_constructor();
 
-	public void cancel() { }
 }

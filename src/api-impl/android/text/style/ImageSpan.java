@@ -269,8 +269,4 @@ public class ImageSpan extends DynamicDrawableSpan {
         return mSource;
     }
 
-	@Override
-	public int getSize(Paint paint, CharSequence text, int start, int end, Paint.FontMetricsInt fm) {
-		return drawable.getIntrinsicWidth();
-	}
 }

@@ -202,6 +202,8 @@ public class PopupMenu {
 	}
 
 	private class MenuImpl implements Menu {
+		@Override
+		public void close() { PopupMenu.this.dismiss(); }
 		long menu = native_init();
 
 		List<MenuItemImpl> items = new ArrayList<>();

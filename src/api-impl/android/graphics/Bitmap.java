@@ -1,5 +1,4 @@
 package android.graphics;
-import android.atl.annotation.Export;
 
 import android.os.Parcelable;
 
