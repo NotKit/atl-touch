@@ -68,7 +68,7 @@ public class ShortcutInfo implements Parcelable {
 		public Builder setShortLabel(CharSequence shortLabel) {
 			return this;
 		}
-	
+
 		public Builder setLocusId(LocusId locusId) {
 			return this;
 		}

@@ -51,7 +51,7 @@ public class Person {
 		public Builder setImportant(boolean important) { person.important = important; return this; }
 
 		public Person build() { return person; }
-	
+
 		private CharSequence mName;
 
 		private Icon mIcon;

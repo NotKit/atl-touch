@@ -47,7 +47,7 @@ public class DownloadManager {
 		public Request addRequestHeader(String header, String value) { return this; }
 
 		public Request setAllowedNetworkTypes(int flags) { return this; }
-	
+
 		public Request setDestinationInExternalFilesDir(Context context, String dirType, String path) { return this; }
 }
 

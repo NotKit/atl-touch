@@ -93,7 +93,7 @@ public class KeyGenParameterSpec implements AlgorithmParameterSpec {
 		public KeyGenParameterSpec build() {
 			return spec;
 		}
-	
+
 		public Builder setCertificateSerialNumber(BigInteger serialNumber) {
 			return this;
 		}

@@ -300,7 +300,7 @@ public class WindowInsets {
 		public WindowInsets build() {
 			return new WindowInsets(typeInsets.clone(), typeVisible.clone(), displayCutout, round);
 		}
-	
+
 		public Builder setPrivacyIndicatorBounds(Rect bounds) {
 			return this;
 		}

@@ -41,7 +41,7 @@ public class MediaDescription implements Parcelable {
 		public MediaDescription build() {
 			return description;
 		}
-	
+
 		public Builder setMediaUri(Uri mediaUri) { return this; }
 }
 }
