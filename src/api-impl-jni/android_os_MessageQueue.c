@@ -50,6 +50,7 @@ static GSource *source = NULL;
 void prepare_main_looper(JNIEnv *env)
 {
 	main_thread_id = g_thread_self();
+	main_thread_looper = ALooper_prepare(0);
 
 	(*env)->CallStaticVoidMethod(env, handle_cache.looper.class, handle_cache.looper.prepareMainLooper);
 	if ((*env)->ExceptionCheck(env)) {

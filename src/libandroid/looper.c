@@ -2,7 +2,11 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include <glib.h>
+
 #include "looper.h"
+
+ALooper *main_thread_looper;
 
 // dummy strong pointer class
 struct sp {
@@ -63,9 +67,45 @@ int ALooper_pollOnce(int timeoutMillis, int *outFd, int *outEvents, void **outDa
 	return _ZN7android6Looper8pollOnceEiPiS1_PPv(looper, timeoutMillis, outFd, outEvents, outData);
 }
 
+struct fd_source {
+	GSource source;
+	gpointer tag;
+	Looper_callbackFunc callback;
+	void *data;
+};
+
+static gboolean dispatch_func(GSource *source, GSourceFunc callback, gpointer user_data)
+{
+	struct fd_source *fd_source = (struct fd_source *)source;
+	int fd = GPOINTER_TO_INT(user_data);
+	GIOCondition gevents = g_source_query_unix_fd(source, fd_source->tag);
+	// glib and Android event mask are almost compatible. Except that glib has an additional
+	// priority intput event on the second bit shifting all later bits by one.
+	int events = (gevents & G_IO_IN) | ((gevents & ~G_IO_IN) >> 1);
+	return fd_source->callback(fd, events, fd_source->data);
+}
+
+static GSourceFuncs source_funcs = {
+	.dispatch = dispatch_func,
+};
+
 int _ZN7android6Looper5addFdEiiiPFiiiPvES1_(ALooper *this, int fd, int ident, int events, Looper_callbackFunc callback, void *data);
 int ALooper_addFd(ALooper *looper, int fd, int ident, int events, Looper_callbackFunc callback, void *data)
 {
+	if (looper == main_thread_looper && callback) {
+		g_source_remove_by_funcs_user_data(&source_funcs, GINT_TO_POINTER(fd));
+		struct fd_source *source = (struct fd_source *)g_source_new(&source_funcs, sizeof(struct fd_source));
+		source->callback = callback;
+		source->data = data;
+		// glib and Android event mask are almost compatible. Except that glib has an additional
+		// priority intput event on the second bit shifting all later bits by one.
+		GIOCondition gevents = (events & ALOOPER_EVENT_INPUT) | ((events & ~ALOOPER_EVENT_INPUT) << 1);
+		source->tag = g_source_add_unix_fd(&source->source, fd, gevents);
+		g_source_set_callback(&source->source, NULL, GINT_TO_POINTER(fd), NULL); // func can be NULL, as we handle everything in the dispatch_func
+		g_source_attach(&source->source, NULL);
+		g_source_unref(&source->source);
+		return 1;
+	}
 	return _ZN7android6Looper5addFdEiiiPFiiiPvES1_(looper, fd, ident, events, callback, data);
 }
 
@@ -78,6 +118,8 @@ void ALooper_wake(ALooper *looper)
 int _ZN7android6Looper8removeFdEi(ALooper *this, int fd);
 int ALooper_removeFd(ALooper *looper, int fd)
 {
+	if (looper == main_thread_looper)
+		return g_source_remove_by_funcs_user_data(&source_funcs, GINT_TO_POINTER(fd));
 	return _ZN7android6Looper8removeFdEi(looper, fd);
 }
 
