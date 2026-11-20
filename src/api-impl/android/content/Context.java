@@ -592,10 +592,11 @@ public abstract class Context {
 	public boolean canLoadUnsafeResources() { return true; }
 
 	public File getDatabasePath(String dbName) {
-		File databaseDir = new File(getDataDirFile(), "databases");
-		if (!databaseDir.exists())
-			databaseDir.mkdirs();
-		return new File(databaseDir, dbName);
+		File file = new File(dbName);
+		if (!file.isAbsolute()) file = new File(new File(getDataDirFile(), "databases"), dbName);
+		File parent = file.getParentFile();
+		if (parent != null) parent.mkdirs();
+		return file;
 	}
 
 	public void sendBroadcast(Intent intent) {

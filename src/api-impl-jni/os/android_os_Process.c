@@ -17,11 +17,10 @@ JNIEXPORT jint JNICALL Java_android_os_Process_getThreadPriority(JNIEnv *env, jc
 	return getpriority(PRIO_PROCESS, tid);
 }
 
-/* CPU time this process has used, which is what AOSP reports here */
 JNIEXPORT jlong JNICALL Java_android_os_Process_getElapsedCpuTime(JNIEnv *env, jclass this)
 {
 	struct timespec now;
-
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now);
-	return (jlong)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+	if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &now) != 0)
+		return 0;
+	return now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
