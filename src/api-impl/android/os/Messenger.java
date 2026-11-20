@@ -58,7 +58,7 @@ public final class Messenger implements Parcelable {
 	 */
 	public IBinder getBinder() {
 		// return mTarget.asBinder();
-		return new IBinder() {
+		return new Binder() {
 			@Override
 			public String getInterfaceDescriptor() {
 				return "android.os.IMessenger";
