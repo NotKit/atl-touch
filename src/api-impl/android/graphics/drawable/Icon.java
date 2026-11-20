@@ -6,7 +6,7 @@ import android.graphics.Bitmap;
 public class Icon {
 
 	public static Icon createWithResource(String packageName, int resourceId) {
-		return null;
+		return new Icon();
 	}
 
 	public static Icon createWithResource(Context context, int resourceId) {
@@ -14,11 +14,12 @@ public class Icon {
 	}
 
 	public static Icon createWithBitmap(Bitmap bitmap) {
-		return null;
+		return new Icon();
 	}
 
 	/* no adaptive-icon masking here; the bitmap is taken as-is */
 	public static Icon createWithAdaptiveBitmap(Bitmap bitmap) {
 		return createWithBitmap(bitmap);
 	}
+	public Drawable loadDrawable(Context context) { return new ColorDrawable(); }
 }

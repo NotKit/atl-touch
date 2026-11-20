@@ -176,6 +176,7 @@ public class ContentProviderOperation implements Parcelable {
 			}
 		}
 		final String[] selectionArgs = resolveSelectionArgs();
+		if (mType == TYPE_ASSERT) return new ContentProviderResult(0);
 		if (mType == TYPE_INSERT) {
 			final Uri newUri = provider.insert(mUri, values);
 			if (newUri == null)

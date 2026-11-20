@@ -34,7 +34,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 public class LayoutInflater {
 	private static final String TAG = "LayoutInflater";
 
-	private static HashMap<String, Constructor<? extends View>> constructorCache = new HashMap<>();
+	private static final HashMap<ClassLoader, HashMap<String, Constructor<? extends View>>> constructorCache = new HashMap<>();
 
 	/* pretty print for debugging */
 	private int indent = 1;
@@ -91,16 +91,22 @@ public class LayoutInflater {
 		if (Log.isLoggable(TAG, Log.VERBOSE))
 			Slog.v(TAG, tabs(indent) + "createView(" + name + ", " + prefix + ", " + attrs + ");");
 
-		Constructor<? extends View> constructor = constructorCache.get(name);
-		if (constructor == null) {
-			String view_class_name = prefix != null ? prefix + name : name;
-			ClassLoader classLoader = context.getClassLoader();
-			if (classLoader == null)
-				classLoader = ClassLoader.getSystemClassLoader();
-			Class<? extends View> view_class = Class.forName(view_class_name, false, classLoader).asSubclass(View.class);
-
-			constructor = view_class.getConstructor(Context.class, AttributeSet.class);
-			constructorCache.put(name, constructor);
+		String viewClassName = prefix != null ? prefix + name : name;
+		ClassLoader classLoader = context.getClassLoader();
+		if (classLoader == null) classLoader = ClassLoader.getSystemClassLoader();
+		Constructor<? extends View> constructor;
+		synchronized (constructorCache) {
+			HashMap<String, Constructor<? extends View>> cache = constructorCache.get(classLoader);
+			if (cache == null) {
+				cache = new HashMap<>();
+				constructorCache.put(classLoader, cache);
+			}
+			constructor = cache.get(viewClassName);
+			if (constructor == null) {
+				Class<? extends View> viewClass = Class.forName(viewClassName, false, classLoader).asSubclass(View.class);
+				constructor = viewClass.getConstructor(Context.class, AttributeSet.class);
+				cache.put(viewClassName, constructor);
+			}
 		}
 
 		Context context = this.context;
