@@ -782,7 +782,24 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public final void offsetDescendantRectToMyCoords(View descendant, Rect rect) {
-		// FIXME
+		offsetRect(descendant, rect, 1);
+	}
+
+	public final void offsetRectIntoDescendantCoords(View descendant, Rect rect) {
+		offsetRect(descendant, rect, -1);
+	}
+
+	private void offsetRect(View descendant, Rect rect, int direction) {
+		int x = 0, y = 0;
+		View child = descendant;
+		while (child != this) {
+			if (child == null || !(child.getParent() instanceof View))
+				throw new IllegalArgumentException("view is not a descendant");
+			x += child.getLeft() - child.getScrollX();
+			y += child.getTop() - child.getScrollY();
+			child = (View)child.getParent();
+		}
+		rect.offset(direction * x, direction * y);
 	}
 
 	public boolean getClipToPadding() { return false; }

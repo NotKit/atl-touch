@@ -105,8 +105,10 @@ JNIEXPORT void JNICALL Java_android_os_MemoryFile_native_1close(JNIEnv *env, jcl
 {
 	int fd = (*env)->CallStaticIntMethod(env, handle_cache.file_descriptor.utils_class, handle_cache.file_descriptor.getInt, fdObj);
 
-	if (fd >= 0)
+	if (fd >= 0) {
 		close(fd);
+		(*env)->CallStaticVoidMethod(env, handle_cache.file_descriptor.utils_class, handle_cache.file_descriptor.setInt, fdObj, -1);
+	}
 }
 
 JNIEXPORT jint JNICALL Java_android_os_MemoryFile_native_1read(JNIEnv *env, jclass this, jobject fdObj, jint address, jbyteArray buffer, jint srcOffset, jint destOffset, jint count, jboolean isUnpinned)

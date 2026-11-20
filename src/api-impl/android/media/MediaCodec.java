@@ -271,7 +271,8 @@ public class MediaCodec {
 
 	public void flush() {
 		if (encoder) return;
-		if (native_codec == 0) throw new IllegalStateException("codec is released");
+		if (native_codec == 0 || inputBuffers == null)
+			throw new IllegalStateException("codec is not configured");
 		native_flush(native_codec, outputBuffers);
 		freeInputBuffers.clear();
 		for (int i = 0; i < inputBuffers.length; i++) freeInputBuffers.add(i);
