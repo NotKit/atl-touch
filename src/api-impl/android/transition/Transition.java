@@ -82,4 +82,8 @@ public class Transition {
 	public Animator createAnimator(ViewGroup sceneRoot, TransitionValues startValues, TransitionValues endValues) {
 		return null;
 	}
+
+	public Transition addTarget(String targetName) {
+		return this;
+	}
 }

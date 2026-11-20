@@ -295,4 +295,10 @@ public class Window {
 	private static native void set_jobject(long ptr, Window obj);
 	private native void remove_gtk_background(long native_window);
 	private native void set_screen_brightness(float brightness);
+
+	public void setSharedElementEnterTransition(Transition transition) {}
+
+	public Transition getEnterTransition() {
+		return null;
+	}
 }

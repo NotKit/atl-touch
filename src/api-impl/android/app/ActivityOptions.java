@@ -17,4 +17,8 @@ public class ActivityOptions {
 	public Bundle toBundle() {
 		return null;
 	}
+
+	public static ActivityOptions makeBasic() {
+		return new ActivityOptions();
+	}
 }

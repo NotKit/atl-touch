@@ -12,4 +12,8 @@ public class TrafficStats {
 	public static long getUidTxBytes(int uid) {
 		return -1;
 	}
+
+	public static int getThreadStatsTag() {
+		return 0;
+	}
 }

@@ -1,4 +1,6 @@
 package android.view;
+import android.atl.GskCanvas;
+
 
 import android.R;
 import android.animation.LayoutTransition;
@@ -981,4 +983,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	private android.view.animation.LayoutAnimationController mLayoutAnimationController;
+
+	public boolean addStatesFromChildren() { return false; }
 }

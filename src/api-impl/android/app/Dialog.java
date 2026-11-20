@@ -1,4 +1,7 @@
 package android.app;
+import android.graphics.Rect;
+import android.view.ViewGroup;
+
 
 import android.R;
 import android.content.Context;
@@ -383,4 +386,8 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	}
 
 	public void setOnKeyListener(OnKeyListener onKeyListener) {}
+
+	public View getCurrentFocus() {
+		return null;
+	}
 }
