@@ -1,4 +1,6 @@
 package android.media;
+import android.os.Handler;
+
 
 public class AudioManager {
 	public static final String PROPERTY_OUTPUT_FRAMES_PER_BUFFER = "android.media.property.OUTPUT_FRAMES_PER_BUFFER";

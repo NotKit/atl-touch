@@ -1,4 +1,6 @@
 package android.text.util;
+import java.util.regex.Pattern;
+
 
 import java.util.regex.Matcher;
 
@@ -24,4 +26,6 @@ public class Linkify {
 	public interface TransformFilter {
 		String transformUrl(Matcher match, String url);
 	}
+
+	public static final boolean addLinks(Spannable text, Pattern urlPattern, String urlScheme) { return true; }
 }
