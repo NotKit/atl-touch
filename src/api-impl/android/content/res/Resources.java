@@ -111,8 +111,7 @@ public class Resources {
 	private ThemedResourceCache<Drawable.ConstantState> mDrawableCacheInternal = new ThemedResourceCache<Drawable.ConstantState>() {
 		@Override
 		protected boolean shouldInvalidateEntry(Drawable.ConstantState entry, int configChanges) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'shouldInvalidateEntry'");
+			return Configuration.needNewResources(configChanges, entry.getChangingConfigurations());
 		}
 	};
 	/*package*/ Object mDrawableCache = Build.VERSION.SDK_INT < 23
@@ -122,8 +121,7 @@ public class Resources {
 	/*package*/ final ThemedResourceCache<Drawable.ConstantState> mColorDrawableCache = new ThemedResourceCache<Drawable.ConstantState>() {
 		@Override
 		protected boolean shouldInvalidateEntry(Drawable.ConstantState entry, int configChanges) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'shouldInvalidateEntry'");
+			return Configuration.needNewResources(configChanges, entry.getChangingConfigurations());
 		}
 	};
 	/*package*/ boolean mPreloading;
@@ -2398,7 +2396,7 @@ public class Resources {
 				//Log.i(TAG, "Returning cached drawable @ #" +
 				//        Integer.toHexString(((Integer)key).intValue())
 				//        + " in " + this + ": " + entry);
-				return entry.newDrawable(this);
+				return entry.newDrawable(this, theme);
 			}
 		}
 		return null;
