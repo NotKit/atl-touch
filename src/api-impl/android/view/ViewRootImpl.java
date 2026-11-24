@@ -794,6 +794,10 @@ public class ViewRootImpl implements ViewParent {
 		android.view.inputmethod.InputMethodManager.onWindowFocusChanged(hasFocus, focusedView);
 	}
 
+	protected void setRenderingActive(boolean active) {
+		Choreographer.getInstance().setFramesEnabled(active);
+	}
+
 	public View getFocusedView() {
 		return focusedView;
 	}

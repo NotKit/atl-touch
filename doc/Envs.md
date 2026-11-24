@@ -190,6 +190,13 @@ Editors expose Copy, Cut, Paste and Select all on long press and through Ctrl+C/
 
 ---
 
+`ATL_DEBUG_RENDER=1` - report slow frames and rendering suspension/resumption with frame counters.
+                       Unfocused, hidden and minimized windows stop drawing. The main thread's
+                       Choreographer callbacks wait while all windows are inactive; handlers keep
+                       running. A first frame maps a new window, and reactivation forces a full redraw.
+
+---
+
 `ATL_DUMP_HIERARCHY=1` - prints every View in every window with its class, id, bounds, measured size,
                          visibility and (for a TextView) its text. It is the substitute for a screenshot
                          on a device where nothing can capture one; accumulate the parents' left/top for

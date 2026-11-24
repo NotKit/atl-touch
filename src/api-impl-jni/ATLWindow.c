@@ -45,11 +45,15 @@ struct ATLWindow {
 	jmethodID dispatch_ime_get_selection;
 	jmethodID dispatch_im_initiated_hide;
 	jmethodID dispatch_window_focus_changed;
+	jmethodID set_rendering_active;
 	jobject window_jobj;    // weak ref to the java android.view.Window
 	bool needs_redraw;
 	/* redraw everything: set by native-initiated invalidations (resize, show,
 	 * WebView frames, ...) that have no ViewRootImpl.mDirty damage rect */
 	bool full_redraw;
+	bool presented;
+	bool rendering_active;
+	unsigned long rendered_frames;
 	bool pointer_down;
 	double pointer_x, pointer_y;
 	int layout_width, layout_height;
@@ -666,6 +670,10 @@ static void atl_window_notify_focus(ATLWindow *window, bool has_focus);
 static void on_window_focus(GLFWwindow *glfw_window, int focused)
 {
 	ATLWindow *window = glfwGetWindowUserPointer(glfw_window);
+	if (focused) {
+		window->needs_redraw = true;
+		window->full_redraw = true;
+	}
 	if (window == windows) /* the window IME events are routed to, see atl_window_hide */
 		atl_window_notify_focus(window, focused != 0);
 }
@@ -1716,6 +1724,7 @@ static void atl_window_render(ATLWindow *window)
 	window->in_render = true;
 	atl_window_render_inner(window);
 	window->in_render = false;
+	window->rendered_frames++;
 }
 
 /* --- event pump on the GLib main loop --- */
@@ -1788,13 +1797,43 @@ static gboolean atl_windows_tick(gpointer user_data)
 			}
 		}
 	}
+	bool active = false;
+	ATLWindow *root = NULL;
 	for (ATLWindow *window = windows; window; window = window->next) {
+		if (!window->view_root)
+			continue;
+		root = window;
+		/* Wayland needs the first buffer before the compositor can focus us. */
+		bool render = glfwGetWindowAttrib(window->glfw_window, GLFW_VISIBLE)
+		              && !glfwGetWindowAttrib(window->glfw_window, GLFW_ICONIFIED)
+		              && (glfwGetWindowAttrib(window->glfw_window, GLFW_FOCUSED) || !window->presented);
+		if (render != window->rendering_active) {
+			window->rendering_active = render;
+			if (render) {
+				window->needs_redraw = true;
+				window->full_redraw = true;
+			}
+			if (debug_render())
+				fprintf(stderr, "ATLWindow: rendering %s window=%p frames=%lu\n",
+				        render ? "active" : "suspended", (void *)window, window->rendered_frames);
+		}
+		active |= render;
+		if (!render)
+			continue;
 		if (window->needs_redraw)
 			atl_window_render(window);
+		window->presented = window->canvas != NULL;
 		/* not inside the render path: an idle window still owes the toplevel
 		 * this commit, and a frame with no damage never reaches a present */
 		if (window->toplevel_resync)
 			atl_window_resync_toplevel(window);
+	}
+	static bool frames_enabled = true;
+	if (root && active != frames_enabled) {
+		JNIEnv *env = get_jni_env();
+		(*env)->CallVoidMethod(env, root->view_root, root->set_rendering_active, active ? JNI_TRUE : JNI_FALSE);
+		atl_report_pending_exception(env);
+		frames_enabled = active;
 	}
 	return G_SOURCE_CONTINUE;
 }
@@ -2038,6 +2077,7 @@ void atl_window_set_view_root(ATLWindow *window, JNIEnv *env, jobject view_root)
 	window->dispatch_ime_get_selection = (*env)->GetMethodID(env, view_root_class, "dispatchImeGetSelection", "()Ljava/lang/String;");
 	window->dispatch_im_initiated_hide = (*env)->GetMethodID(env, view_root_class, "dispatchImInitiatedHide", "()V");
 	window->dispatch_window_focus_changed = (*env)->GetMethodID(env, view_root_class, "dispatchWindowFocusChanged", "(Z)V");
+	window->set_rendering_active = (*env)->GetMethodID(env, view_root_class, "setRenderingActive", "(Z)V");
 	window->dirty_field = (*env)->GetFieldID(env, view_root_class, "mDirty", "Landroid/graphics/Rect;");
 	jclass rect_class = (*env)->FindClass(env, "android/graphics/Rect");
 	window->rect_left = (*env)->GetFieldID(env, rect_class, "left", "I");
@@ -2064,6 +2104,7 @@ void atl_window_set_default_size(ATLWindow *window, int width, int height)
 void atl_window_show(ATLWindow *window)
 {
 	glfwShowWindow(window->glfw_window);
+	window->presented = false;
 	window->needs_redraw = true;
 	window->full_redraw = true; // a fresh surface needs a full commit
 }

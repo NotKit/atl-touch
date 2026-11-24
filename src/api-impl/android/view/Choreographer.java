@@ -113,6 +113,7 @@ public final class Choreographer {
 	private CallbackRecord mCallbackPool;
 	private final CallbackQueue[] mCallbackQueues;
 	private boolean mFrameScheduled;
+	private boolean mFramesEnabled = true;
 	private boolean mCallbacksRunning;
 	private long mLastFrameTimeNanos;
 	private long mFrameIntervalNanos;
@@ -400,8 +401,21 @@ public final class Choreographer {
 			return USE_FRAME_TIME ? mLastFrameTimeNanos : System.nanoTime();
 		}
 	}
+	void setFramesEnabled(boolean enabled) {
+		synchronized (mLock) {
+			if (mFramesEnabled == enabled)
+				return;
+			mFramesEnabled = enabled;
+			if (enabled) {
+				scheduleFrameLocked(SystemClock.uptimeMillis());
+			} else {
+				mHandler.removeMessages(MSG_DO_FRAME);
+				mFrameScheduled = false;
+			}
+		}
+	}
 	private void scheduleFrameLocked(long now) {
-		if (!mFrameScheduled) {
+		if (mFramesEnabled && !mFrameScheduled) {
 			mFrameScheduled = true;
 			final long nextFrameTime = Math.max(
 			    mLastFrameTimeNanos / NANOS_PER_MS + sFrameDelay, now);
