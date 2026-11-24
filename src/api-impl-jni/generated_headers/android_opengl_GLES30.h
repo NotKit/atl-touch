@@ -667,6 +667,14 @@ extern "C" {
 #define android_opengl_GLES30_GL_MAP_FLUSH_EXPLICIT_BIT 16L
 #undef android_opengl_GLES30_GL_MAP_UNSYNCHRONIZED_BIT
 #define android_opengl_GLES30_GL_MAP_UNSYNCHRONIZED_BIT 32L
+#undef android_opengl_GLES30_GL_PROGRAM_BINARY_RETRIEVABLE_HINT
+#define android_opengl_GLES30_GL_PROGRAM_BINARY_RETRIEVABLE_HINT 33367L
+#undef android_opengl_GLES30_GL_PROGRAM_BINARY_LENGTH
+#define android_opengl_GLES30_GL_PROGRAM_BINARY_LENGTH 34625L
+#undef android_opengl_GLES30_GL_NUM_PROGRAM_BINARY_FORMATS
+#define android_opengl_GLES30_GL_NUM_PROGRAM_BINARY_FORMATS 34814L
+#undef android_opengl_GLES30_GL_PROGRAM_BINARY_FORMATS
+#define android_opengl_GLES30_GL_PROGRAM_BINARY_FORMATS 34815L
 /*
  * Class:     android_opengl_GLES30
  * Method:    glReadBuffer
@@ -738,6 +746,38 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform3ui
  */
 JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform4ui
   (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetProgramBinary
+ * Signature: (II[II[IILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetProgramBinary__II_3II_3IILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jintArray, jint, jintArray, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetProgramBinary
+ * Signature: (IILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetProgramBinary__IILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jobject, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glProgramBinary
+ * Signature: (IILjava/nio/Buffer;I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glProgramBinary
+  (JNIEnv *, jclass, jint, jint, jobject, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glProgramParameteri
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glProgramParameteri
+  (JNIEnv *, jclass, jint, jint, jint);
 
 #ifdef __cplusplus
 }
